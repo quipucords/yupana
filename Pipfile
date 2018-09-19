@@ -1,0 +1,16 @@
+[[source]]
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+djangorestframework = ">=3.8.2"
+Django = ">=2.1.1"
+django-environ = "*"
+
+[dev-packages]
+pylint = ">=2.1.1"
+autopep8 = ">=1.4"
+
+[requires]
+python_version = "3.6"

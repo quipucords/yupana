@@ -27,34 +27,21 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
-import os
 import environ
+import os
+from .env import ENVIRONMENT
 
 ROOT_DIR = environ.Path(__file__) - 4
 APPS_DIR = ROOT_DIR.path('yupana')
-
-env = environ.Env()
-
-# .env file, should load only in development environment
-READ_DOT_ENV_FILE = env.bool('DJANGO_READ_DOT_ENV_FILE', default=False)
-
-if READ_DOT_ENV_FILE:
-    # Operating System Environment variables have precedence over variables
-    # defined in the .env file, that is to say variables from the .env files
-    # will only be used if not defined as environment variables.
-    env_file = str(ROOT_DIR.path('.env'))
-    print('Loading : {}'.format(env_file))
-    env.read_env(env_file)
-    print('The .env file has been loaded. See base.py for more information')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env('DJANGO_SECRET_KEY',
+SECRET_KEY = ENVIRONMENT.get_value('DJANGO_SECRET_KEY',
                  default='base')
-DEBUG = env.bool('DJANGO_DEBUG', default=False)
-ALLOWED_HOSTS = env('DJANGO_ALLOWED_HOSTS', default=['*'])
+DEBUG = ENVIRONMENT.bool('DJANGO_DEBUG', default=False)
+ALLOWED_HOSTS = ENVIRONMENT.get_value('DJANGO_ALLOWED_HOSTS', default=['*'])
 
 # Logging
 # https://docs.djangoproject.com/en/dev/topics/logging/
@@ -70,7 +57,7 @@ LOGGING = {
     },
     'handlers': {
         'console': {
-            'level': env('DJANGO_CONSOLE_LOG_LEVEL', default='INFO'),
+            'level': ENVIRONMENT.get_value('DJANGO_CONSOLE_LOG_LEVEL', default='INFO'),
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
@@ -78,7 +65,7 @@ LOGGING = {
     'loggers': {
         '': {
             'handlers': ['console', ],
-            'level': env('DJANGO_LOG_LEVEL', default='INFO'),
+            'level': ENVIRONMENT.get_value('DJANGO_LOG_LEVEL', default='INFO'),
         },
     },
 }
@@ -101,6 +88,7 @@ THIRD_PARTY_APPS = [
 
 # Apps specific to this project go here
 LOCAL_APPS = [
+    'api'
 ]
 
 
@@ -180,8 +168,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
 
-STATIC_URL = env('DJANGO_STATIC_URL', default='/static/')
-STATIC_ROOT = env('DJANGO_STATIC_ROOT', default=str(ROOT_DIR.path('static')))
+STATIC_URL = ENVIRONMENT.get_value('DJANGO_STATIC_URL', default='/static/')
+STATIC_ROOT = ENVIRONMENT.get_value('DJANGO_STATIC_ROOT', default=str(ROOT_DIR.path('static')))
 
 # Django Rest Framework
 # http://www.django-rest-framework.org/api-guide/settings/
