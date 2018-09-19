@@ -15,7 +15,24 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-"""API views for import organization"""
-# flake8: noqa
-# pylint: disable=unused-import
-from api.status.views import status
+"""Serializer to capture server status."""
+
+from rest_framework import serializers
+
+from .models import Status
+
+
+class StatusSerializer(serializers.Serializer):
+    """Serializer for the Status model."""
+
+    api_version = serializers.IntegerField()
+    commit = serializers.CharField()
+    modules = serializers.DictField()
+    platform_info = serializers.DictField()
+    python_version = serializers.CharField()
+
+    class Meta:
+        """Metadata for the serializer."""
+
+        model = Status
+        fields = '__all__'
