@@ -15,6 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-from django.db import models
-
-# Create your models here.
+"""API models for import organization."""
+# flake8: noqa
+# pylint: disable=unused-import
+from api.status.models import Status
