@@ -11,6 +11,10 @@ django-environ = "*"
 [dev-packages]
 pylint = ">=2.1.1"
 autopep8 = ">=1.4"
+flake8 = ">=3.5.0"
+tox = ">=3.3.0"
+coverage = ">=4.5.1"
+codecov = ">=2.0.15"
 
 [requires]
 python_version = "3.6"

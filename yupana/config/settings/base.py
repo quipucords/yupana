@@ -27,8 +27,10 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
-import environ
 import os
+
+import environ
+
 from .env import ENVIRONMENT
 
 ROOT_DIR = environ.Path(__file__) - 4
@@ -39,7 +41,7 @@ APPS_DIR = ROOT_DIR.path('yupana')
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = ENVIRONMENT.get_value('DJANGO_SECRET_KEY',
-                 default='base')
+                                   default='base')
 DEBUG = ENVIRONMENT.bool('DJANGO_DEBUG', default=False)
 ALLOWED_HOSTS = ENVIRONMENT.get_value('DJANGO_ALLOWED_HOSTS', default=['*'])
 

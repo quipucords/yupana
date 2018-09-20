@@ -16,7 +16,7 @@
 #
 
 """Settings file meant for local development."""
-from .base import *
+from .base import *  # noqa: F401,F403
 from .env import ENVIRONMENT
 
 DEBUG = ENVIRONMENT.bool('DJANGO_DEBUG', default=True)
