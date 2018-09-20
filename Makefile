@@ -20,6 +20,8 @@ help:
 	@echo "--- Commands using local services ---"
 	@echo "run-migrations           run migrations against database"
 	@echo "serve                    run the Django server locally"
+	@echo "unittest                 run the unit tests"
+	@echo "test-coverage            run the test coverage"
 	@echo "requirements             create requirements.txt for readthedocs"
 
 clean:
@@ -30,6 +32,12 @@ run-migrations:
 
 serve:
 	DJANGO_READ_DOT_ENV_FILE=True $(PYTHON) $(PYDIR)/manage.py runserver
+
+unittest:
+	$(PYTHON) $(PYDIR)/manage.py test $(PYDIR) -v 2
+
+test-coverage:
+	tox -e py36 --
 
 requirements:
 	pipenv lock

@@ -18,4 +18,4 @@
 """API models for import organization."""
 # flake8: noqa
 # pylint: disable=unused-import
-from api.status.models import Status
+from api.status.model import Status

@@ -18,13 +18,11 @@
 
 import logging
 from collections import namedtuple
-from unittest.mock import ANY, Mock, PropertyMock, patch
+from unittest.mock import ANY, Mock, patch
 
 from django.test import TestCase
-from django.urls import reverse
 
-from api.iam.models import Tenant
-from api.status.models import Status
+from api.status.model import Status
 
 
 class StatusModelTest(TestCase):
@@ -46,7 +44,6 @@ class StatusModelTest(TestCase):
     def setUp(self):
         """Create test case setup."""
         super().setUp()
-        Tenant.objects.get_or_create(schema_name='public')
 
     @patch('os.environ')
     def test_commit_with_env(self, mock_os):
@@ -57,7 +54,7 @@ class StatusModelTest(TestCase):
         self.assertEqual(result, expected)
 
     @patch('subprocess.run')
-    @patch('api.status.models.os.environ')
+    @patch('api.status.model.os.environ')
     def test_commit_with_subprocess(self, mock_os, mock_subprocess):
         """Test the commit method via subprocess."""
         expected = 'buildnum'
@@ -98,34 +95,8 @@ class StatusModelTest(TestCase):
         result = self.status_info.modules
         self.assertEqual(result, expected)
 
-    @patch('api.status.models.logger.info')
+    @patch('api.status.model.logger.info')
     def test_startup_with_modules(self, mock_logger):  # pylint: disable=no-self-use
         """Test the startup method with a module list."""
         self.status_info.startup()
-        mock_logger.assert_called_with(ANY, ANY)
-
-    @patch('api.status.models.Status.modules', new_callable=PropertyMock)
-    def test_startup_without_modules(self, mock_mods):  # pylint: disable=no-self-use
-        """Test the startup method without a module list."""
-        mock_mods.return_value = {}
-        expected = 'INFO:api.status.models:Modules: None'
-
-        with self.assertLogs('api.status.models', level='INFO') as logger:
-            self.status_info.startup()
-            self.assertIn(expected, logger.output)
-
-
-class StatusViewTest(TestCase):
-    """Tests the status view."""
-
-    def setUp(self):
-        """Create test case setup."""
-        super().setUp()
-        Tenant.objects.get_or_create(schema_name='public')
-
-    def test_status_endpoint(self):
-        """Test the status endpoint."""
-        url = reverse('server-status')
-        response = self.client.get(url)
-        json_result = response.json()
-        self.assertEqual(json_result['api_version'], 1)
+        mock_logger.assert_called_with(ANY, ANY, ANY)

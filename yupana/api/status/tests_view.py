@@ -14,8 +14,23 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
+"""Test the status API."""
 
-"""API views for import organization"""
-# flake8: noqa
-# pylint: disable=unused-import
-from api.status.view import status
+
+from django.test import TestCase
+from django.urls import reverse
+
+
+class StatusViewTest(TestCase):
+    """Tests the status view."""
+
+    def setUp(self):
+        """Create test case setup."""
+        super().setUp()
+
+    def test_status_endpoint(self):
+        """Test the status endpoint."""
+        url = reverse('server-status')
+        response = self.client.get(url)
+        json_result = response.json()
+        self.assertEqual(json_result['api_version'], 1)

@@ -15,6 +15,24 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-from django.test import TestCase
+"""Serializer to capture server status."""
 
-# Create your tests here.
+from rest_framework import serializers
+
+from .model import Status
+
+
+class StatusSerializer(serializers.Serializer):
+    """Serializer for the Status model."""
+
+    api_version = serializers.IntegerField()
+    commit = serializers.CharField()
+    modules = serializers.DictField()
+    platform_info = serializers.DictField()
+    python_version = serializers.CharField()
+
+    class Meta:
+        """Metadata for the serializer."""
+
+        model = Status
+        fields = '__all__'

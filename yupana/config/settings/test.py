@@ -14,25 +14,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
+"""Settings file meant for running tests."""
+from .base import *  # noqa: F401,F403
+from .env import ENVIRONMENT
 
-"""Serializer to capture server status."""
+DEBUG = ENVIRONMENT.bool('DJANGO_DEBUG', default=False)
+SECRET_KEY = ENVIRONMENT.get_value('DJANGO_SECRET_KEY', default='test')
+TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 
-from rest_framework import serializers
-
-from .models import Status
-
-
-class StatusSerializer(serializers.Serializer):
-    """Serializer for the Status model."""
-
-    api_version = serializers.IntegerField()
-    commit = serializers.CharField()
-    modules = serializers.DictField()
-    platform_info = serializers.DictField()
-    python_version = serializers.CharField()
-
-    class Meta:
-        """Metadata for the serializer."""
-
-        model = Status
-        fields = '__all__'
+LOGGING['handlers']['console']['level'] = 'ERROR'

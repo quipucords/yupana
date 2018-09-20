@@ -24,6 +24,7 @@ from django.db.utils import OperationalError, ProgrammingError
 
 from config.settings.env import ENVIRONMENT
 
+
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 
@@ -51,7 +52,7 @@ class ApiConfig(AppConfig):
     def startup_status(self):  # pylint: disable=R0201
         """Log the status of the server at startup."""
         # noqa: E402 pylint: disable=C0413
-        from api.status.models import Status
+        from api.status.model import Status
         status_info = Status()
 
         status_info.startup()
