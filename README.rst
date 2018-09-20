@@ -17,7 +17,7 @@ This is a Python project developed using Python 3.6. Make sure you have at least
 Development
 ===========
 
-To get started developing against Koku first clone a local copy of the git repository. ::
+To get started developing against Yupana first clone a local copy of the git repository. ::
 
     git clone https://github.com/quipucords/yupana
 
@@ -55,7 +55,7 @@ To run a local dev Django server you can use ::
 Testing and Linting
 -------------------
 
-Koku uses tox to standardize the environment used when running tests. Essentially, tox manages its own virtual environment and a copy of required dependencies to run tests. To ensure a clean tox environment run ::
+Yupana uses tox to standardize the environment used when running tests. Essentially, tox manages its own virtual environment and a copy of required dependencies to run tests. To ensure a clean tox environment run ::
 
     tox -r
 
