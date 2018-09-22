@@ -85,6 +85,8 @@ class Status:
         """Return the non-sensitive envs."""
         env_dict = {}
         for key, value in os.environ.items():
+            if 'password' in key.lower():
+                value = '*' * 8
             env_dict[key] = value
         return env_dict
 

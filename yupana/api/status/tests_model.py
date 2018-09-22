@@ -53,6 +53,21 @@ class StatusModelTest(TestCase):
         result = self.status_info.commit
         self.assertEqual(result, expected)
 
+    @patch('os.environ')
+    def test_env_vars(self, mock_envs):
+        """Test the environment variables."""
+        expected = {
+            'key': 'value',
+            'password': '1234',
+            'good_PassWord': '2345'}
+        mock_envs.items.return_value = expected.items()
+        result = self.status_info.environment_vars
+
+        self.assertNotEqual(result, expected)
+        expected['password'] = '*' * 8
+        expected['good_PassWord'] = '*' * 8
+        self.assertEqual(result, expected)
+
     @patch('subprocess.run')
     @patch('api.status.model.os.environ')
     def test_commit_with_subprocess(self, mock_os, mock_subprocess):
