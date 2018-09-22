@@ -87,7 +87,7 @@ class Status:
         for key, value in os.environ.items():
             if 'password' in key.lower():
                 value = '*' * 8
-                env_dict[key] = value
+            env_dict[key] = value
         return env_dict
 
     def startup(self):
