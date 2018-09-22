@@ -26,12 +26,19 @@ help:
 
 clean:
 	git clean -fdx -e .idea/ -e *env/ $(PYDIR)/db.sqlite3
+	rm -rf yupana/static
 
 run-migrations:
-	DJANGO_READ_DOT_ENV_FILE=True $(PYTHON) $(PYDIR)/manage.py migrate
+	DJANGO_READ_DOT_ENV_FILE=True $(PYTHON) $(PYDIR)/manage.py migrate -v 3
 
 serve:
 	DJANGO_READ_DOT_ENV_FILE=True $(PYTHON) $(PYDIR)/manage.py runserver
+
+server-static:
+	mkdir -p ./yupana/static/client
+	$(PYTHON) yupana/manage.py collectstatic --settings config.settings.local --no-input
+
+server-init: run-migrations server-static
 
 unittest:
 	$(PYTHON) $(PYDIR)/manage.py test $(PYDIR) -v 2

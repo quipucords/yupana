@@ -6,7 +6,8 @@ name = "pypi"
 [packages]
 djangorestframework = ">=3.8.2"
 Django = ">=2.1.1"
-django-environ = "*"
+django-environ = ">=0.4.5"
+gunicorn =">=19.9.0"
 
 [dev-packages]
 pylint = ">=2.1.1"

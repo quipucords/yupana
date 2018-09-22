@@ -49,8 +49,16 @@ Server
 
 To run a local dev Django server you can use ::
 
-    make run-migrations
+    make server-init
     make serve
+
+Run Server with gunicorn
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+To run a local gunicorn server with yupana do the following::
+
+    make server-init
+    gunicorn config.wsgi -c ./yupana/config/gunicorn.py --chdir=./yupana/
 
 Testing and Linting
 -------------------
