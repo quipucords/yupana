@@ -115,3 +115,7 @@ apidoc/*
 
 # static files
 yupana/staticfiles/
+
+# node
+node_modules
+package-lock.json
