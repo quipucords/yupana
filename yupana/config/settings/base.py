@@ -170,12 +170,11 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
 
-STATIC_URL = ENVIRONMENT.get_value('DJANGO_STATIC_URL', default='/static/')
-STATIC_ROOT = ENVIRONMENT.get_value('DJANGO_STATIC_ROOT', default=str(APPS_DIR.path('static')))
-
-STATICFILES_DIRS = (
-    os.path.join(APPS_DIR, 'static/client'),
-)
+STATIC_URL = ENVIRONMENT.get_value('DJANGO_STATIC_URL', default='/apidoc/')
+STATIC_ROOT = ENVIRONMENT.get_value('DJANGO_STATIC_ROOT', default=str(APPS_DIR.path('staticfiles')))
+STATICFILES_DIRS = [
+    os.path.join(APPS_DIR, '..', 'apidoc'),
+]
 
 # Django Rest Framework
 # http://www.django-rest-framework.org/api-guide/settings/

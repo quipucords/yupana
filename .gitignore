@@ -108,3 +108,14 @@ venv.bak/
 
 # Django
 yupana/static/
+
+# apidoc
+apidoc/*
+!apidoc/.apidocignore
+
+# static files
+yupana/staticfiles/
+
+# node
+node_modules
+package-lock.json

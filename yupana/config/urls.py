@@ -35,8 +35,14 @@ Including another URLconf
 from django.conf.urls import include, url
 from django.contrib import admin
 from django.urls import path
+from django.views.generic import RedirectView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     url(r'^api/v1/', include('api.urls')),
+
+    # static files (*.css, *.js, *.jpg, etc.)
+    url(r'^(?!/?apidoc/)(?P<path>.*\..*)$',
+        RedirectView.as_view(url='/apidoc/%(path)s', permanent=False),
+        name='apidoc'),
 ]
