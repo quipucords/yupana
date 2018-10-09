@@ -2,4 +2,6 @@
 django-environ==0.4.5
 django==2.1.2
 djangorestframework==3.8.2
+gunicorn==19.9.0
 pytz==2018.5
+whitenoise==4.1

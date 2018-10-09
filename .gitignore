@@ -119,3 +119,6 @@ yupana/staticfiles/
 # node
 node_modules
 package-lock.json
+
+# Sphinx documentation
+docs/build/

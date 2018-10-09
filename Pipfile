@@ -8,6 +8,7 @@ djangorestframework = ">=3.8.2"
 Django = ">=2.1.2"
 django-environ = ">=0.4.5"
 gunicorn =">=19.9.0"
+whitenoise= ">=4.1"
 
 [dev-packages]
 pylint = ">=2.1.1"
@@ -16,6 +17,9 @@ flake8 = ">=3.5.0"
 tox = ">=3.3.0"
 coverage = ">=4.5.1"
 codecov = ">=2.0.15"
+sphinx-rtd-theme = ">=0.3.0"
+sphinx = ">=1.7.0"
+sphinx-autobuild = ">=0.7.1"
 
 [requires]
 python_version = "3.6"
