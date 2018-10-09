@@ -2,6 +2,8 @@ PYTHON	= $(shell which python)
 
 TOPDIR  = $(shell pwd)
 PYDIR	= yupana
+APIDOC = apidoc
+STATIC = staticfiles
 
 OS := $(shell uname)
 ifeq ($(OS),Darwin)
@@ -23,10 +25,19 @@ help:
 	@echo "unittest                 run the unit tests"
 	@echo "test-coverage            run the test coverage"
 	@echo "requirements             create requirements.txt for readthedocs"
+	@echo "gen-apidoc               create api documentation"
+	@echo "collect-static           collect static files to host"
 
 clean:
 	git clean -fdx -e .idea/ -e *env/ $(PYDIR)/db.sqlite3
 	rm -rf yupana/static
+
+gen-apidoc:
+	rm -fr $(PYDIR)/$(STATIC)/
+	apidoc -i $(PYDIR) -o $(APIDOC)
+
+collect-static:
+	$(PYTHON) $(PYDIR)/manage.py collectstatic --no-input
 
 run-migrations:
 	DJANGO_READ_DOT_ENV_FILE=True $(PYTHON) $(PYDIR)/manage.py migrate -v 3

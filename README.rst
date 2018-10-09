@@ -60,6 +60,22 @@ To run a local gunicorn server with yupana do the following::
     make server-init
     gunicorn config.wsgi -c ./yupana/config/gunicorn.py --chdir=./yupana/
 
+API Documentation Generation
+----------------------------
+
+To generate and host the API documentation locally you need to `Install APIDoc`_.
+
+Generate the project API documentation by running the following command ::
+
+   `make gen-apidoc`
+
+In order to host the docs locally you need to collect the static files ::
+
+   `make collect-static`
+
+Now start the server as described above and point your browser to
+**http://127.0.0.1:8000/apidoc/index.html**
+
 Testing and Linting
 -------------------
 
@@ -82,3 +98,4 @@ To lint the code base ::
 .. |Updates| image:: https://pyup.io/repos/github/quipucords/yupana/shield.svg
    :target: https://pyup.io/repos/github/quipucords/yupana/
 .. |Python 3| image:: https://pyup.io/repos/github/quipucords/yupana/python-3-shield.svg
+.. _`Install APIDoc`: http://apidocjs.com/#install
