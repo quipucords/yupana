@@ -8,6 +8,7 @@ Yupana README
 About
 ~~~~~
 
+Full documentation is available through `readthedocs`_.
 
 Getting Started
 ===============
@@ -94,6 +95,7 @@ To lint the code base ::
     tox -e lint
 
 
+.. _readthedocs: https://yupana.readthedocs.io/en/latest/
 .. |license| image:: https://img.shields.io/github/license/quipucords/yupana.svg
 .. |Updates| image:: https://pyup.io/repos/github/quipucords/yupana/shield.svg
    :target: https://pyup.io/repos/github/quipucords/yupana/
