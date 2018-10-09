@@ -22,6 +22,7 @@ help:
 	@echo "--- Commands using local services ---"
 	@echo "run-migrations           run migrations against database"
 	@echo "serve                    run the Django server locally"
+	@echo "validate-swagger         to run swagger-cli validation"
 	@echo "unittest                 run the unit tests"
 	@echo "test-coverage            run the test coverage"
 	@echo "requirements             create requirements.txt for readthedocs"
@@ -60,3 +61,7 @@ test-coverage:
 requirements:
 	pipenv lock
 	pipenv lock -r > docs/rtd_requirements.txt
+
+validate-swagger:
+	npm install swagger-cli
+	node_modules/swagger-cli/bin/swagger-cli.js validate docs/swagger.yml

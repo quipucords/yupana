@@ -12,6 +12,7 @@ install:
 
 script:
   - tox
+  - make validate-swagger
 
 after_success:
   - codecov
