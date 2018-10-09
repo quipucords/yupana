@@ -71,7 +71,7 @@ Generate the project API documentation by running the following command ::
 
 In order to host the docs locally you need to collect the static files ::
 
-   `make collect-static`
+   `make server-static`
 
 Now start the server as described above and point your browser to
 **http://127.0.0.1:8000/apidoc/index.html**

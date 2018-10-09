@@ -68,4 +68,4 @@ definitions:
       platform_info:
         type: "object"
         description: "name/value string pairs describing the server"
-        example: {"system": "Darwin", "node": "aaiken-OSX.local", "release": "17.0.0", "version": "Darwin Kernel Version 17.0.0", "machine": "x86_64", "processor": "i386"}
+        example: {"system": "Darwin", "node": "jsmith-OSX.local", "release": "17.0.0", "version": "Darwin Kernel Version 17.0.0", "machine": "x86_64", "processor": "i386"}

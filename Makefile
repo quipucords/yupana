@@ -27,7 +27,7 @@ help:
 	@echo "test-coverage            run the test coverage"
 	@echo "requirements             create requirements.txt for readthedocs"
 	@echo "gen-apidoc               create api documentation"
-	@echo "collect-static           collect static files to host"
+	@echo "server-static            collect static files to host"
 
 clean:
 	git clean -fdx -e .idea/ -e *env/ $(PYDIR)/db.sqlite3
