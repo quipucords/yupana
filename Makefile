@@ -1,4 +1,5 @@
 PYTHON	= $(shell which python)
+IMAGE_NAME = yupana-centos7
 
 TOPDIR  = $(shell pwd)
 PYDIR	= yupana
@@ -65,3 +66,12 @@ requirements:
 validate-swagger:
 	npm install swagger-cli
 	node_modules/swagger-cli/bin/swagger-cli.js validate docs/swagger.yml
+
+.PHONY: build
+build:
+	docker build -t $(IMAGE_NAME) .
+
+.PHONY: test
+test:
+	docker build -t $(IMAGE_NAME)-candidate .
+	IMAGE_NAME=$(IMAGE_NAME)-candidate test/run
