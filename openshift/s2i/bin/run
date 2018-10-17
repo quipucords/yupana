@@ -75,7 +75,7 @@ manage_file=$APP_HOME/manage.py
 if should_migrate; then
   if [[ -f "$manage_file" ]]; then
     echo "---> Migrating database ..."
-    python "$manage_file" migrate_schemas --noinput
+    python "$manage_file" migrate --noinput
   else
     echo "WARNING: seems that you're using Django, but we could not find a 'manage.py' file."
     echo "Skipped 'python manage.py migrate'."
@@ -83,12 +83,6 @@ if should_migrate; then
 fi
 
 if is_gunicorn_installed; then
-  if [[ -z "$APP_MODULE" ]]; then
-    # Look only in the directory specified by APP_HOME, or the current directory
-    # replace all "/" with ".", remove leading "." and ".py" suffix
-    APP_MODULE=$(find $APP_HOME -maxdepth 1 -type f -name 'wsgi.py' | sed 's:/:.:g;s:^\.\+::;s:\.py$::')
-  fi
-
   if [[ -z "$APP_MODULE" && -f setup.py ]]; then
     APP_MODULE="$(python setup.py --name)"
   fi
@@ -97,7 +91,7 @@ if is_gunicorn_installed; then
     export WEB_CONCURRENCY=${WEB_CONCURRENCY:-$(get_default_web_concurrency)}
 
     echo "---> Serving application with gunicorn ($APP_MODULE) ..."
-    exec gunicorn "$APP_MODULE" --chdir=$APP_HOME --bind=0.0.0.0:8080 --access-logfile=- --config "$APP_CONFIG"
+    exec gunicorn "$APP_MODULE" -c "./yupana/config/gunicorn.py" --chdir=$APP_HOME --bind=0.0.0.0:8080 --access-logfile=-
   fi
 fi
 
