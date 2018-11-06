@@ -45,8 +45,6 @@ If you'd like to start the cluster and deploy Yupana, run the following:
 
     make oc-up-dev
 
-This will use the templates to create all the objects necessary.
-
 To stop the local cluster run the following:
 
 .. code-block:: bash
