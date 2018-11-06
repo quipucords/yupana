@@ -61,6 +61,12 @@ To run a local gunicorn server with yupana do the following::
     make server-init
     gunicorn config.wsgi -c ./yupana/config/gunicorn.py --chdir=./yupana/
 
+
+Preferred Environment
+---------------------
+
+Please refer to `Working with Openshift`_.
+
 API Documentation Generation
 ----------------------------
 
@@ -101,3 +107,4 @@ To lint the code base ::
    :target: https://pyup.io/repos/github/quipucords/yupana/
 .. |Python 3| image:: https://pyup.io/repos/github/quipucords/yupana/python-3-shield.svg
 .. _`Install APIDoc`: http://apidocjs.com/#install
+.. _`Working with Openshift`: https://yupana.readthedocs.io/en/latest/openshift.html
