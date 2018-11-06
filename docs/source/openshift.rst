@@ -1,7 +1,7 @@
 Working with OpenShift
 ======================
 
-We are currently developing using OpenShift version 3.9. There are different setup requirements for Mac OS and Linux (instructions are provided for Fedora). To install the openshift client, visit https://access.redhat.com/downloads/content/290/ver=3.9/rhel---7/3.9.43/x86_64/product-software and follow the instructions to download the oc archive. Once you have downloaded the archive, unpack it and move the oc binary to a location such as ``/Users/your-user/dev/bin/openshift/``. Now edit your .bash_profile to define PATH as the following::
+We are currently developing using OpenShift version 3.9. There are different setup requirements for Mac OS and Linux (instructions are provided for Fedora). To install the openshift client, visit https://access.redhat.com/downloads/content/290/ver=3.9/rhel---7/3.9.43/x86_64/product-software and follow the instructions to download the oc archive. Once you have downloaded the archive, unpack it and move the oc binary to a location such as ``/Users/your-user/dev/bin/openshift/``. Now edit your .bash_profile to define ``PATH`` as the following::
 
     PATH="PATH_TO_OPENSHIFT_OC/:${PATH}"
     export PATH
@@ -34,6 +34,7 @@ To start the local cluster run the following:
     make oc-up
 
 That will start a barebones OpenShift cluster that will persist configuration between restarts. Once the cluster is running, you can deploy Yupana by running the following:
+
 .. code-block:: bash
 
     make oc-create-yupana
