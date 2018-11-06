@@ -8,10 +8,8 @@ STATIC = staticfiles
 OC_SOURCE = registry.access.redhat.com/openshift3/ose
 OC_VERSION	= v3.9
 OC_DATA_DIR	= ${HOME}/.oc/openshift.local.data
-OPENSHIFT_PROJECT='myproject'
+OPENSHIFT_PROJECT='yupana'
 OPENSHIFT_TEMPLATE_PATH='openshift/yupana-template.yaml'
-OPENSHIFT_SETUP_CONFIG='openshift/setup/console-config.yaml'
-OPENSHIFT_SETUP_TEMPLATE='openshift/setup/console-template.yaml'
 TEMPLATE='yupana-template'
 CODE_REPO='https://github.com/quipucords/yupana.git'
 REPO_BRANCH='issues/11'
@@ -139,6 +137,3 @@ oc-forward-ports:
 	-make oc-stop-forwarding-ports 2>/dev/null
 	oc port-forward $$(oc get pods -o jsonpath='{.items[*].metadata.name}' -l name=koku-pgsql) 15432:5432 >/dev/null 2>&1 &
 
-oc-fix: oc-login-admin
-	oc create namespace openshift-web-console
-	oc process -f ${OPENSHIFT_SETUP_TEMPLATE} -p "API_SERVER_CONFIG=$(cat ${OPENSHIFT_SETUP_CONFIG})" | oc apply -n openshift-web-console -f -
