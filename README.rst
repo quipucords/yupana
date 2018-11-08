@@ -70,7 +70,7 @@ Please refer to `Working with Openshift`_.
 Configuration
 ^^^^^^^^^^^^^
 
-This project is developed using the Django web framework. Many configuration settings can be read in from a `.env` file. An example file `.env.example` is provided in the repository. To use the defaults simply ::
+This project is developed using the Django web framework. Many configuration settings can be read in from a ``.env`` file. An example file ``.env.example`` is provided in the repository. To use the defaults simply ::
 
     cp .env.example .env
 
@@ -99,7 +99,7 @@ There is a known limitation with docker-compose and Linux environments with SELi
 
     "mkdir: cannot create directory '/var/lib/pgsql/data/userdata': Permission denied" can be resolved by granting ./pg_data ownership permissions to uid:26 (postgres user in centos/postgresql-96-centos7)
 
-If a docker container running Postgres is not feasible, it is possible to run Postgres locally as documented in the Postgres tutorial_. The default port for local Postgres installations is `5432`. Make sure to modify the `.env` file accordingly. To initialize the database run ::
+If a docker container running Postgres is not feasible, it is possible to run Postgres locally as documented in the Postgres tutorial_. The default port for local Postgres installations is ``5432``. Make sure to modify the `.env` file accordingly. To initialize the database run ::
 
     make run-migrations
 
