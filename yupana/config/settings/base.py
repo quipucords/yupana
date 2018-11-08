@@ -129,12 +129,38 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
+engines = {
+    'sqlite': 'django.db.backends.sqlite3',
+    'postgresql': 'django.db.backends.postgresql',
+    'mysql': 'django.db.backends.mysql',
+}
+
+service_name = ENVIRONMENT.get_value('DATABASE_SERVICE_NAME',
+                                         default='').upper().replace('-', '_')
+if service_name:
+    engine = engines.get(ENVIRONMENT.get_value('DATABASE_ENGINE'),
+                         engines['postgresql'])
+else:
+    engine = engines['sqlite']
+
+name = ENVIRONMENT.get_value('DATABASE_NAME', default=None)
+
+if not name and engine == engines['sqlite']:
+    name = os.path.join(APPS_DIR, 'db.sqlite3')
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(APPS_DIR, 'db.sqlite3'),
-    }
+    'ENGINE': engine,
+    'NAME': name,
+    'USER': ENVIRONMENT.get_value('DATABASE_USER', default=None),
+    'PASSWORD': ENVIRONMENT.get_value('DATABASE_PASSWORD', default=None),
+    'HOST': ENVIRONMENT.get_value('{}_SERVICE_HOST'.format(service_name),
+                                  default=None),
+    'PORT': ENVIRONMENT.get_value('{}_SERVICE_PORT'.format(service_name),
+                                  default=None),
+}
+
+DATABASES = {
+    'default': DATABASES
 }
 
 

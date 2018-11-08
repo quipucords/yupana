@@ -12,8 +12,9 @@ OPENSHIFT_PROJECT='yupana'
 OPENSHIFT_TEMPLATE_PATH='openshift/yupana-template.yaml'
 TEMPLATE='yupana-template'
 CODE_REPO='https://github.com/quipucords/yupana.git'
-REPO_BRANCH='issues/11'
+REPO_BRANCH='master'
 EMAIL_SERVICE_PASSWORD=$EMAIL_SERVICE_PASSWORD
+PGSQL_VERSION   = 9.6
 
 OS := $(shell uname)
 ifeq ($(OS),Darwin)
@@ -54,6 +55,12 @@ clean:
 gen-apidoc:
 	rm -fr $(PYDIR)/$(STATIC)/
 	apidoc -i $(PYDIR) -o $(APIDOC)
+
+html:
+	@cd docs; $(MAKE) html
+
+lint:
+	tox -elint
 
 collect-static:
 	$(PYTHON) $(PYDIR)/manage.py collectstatic --no-input
@@ -123,7 +130,22 @@ oc-apply:
 
 oc-up-dev: oc-up oc-project oc-apply oc-new-app
 
+oc-create-all: oc-login-developer oc-project oc-create-tags oc-apply oc-new-app
+
 oc-create-yupana: oc-login-developer oc-project oc-apply oc-new-app
+
+oc-create-tags:
+	oc get istag postgresql:$(PGSQL_VERSION) || oc create istag postgresql:$(PGSQL_VERSION) --from-image=centos/postgresql-96-centos7
+
+oc-create-db:
+	oc process openshift//postgresql-persistent \
+		-p NAMESPACE=yupana \
+		-p POSTGRESQL_USER=yupanaadmin \
+		-p POSTGRESQL_PASSWORD=admin123 \
+		-p POSTGRESQL_DATABASE=yupana \
+		-p POSTGRESQL_VERSION=$(PGSQL_VERSION) \
+		-p DATABASE_SERVICE_NAME=yupana-pgsql \
+	| oc create -f -
 
 oc-run-migrations: oc-forward-ports
 	sleep 3
@@ -135,5 +157,22 @@ oc-stop-forwarding-ports:
 
 oc-forward-ports:
 	-make oc-stop-forwarding-ports 2>/dev/null
-	oc port-forward $$(oc get pods -o jsonpath='{.items[*].metadata.name}' -l name=koku-pgsql) 15432:5432 >/dev/null 2>&1 &
+	oc port-forward $$(oc get pods -o jsonpath='{.items[*].metadata.name}' -l name=yupana-pgsql) 15432:5432 >/dev/null 2>&1 &
 
+remove-db:
+	$(PREFIX) rm -rf $(TOPDIR)/pg_data
+
+start-db:
+	docker-compose up -d db
+
+stop-compose:
+	docker-compose down
+
+reinitdb: stop-compose remove-db start-db run-migrations
+
+oc-up-db: oc-up oc-create-db
+
+serve-with-oc: oc-forward-ports
+	sleep 3
+	DJANGO_READ_DOT_ENV_FILE=True $(PYTHON) $(PYDIR)/manage.py runserver
+	make oc-stop-forwarding-ports
