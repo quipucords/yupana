@@ -122,3 +122,10 @@ package-lock.json
 
 # Sphinx documentation
 docs/build/
+
+# Local Postgres data
+pg_data/
+postgres
+
+# Ignore pycharm data
+.idea/*

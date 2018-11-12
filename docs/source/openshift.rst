@@ -33,13 +33,13 @@ To start the local cluster run the following:
 
     make oc-up
 
-That will start a barebones OpenShift cluster that will persist configuration between restarts. Once the cluster is running, you can deploy Yupana by running the following:
+That will start a barebones OpenShift cluster that will persist configuration between restarts. Once the cluster is running, you can deploy Yupana and PostgreSQL by running the following:
 
 .. code-block:: bash
 
     make oc-create-yupana
 
-If you'd like to start the cluster and deploy Yupana, run the following:
+If you'd like to start the cluster, deploy Yupana, and deploy PostgreSQL, run the following:
 
 .. code-block:: bash
 
@@ -59,7 +59,22 @@ If you'd like to remove all your saved settings for your cluster, you can run th
 
     make oc-clean
 
-There are also other make targets available to step through the project deployment.
+There are also other make targets available to step through the project deployment. You can run the entire application and its dependent services through Openshift, or just the dependent services can be spun up, while using the local Django dev server.
+
+.. code-block:: bash
+
+    # Run everything through Openshift
+    make oc-up-all
+
+    # Run just a database in Openshift, while running the server locally
+    make oc-up-db
+
+    # Run Django migrations to initialize the database
+    make oc-server-migrate
+
+    # Run the Django server locally with access to the OpenShift database
+    make serve-with-oc
+
 
 Fedora
 ------
