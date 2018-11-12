@@ -31,7 +31,7 @@ help:
 	@echo "help                     show this message"
 	@echo ""
 	@echo "--- Commands using local services ---"
-	@echo "run-migrations           run migrations against database"
+	@echo "server-migrate           run migrations against database"
 	@echo "serve                    run the Django server locally"
 	@echo "validate-swagger         to run swagger-cli validation"
 	@echo "unittest                 run the unit tests"
@@ -39,6 +39,10 @@ help:
 	@echo "requirements             create requirements.txt for readthedocs"
 	@echo "gen-apidoc               create api documentation"
 	@echo "server-static            collect static files to host"
+	@echo "start-db                 start postgres db"
+	@echo "clean-db                 remove postgres db"
+	@echo "reinit-db                remove db and start a new one"
+	@echo "server-migrate           run migrations"
 	@echo ""
 	@echo "--- Commands using an OpenShift Cluster ---"
 	@echo "oc-clean                 stop openshift cluster & remove local config data"
@@ -46,6 +50,9 @@ help:
 	@echo "oc-up-dev                run app in openshift cluster"
 	@echo "oc-down                  stop app & openshift cluster"
 	@echo "oc-create-yupana         create the Yupana app in an initialized openshift cluster"
+	@echo "oc-login-admin           login to openshift as admin"
+	@echo "oc-login-developer       login to openshift as developer"
+	@echo "oc-server-migrate        run migrations"
 
 
 clean:
@@ -65,7 +72,7 @@ lint:
 collect-static:
 	$(PYTHON) $(PYDIR)/manage.py collectstatic --no-input
 
-run-migrations:
+server-migrate:
 	DJANGO_READ_DOT_ENV_FILE=True $(PYTHON) $(PYDIR)/manage.py migrate -v 3
 
 serve:
@@ -75,7 +82,7 @@ server-static:
 	mkdir -p ./yupana/static/client
 	$(PYTHON) yupana/manage.py collectstatic --settings config.settings.local --no-input
 
-server-init: run-migrations server-static
+server-init: server-migrate server-static
 
 unittest:
 	$(PYTHON) $(PYDIR)/manage.py test $(PYDIR) -v 2
@@ -147,7 +154,7 @@ oc-create-db:
 		-p DATABASE_SERVICE_NAME=yupana-pgsql \
 	| oc create -f -
 
-oc-run-migrations: oc-forward-ports
+oc-server-migrate: oc-forward-ports
 	sleep 3
 	DJANGO_READ_DOT_ENV_FILE=True $(PYTHON) $(PYDIR)/manage.py migrate
 	make oc-stop-forwarding-ports
@@ -159,16 +166,17 @@ oc-forward-ports:
 	-make oc-stop-forwarding-ports 2>/dev/null
 	oc port-forward $$(oc get pods -o jsonpath='{.items[*].metadata.name}' -l name=yupana-pgsql) 15432:5432 >/dev/null 2>&1 &
 
-remove-db:
+clean-db:
 	$(PREFIX) rm -rf $(TOPDIR)/pg_data
+	make down-compose
 
 start-db:
 	docker-compose up -d db
 
-stop-compose:
+down-compose:
 	docker-compose down
 
-reinitdb: stop-compose remove-db start-db run-migrations
+reinitdb: down-compose clean-db start-db server-migrate
 
 oc-up-db: oc-up oc-create-db
 

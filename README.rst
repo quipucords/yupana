@@ -86,7 +86,7 @@ PostgreSQL is used as the database backend for Yupana. A docker-compose file is 
     make start-db
 
     # This will run Django's migrations against the database
-    make run-migrations
+    make server-migrate
 
     # This will stop and remove a currently running database and run the above commands. If this command fails, try running each command it combines separately, using ``docker ps`` in between to track the existence of the db ::
     make reinitdb
@@ -101,7 +101,7 @@ There is a known limitation with docker-compose and Linux environments with SELi
 
 If a docker container running Postgres is not feasible, it is possible to run Postgres locally as documented in the Postgres tutorial_. The default port for local Postgres installations is ``5432``. Make sure to modify the `.env` file accordingly. To initialize the database run ::
 
-    make run-migrations
+    make server-migrate
 
 
 API Documentation Generation

@@ -70,7 +70,7 @@ There are also other make targets available to step through the project deployme
     make oc-up-db
 
     # Run Django migrations to initialize the database
-    make oc-run-migrations
+    make oc-server-migrate
 
     # Run the Django server locally with access to the OpenShift database
     make serve-with-oc
