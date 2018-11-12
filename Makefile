@@ -168,15 +168,15 @@ oc-forward-ports:
 
 clean-db:
 	$(PREFIX) rm -rf $(TOPDIR)/pg_data
-	make down-compose
+	make compose-down
 
 start-db:
 	docker-compose up -d db
 
-down-compose:
+compose-down:
 	docker-compose down
 
-reinitdb: down-compose clean-db start-db server-migrate
+reinitdb: compose-down clean-db start-db server-migrate
 
 oc-up-db: oc-up oc-create-db
 
