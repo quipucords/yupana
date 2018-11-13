@@ -18,7 +18,7 @@ You can access the deployment jobs via `Jenkins`_. The job for ci is called ``de
 Deployment
 ==========
 
-If you make changes to the deployment `template <openshift/yupana-template.yaml>`_, you must delete the yupana app within subscriptions-ci and subscriptions-qa projects and redeploy via Jenkins. You can do this by completing the following steps ::
+If you make changes to the deployment `template <../openshift/yupana-template.yaml>`_, you must delete the yupana app within subscriptions-ci and subscriptions-qa projects and redeploy via Jenkins. You can do this by completing the following steps ::
 
     oc login https://api.insights-dev.openshift.com:443 --token=<your-token>
     oc project subscriptions-ci
