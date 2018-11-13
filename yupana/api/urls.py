@@ -15,8 +15,8 @@
 #
 """Describes the urls and patterns for the API application."""
 from django.conf.urls import include, url
-from rest_framework.routers import DefaultRouter
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+from rest_framework.routers import DefaultRouter
 
 from api.views import (status)
 
