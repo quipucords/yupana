@@ -16,6 +16,7 @@
 """Describes the urls and patterns for the API application."""
 from django.conf.urls import include, url
 from rest_framework.routers import DefaultRouter
+from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 
 from api.views import (status)
 
@@ -26,3 +27,5 @@ urlpatterns = [
     url(r'^status/$', status, name='server-status'),
     url(r'^', include(ROUTER.urls))
 ]
+
+urlpatterns += staticfiles_urlpatterns()
