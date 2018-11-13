@@ -2,7 +2,7 @@
 Yupana README
 =============
 
-|license| |Build Status| |codecov| |Updates| |Python 3| |Docs|
+|license| |Updates| |Python 3|
 
 ~~~~~
 About
