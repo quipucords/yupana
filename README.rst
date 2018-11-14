@@ -89,13 +89,13 @@ To run a local gunicorn server with yupana do the following::
 
 
 Preferred Environment
----------------------
+^^^^^^^^^^^^^^^^^^^^^
 
 Please refer to `Working with Openshift`_.
 
 
 API Documentation Generation
-----------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 To generate and host the API documentation locally you need to `Install APIDoc`_.
 
@@ -111,7 +111,7 @@ Now start the server as described above and point your browser to
 **http://127.0.0.1:8000/apidoc/index.html**
 
 Testing and Linting
--------------------
+^^^^^^^^^^^^^^^^^^^
 
 Yupana uses tox to standardize the environment used when running tests. Essentially, tox manages its own virtual environment and a copy of required dependencies to run tests. To ensure a clean tox environment run ::
 
