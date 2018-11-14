@@ -42,7 +42,6 @@ help:
 	@echo "start-db                 start postgres db"
 	@echo "clean-db                 remove postgres db"
 	@echo "reinit-db                remove db and start a new one"
-	@echo "server-migrate           run migrations"
 	@echo ""
 	@echo "--- Commands using an OpenShift Cluster ---"
 	@echo "oc-clean                 stop openshift cluster & remove local config data"
@@ -176,7 +175,7 @@ start-db:
 compose-down:
 	docker-compose down
 
-reinitdb: compose-down clean-db start-db server-migrate
+reinit-db: compose-down clean-db start-db server-migrate
 
 oc-up-db: oc-up oc-create-db
 

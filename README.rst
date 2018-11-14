@@ -44,6 +44,32 @@ This project is developed using the Django web framework. Many configuration set
 
 Modify as you see fit.
 
+Database
+^^^^^^^^
+
+PostgreSQL is used as the database backend for Yupana. A docker-compose file is provided for creating a local database container. If modifications were made to the .env file the docker-compose file will need to be modified to ensure matching database credentials. Several commands are available for interacting with the database. ::
+
+    # This will launch a Postgres container
+    make start-db
+
+    # This will run Django's migrations against the database
+    make server-migrate
+
+    # This will stop and remove a currently running database and run the above commands. If this command fails, try running each command it combines separately, using ``docker ps`` in between to track the existence of the db ::
+    make reinit-db
+
+Assuming the default .env file values are used, to access the database directly using psql run ::
+
+    psql postgres -U postgres -h localhost -p 15432
+
+There is a known limitation with docker-compose and Linux environments with SELinux enabled. You may see the following error during the postgres container deployment::
+
+    "mkdir: cannot create directory '/var/lib/pgsql/data/userdata': Permission denied" can be resolved by granting ./pg_data ownership permissions to uid:26 (postgres user in centos/postgresql-96-centos7)
+
+If a docker container running Postgres is not feasible, it is possible to run Postgres locally as documented in the Postgres tutorial_. The default port for local Postgres installations is ``5432``. Make sure to modify the `.env` file accordingly. To initialize the database run ::
+
+    make server-migrate
+
 
 Server
 ^^^^^^
@@ -66,42 +92,6 @@ Preferred Environment
 ---------------------
 
 Please refer to `Working with Openshift`_.
-
-Configuration
-^^^^^^^^^^^^^
-
-This project is developed using the Django web framework. Many configuration settings can be read in from a ``.env`` file. An example file ``.env.example`` is provided in the repository. To use the defaults simply ::
-
-    cp .env.example .env
-
-
-Modify as you see fit.
-
-Database
-^^^^^^^^
-
-PostgreSQL is used as the database backend for Yupana. A docker-compose file is provided for creating a local database container. If modifications were made to the .env file the docker-compose file will need to be modified to ensure matching database credentials. Several commands are available for interacting with the database. ::
-
-    # This will launch a Postgres container
-    make start-db
-
-    # This will run Django's migrations against the database
-    make server-migrate
-
-    # This will stop and remove a currently running database and run the above commands. If this command fails, try running each command it combines separately, using ``docker ps`` in between to track the existence of the db ::
-    make reinitdb
-
-Assuming the default .env file values are used, to access the database directly using psql run ::
-
-    psql postgres -U postgres -h localhost -p 15432
-
-There is a known limitation with docker-compose and Linux environments with SELinux enabled. You may see the following error during the postgres container deployment::
-
-    "mkdir: cannot create directory '/var/lib/pgsql/data/userdata': Permission denied" can be resolved by granting ./pg_data ownership permissions to uid:26 (postgres user in centos/postgresql-96-centos7)
-
-If a docker container running Postgres is not feasible, it is possible to run Postgres locally as documented in the Postgres tutorial_. The default port for local Postgres installations is ``5432``. Make sure to modify the `.env` file accordingly. To initialize the database run ::
-
-    make server-migrate
 
 
 API Documentation Generation
