@@ -209,3 +209,15 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
     'PAGE_SIZE': 10,
 }
+
+# Override the initial ingest requirement to allow INITIAL_INGEST_NUM_MONTHS
+INGEST_OVERRIDE = False if os.getenv('INITIAL_INGEST_OVERRIDE', 'False') == 'False' else True
+
+# Insights Kafka messaging address
+INSIGHTS_KAFKA_HOST = os.getenv('INSIGHTS_KAFKA_HOST', 'localhost')
+
+# Insights Kafka messaging address
+INSIGHTS_KAFKA_PORT = os.getenv('INSIGHTS_KAFKA_PORT', '29092')
+
+# Insights Kafka server address
+INSIGHTS_KAFKA_ADDRESS = f'{INSIGHTS_KAFKA_HOST}:{INSIGHTS_KAFKA_PORT}'
