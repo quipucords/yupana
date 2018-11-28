@@ -25,6 +25,9 @@ if [ -z "$BUILD_CONFIG" ]; then
       --param NAMESPACE=${OPENSHIFT_PROJECT} \
       --param SOURCE_REPOSITORY_URL=${GIT_URL} \
       --param SOURCE_REPOSITORY_REF=${GIT_BRANCH} \
+      --param KAFKA_HOST=${KAFKA_HOST} \
+      --param KAFKA_PORT=${KAFKA_PORT} \
+      --param KAFKA_NAMESPACE=${KAFKA_NAMESPACE} \
 
   echo "Find build id"
   BUILD_ID=`oc get builds | grep ${APP_NAME} | tail -1 | awk '{print $1}'`

@@ -88,7 +88,7 @@ objects:
     app-module: ${APP_MODULE}
     app-namespace: ${NAMESPACE}
     app-domain: ${APP_DOMAIN}
-    insights-kafka-server-host: ${KAFKA_HOST}.${NAMESPACE}.svc
+    insights-kafka-server-host: ${KAFKA_HOST}.${KAFKA_NAMESPACE}.svc
     insights-kafka-server-port: ${KAFKA_PORT}
     log-level: INFO
 - apiVersion: v1
@@ -579,3 +579,8 @@ parameters:
   name: KAFKA_PORT
   required: true
   value: "29092"
+- description: Insights Upload Server namespace
+  displayName: Kafka server namespace
+  name: KAFKA_NAMESPACE
+  required: true
+  value: yupana
