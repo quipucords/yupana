@@ -23,10 +23,8 @@ import threading
 
 from aiokafka import AIOKafkaConsumer
 from kafka.errors import ConnectionError as KafkaConnectionError
-from config.settings.base import (INGEST_OVERRIDE,
-                                  INSIGHTS_KAFKA_ADDRESS,
-                                  INSIGHTS_KAFKA_HOST,
-                                  INSIGHTS_KAFKA_PORT)
+
+from config.settings.base import INSIGHTS_KAFKA_ADDRESS
 
 LOG = logging.getLogger(__name__)
 EVENT_LOOP = asyncio.get_event_loop()
@@ -96,7 +94,6 @@ async def process_messages():  # pragma: no cover
     while True:
         msg = await MSG_PENDING_QUEUE.get()
         handle_message(msg)
-
 
 
 async def listen_for_messages(consumer):  # pragma: no cover
