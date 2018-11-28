@@ -25,7 +25,6 @@ import tempfile
 import threading
 from tarfile import ReadError, TarFile
 
-# import requests
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from kafka.errors import ConnectionError as KafkaConnectionError
 
@@ -53,34 +52,32 @@ INSIGHTS_KAFKA_ADDRESS = f'{INSIGHTS_KAFKA_HOST}:{INSIGHTS_KAFKA_PORT}'
 
 class KafkaMsgHandlerError(Exception):
     """Kafka msg handler error."""
+
     pass
 
 
 def extract_payload(url):
     """
     Extract QPC report payload into local directory structure.
+
     Payload is expected to be a .tar.gz file that contains:
     1. *.json - qpc deployments report
     Args:
         url (String): URL path to payload in the Insights upload service..
     Returns:
         None
+
     """
     # Create temporary directory for initial file staging and verification
     temp_dir = tempfile.mkdtemp()
 
-    # Download file from quarantine bucket as tar.gz
-    # try:
-    #     download_response = requests.get(url)
-    #     download_response.raise_for_status()
-    # except requests.exceptions.HTTPError as err:
-    #     shutil.rmtree(temp_dir)
-    #     raise KafkaMsgHandlerError('Unable to download file. Error: ', str(err))
+    # TODO: Download file from quarantine bucket as tar.gz (see masu)
 
     temp_file = '{}/{}'.format(temp_dir, 'qpc_report.tar.gz')
     try:
         temp_file_hdl = open('{}/{}'.format(temp_dir, 'qpc_report.tar.gz'), 'wb')
-        temp_file_hdl.write(download_response.content)
+        # TODO: write downloaded content to a temp file
+        # temp_file_hdl.write(download_response.content)
         temp_file_hdl.close()
     except (OSError, IOError) as error:
         shutil.rmtree(temp_dir)
@@ -109,6 +106,7 @@ def extract_payload(url):
 async def send_confirmation(file_hash, status):  # pragma: no cover
     """
     Send kafka validation message to Insights Upload service.
+
     When a new file lands for topic 'qpc' we must validate it
     so that it will be made permanently available to other
     apps listening on the 'platform.upload.available' topic.
@@ -140,8 +138,8 @@ async def send_confirmation(file_hash, status):  # pragma: no cover
 
 def handle_message(msg):
     """
-    Handles messages from pending queue with topics:
-    'platform.upload.qpc', and 'platform.upload.available'.
+    Handle messages from pending queue with QPC_TOPIC & AVALIABLE_TOPIC.
+
     The QPC report payload will land on the qpc topic.
     These messages will be extracted into the local report
     directory structure.  Once the file has been verified
@@ -188,6 +186,7 @@ def handle_message(msg):
 async def process_messages():  # pragma: no cover
     """
     Process asyncio MSG_PENDING_QUEUE and send validation status.
+
     Args:
         None
     Returns:
@@ -204,6 +203,7 @@ async def process_messages():  # pragma: no cover
 async def listen_for_messages(consumer):  # pragma: no cover
     """
     Listen for messages on the available and qpc topics.
+
     Once a message from one of these topics arrives, we add
     them to the MSG_PENDING_QUEUE.
     Args:
@@ -230,6 +230,7 @@ async def listen_for_messages(consumer):  # pragma: no cover
 def asyncio_worker_thread(loop):  # pragma: no cover
     """
     Worker thread function to run the asyncio event loop.
+
     Args:
         None
     Returns:
@@ -252,6 +253,7 @@ def asyncio_worker_thread(loop):  # pragma: no cover
 def initialize_kafka_handler():  # pragma: no cover
     """
     Create asyncio tasks and daemon thread to run event loop.
+
     Args:
         None
     Returns:
