@@ -88,6 +88,9 @@ objects:
     app-module: ${APP_MODULE}
     app-namespace: ${NAMESPACE}
     app-domain: ${APP_DOMAIN}
+    insights-kafka-server-host: ${KAFKA_HOST}.${NAMESPACE}.svc
+    insights-kafka-server-port: ${KAFKA_PORT}
+    log-level: INFO
 - apiVersion: v1
   kind: Service
   metadata:
@@ -273,6 +276,18 @@ objects:
                   name: yupana-env
                   key: app-domain
                   optional: true
+            - name: INSIGHTS_KAFKA_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: yupana-env
+                  key: insights-kafka-server-host
+                  optional: false
+            - name: INSIGHTS_KAFKA_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: yupana-env
+                  key: insights-kafka-server-port
+                  optional: false
           livenessProbe:
             failureThreshold: 3
             httpGet:
@@ -554,3 +569,13 @@ parameters:
   description: Whether to upgrade pip to latest
   name: UPGRADE_PIP_TO_LATEST
   value: ''
+- description: Insights Upload Server address
+  displayName: Kafka server address
+  name: KAFKA_HOST
+  required: true
+  value: localhost
+- description: Insights Upload Server port
+  displayName: Kafka server port
+  name: KAFKA_PORT
+  required: true
+  value: "29092"
