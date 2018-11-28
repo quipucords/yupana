@@ -12,7 +12,7 @@ OPENSHIFT_PROJECT='yupana'
 OPENSHIFT_TEMPLATE_PATH='openshift/yupana-template.yaml'
 TEMPLATE='yupana-template'
 CODE_REPO='https://github.com/quipucords/yupana.git'
-REPO_BRANCH='issues/29'
+REPO_BRANCH='master'
 EMAIL_SERVICE_PASSWORD=$EMAIL_SERVICE_PASSWORD
 PGSQL_VERSION   = 9.6
 
