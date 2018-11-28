@@ -25,7 +25,7 @@ import tempfile
 import threading
 from tarfile import ReadError, TarFile
 
-import requests
+# import requests
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from kafka.errors import ConnectionError as KafkaConnectionError
 
@@ -70,12 +70,12 @@ def extract_payload(url):
     temp_dir = tempfile.mkdtemp()
 
     # Download file from quarantine bucket as tar.gz
-    try:
-        download_response = requests.get(url)
-        download_response.raise_for_status()
-    except requests.exceptions.HTTPError as err:
-        shutil.rmtree(temp_dir)
-        raise KafkaMsgHandlerError('Unable to download file. Error: ', str(err))
+    # try:
+    #     download_response = requests.get(url)
+    #     download_response.raise_for_status()
+    # except requests.exceptions.HTTPError as err:
+    #     shutil.rmtree(temp_dir)
+    #     raise KafkaMsgHandlerError('Unable to download file. Error: ', str(err))
 
     temp_file = '{}/{}'.format(temp_dir, 'qpc_report.tar.gz')
     try:
