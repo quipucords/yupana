@@ -41,6 +41,7 @@ class ApiConfig(AppConfig):
         try:
             self.startup_status()
             self.check_and_create_service_admin()
+            self.start_kafka_consumer()
         except (OperationalError, ProgrammingError) as op_error:
             if 'no such table' in str(op_error) or \
                     'does not exist' in str(op_error):
@@ -70,6 +71,12 @@ class ApiConfig(AppConfig):
                                       service_email,
                                       service_pass)
         logger.info('Created Service Admin: %s.', service_email)
+
+    def start_kafka_consumer(self):
+        """Start the kafka consumer."""
+        from processor.kafka_msg_handler import initialize_kafka_handler
+        logger.info('Initializing the kafka messaging handler.')
+        initialize_kafka_handler()
 
     def check_and_create_service_admin(self):  # pylint: disable=R0201
         """Check for the service admin and create it if necessary."""
