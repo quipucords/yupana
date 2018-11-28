@@ -19,14 +19,14 @@
 import asyncio
 import json
 import logging
-import os
-import shutil
-import tempfile
 import threading
-from tarfile import ReadError, TarFile
 
-from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+from aiokafka import AIOKafkaConsumer
 from kafka.errors import ConnectionError as KafkaConnectionError
+from config.settings.base import (INGEST_OVERRIDE,
+                                  INSIGHTS_KAFKA_ADDRESS,
+                                  INSIGHTS_KAFKA_HOST,
+                                  INSIGHTS_KAFKA_PORT)
 
 LOG = logging.getLogger(__name__)
 EVENT_LOOP = asyncio.get_event_loop()
@@ -37,103 +37,11 @@ VALIDATION_TOPIC = 'platform.upload.validation'
 SUCCESS_CONFIRM_STATUS = 'success'
 FAILURE_CONFIRM_STATUS = 'failure'
 
-# Override the initial ingest requirement to allow INITIAL_INGEST_NUM_MONTHS
-INGEST_OVERRIDE = False if os.getenv('INITIAL_INGEST_OVERRIDE', 'False') == 'False' else True
-
-# Insights Kafka messaging address
-INSIGHTS_KAFKA_HOST = os.getenv('INSIGHTS_KAFKA_HOST', 'localhost')
-
-# Insights Kafka messaging address
-INSIGHTS_KAFKA_PORT = os.getenv('INSIGHTS_KAFKA_PORT', '29092')
-
-# Insights Kafka server address
-INSIGHTS_KAFKA_ADDRESS = f'{INSIGHTS_KAFKA_HOST}:{INSIGHTS_KAFKA_PORT}'
-
 
 class KafkaMsgHandlerError(Exception):
     """Kafka msg handler error."""
 
     pass
-
-
-def extract_payload(url):
-    """
-    Extract QPC report payload into local directory structure.
-
-    Payload is expected to be a .tar.gz file that contains:
-    1. *.json - qpc deployments report
-    Args:
-        url (String): URL path to payload in the Insights upload service..
-    Returns:
-        None
-
-    """
-    # Create temporary directory for initial file staging and verification
-    temp_dir = tempfile.mkdtemp()
-
-    # TODO: Download file from quarantine bucket as tar.gz (see masu)
-
-    temp_file = '{}/{}'.format(temp_dir, 'qpc_report.tar.gz')
-    try:
-        temp_file_hdl = open('{}/{}'.format(temp_dir, 'qpc_report.tar.gz'), 'wb')
-        # TODO: write downloaded content to a temp file
-        # temp_file_hdl.write(download_response.content)
-        temp_file_hdl.close()
-    except (OSError, IOError) as error:
-        shutil.rmtree(temp_dir)
-        raise KafkaMsgHandlerError('Unable to write file. Error: ', str(error))
-
-    # Extract tarball into temp directory
-    try:
-        mytar = TarFile.open(temp_file)
-        mytar.extractall(path=temp_dir)
-    except ReadError as error:
-        LOG.error('Unable to untar file. Reason: %s', str(error))
-        shutil.rmtree(temp_dir)
-        raise KafkaMsgHandlerError('Extraction failure.')
-
-    # Open the report json file and build the payload dictionary.
-    # TODO: write function to build payload dictionary
-    # report_meta = utils.get_report_details(temp_dir)
-
-    # TODO: validate that the payload is a deployments report
-    # validate_report(report_meta)
-
-    # Remove temporary directory and files
-    shutil.rmtree(temp_dir)
-
-
-async def send_confirmation(file_hash, status):  # pragma: no cover
-    """
-    Send kafka validation message to Insights Upload service.
-
-    When a new file lands for topic 'qpc' we must validate it
-    so that it will be made permanently available to other
-    apps listening on the 'platform.upload.available' topic.
-    Args:
-        file_hash (String): Hash for file being confirmed.
-        status (String): Either 'success' or 'failure'
-    Returns:
-        None
-    """
-    producer = AIOKafkaProducer(
-        loop=EVENT_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
-    )
-    try:
-        await producer.start()
-    except (KafkaConnectionError, TimeoutError):
-        await producer.stop()
-        raise KafkaMsgHandlerError('Unable to connect to kafka server.  Closing producer.')
-
-    try:
-        validation = {
-            'hash': file_hash,
-            'validation': status
-        }
-        msg = bytes(json.dumps(validation), 'utf-8')
-        await producer.send_and_wait(VALIDATION_TOPIC, msg)
-    finally:
-        await producer.stop()
 
 
 def handle_message(msg):
@@ -158,19 +66,12 @@ def handle_message(msg):
         None
     """
     if msg.topic == QPC_TOPIC:
-        value = json.loads(msg.value.decode('utf-8'))
         try:
-            print('\n\n\nValue: ')
-            print(value)
-            print('\n\n')
-            print(msg)
-            LOG.info('Message placed on topic "%s": %s', (QPC_TOPIC, value))
-            # TODO extract the message payload
-            # extract_payload(value['url'])
-            return SUCCESS_CONFIRM_STATUS
+            message = 'The following message was placed on the "%s" topic: %s' % (QPC_TOPIC, msg)
+            LOG.info(message)
+            print(message)
         except KafkaMsgHandlerError as error:
             LOG.error('Unable to extract payload. Error: %s', str(error))
-            return FAILURE_CONFIRM_STATUS
 
     elif msg.topic == AVAILABLE_TOPIC:
         value = json.loads(msg.value.decode('utf-8'))
@@ -194,10 +95,8 @@ async def process_messages():  # pragma: no cover
     """
     while True:
         msg = await MSG_PENDING_QUEUE.get()
-        status = handle_message(msg)
-        if status:
-            value = json.loads(msg.value.decode('utf-8'))
-            await send_confirmation(value['hash'], status)
+        handle_message(msg)
+
 
 
 async def listen_for_messages(consumer):  # pragma: no cover
