@@ -74,7 +74,8 @@ class ApiConfig(AppConfig):
 
     def start_kafka_consumer(self):
         """Start the kafka consumer."""
-        from kafka.kafka_msg_handler import initialize_kafka_handler
+        from processor.kafka_msg_handler import initialize_kafka_handler
+        logger.info('Initializing the kafka messaging handler.')
         initialize_kafka_handler()
 
     def check_and_create_service_admin(self):  # pylint: disable=R0201
