@@ -19,8 +19,11 @@
 import asyncio
 import json
 import logging
+import tarfile
 import threading
+from io import BytesIO
 
+import requests
 from aiokafka import AIOKafkaConsumer
 from kafka.errors import ConnectionError as KafkaConnectionError
 
@@ -40,6 +43,92 @@ class KafkaMsgHandlerError(Exception):
     """Kafka msg handler error."""
 
     pass
+
+
+def extract_tar_gz(file_like_obj):
+    """Retrieve the contents of a tar.gz file like object.
+
+    :param file_like_obj: A hexstring or BytesIO tarball saved in memory
+    with gzip encryption.
+    """
+    file_data = {}
+    try:
+        tar = tarfile.open(fileobj=BytesIO(file_like_obj), mode='r:gz')
+        files_check = tar.getmembers()
+        if len(files_check) > 1:
+            LOG.error('There are multiple files within the uploaded folder.')
+        file = files_check[1]
+        tarfile_obj = tar.extractfile(file)
+        file_data = tarfile_obj.read().decode('utf-8')
+        if '.json' in file.name:
+            try:
+                file_data = json.loads(file_data)
+            except ValueError:
+                LOG.error('File does not contain valid JSON')
+        return file_data
+    except Exception as err:
+        print('Error: %s' % str(err))
+        LOG.error('The file could not be read due to the following error: ', str(err))
+        return file_data
+
+
+def validate_contents(url):
+    """
+    Extract the file response from the url and validate the contents.
+
+    :param url: The url where the file is located.
+    :returns None
+    """
+    try:
+        download_response = requests.get(url)
+        contents = extract_tar_gz(download_response.content)
+        is_valid = verify_report_details(contents)
+        return is_valid
+
+    except requests.exceptions.HTTPError as err:
+        raise KafkaMsgHandlerError('Unable to download file. Error: ', str(err))
+
+
+def verify_report_details(report_contents):
+    """
+    Verify that the report contents are a valid deployments report.
+
+    Args:
+        report_contents (dict): dictionary with report details
+    Returns:
+        boolean regarding report validity
+    """
+    DEPLOYMENTS_REPORT_TYPE = 'deployments'
+    SYSTEM_FINGERPRINTS_KEY = 'system_fingerprints'
+    valid = True
+
+    # validate report id
+    report_id = report_contents.get('report_id', None)
+    if not report_id:
+        # terminate if there is not a report id
+        print('Not a valid QPC report')
+        valid = False
+
+    # validate version type
+    report_version = report_contents.get('report_version', None)
+    if not report_version:
+        # terminate if there is not a report version
+        print('Not a valid QPC report.')
+        valid = False
+
+    # validate report type
+    report_type = report_contents.get('report_type', '')
+    if report_type != DEPLOYMENTS_REPORT_TYPE:
+        # terminate if different from deployments type
+        print('Not a valid QPC report')
+        valid = False
+
+    # validate system fingerprints
+    fingerprints = report_contents.get(SYSTEM_FINGERPRINTS_KEY, None)
+    if not fingerprints:
+        valid = False
+
+    return valid
 
 
 def handle_message(msg):
@@ -63,16 +152,23 @@ def handle_message(msg):
     Returns:
         None
     """
-    if msg.topic == QPC_TOPIC:
-        try:
+    if msg.topic == AVAILABLE_TOPIC:
+
+        value = json.loads(msg.value.decode('utf-8'))
+        service = value.get('service')
+
+        if service == 'available':
+            value = json.loads(msg.value.decode('utf-8'))
             message = 'The following message was placed on the "%s" topic: %s' % (QPC_TOPIC, msg)
             LOG.info(message)
             print(message)
-        except KafkaMsgHandlerError as error:
-            LOG.error('Unable to extract payload. Error: %s', str(error))
+            try:
+                valid = validate_contents(value['url'])
+                print(valid)
+                return valid
+            except KafkaMsgHandlerError as error:
+                LOG.error('Unable to extract payload. Error: %s', str(error))
 
-    elif msg.topic == AVAILABLE_TOPIC:
-        value = json.loads(msg.value.decode('utf-8'))
         # Decide if we want to keep track of confirmed messages.
         # If so we will have to store the hash for qpc topic msg and
         # look for them on a list here to get the validated url.
@@ -93,7 +189,11 @@ async def process_messages():  # pragma: no cover
     """
     while True:
         msg = await MSG_PENDING_QUEUE.get()
-        handle_message(msg)
+        valid = handle_message(msg)
+        if valid:
+            print('The report is valid!')
+        else:
+            print('The report is not valid!')
 
 
 async def listen_for_messages(consumer):  # pragma: no cover
