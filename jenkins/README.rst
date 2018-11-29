@@ -23,8 +23,17 @@ If you make changes to the deployment `template <../openshift/yupana-template.ya
     oc login https://api.insights-dev.openshift.com:443 --token=<your-token>
     oc project subscriptions-ci
     oc delete all -l app=yupana
+    oc delete persistentvolumeclaim yupana-pgsql
+    oc delete configmaps yupana-env
+    oc delete secret yupana-secret
+    oc delete secret yupana-pgsql
+
     oc project subscriptions-qa
     oc delete all -l app=yupana
+    oc delete persistentvolumeclaim yupana-pgsql
+    oc delete configmaps yupana-env
+    oc delete secret yupana-secret
+    oc delete secret yupana-pgsql
 
 After deleting the app, you should visit `Jenkins`_ and choose ``Build Now`` for the ``deploy-yupana-ci/qa`` projects.
 
