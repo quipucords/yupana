@@ -24,7 +24,7 @@ import threading
 from io import BytesIO
 
 import requests
-from aiokafka import AIOKafkaConsumer
+from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from kafka.errors import ConnectionError as KafkaConnectionError
 
 from config.settings.base import INSIGHTS_KAFKA_ADDRESS
@@ -50,40 +50,56 @@ def extract_tar_gz(file_like_obj):
 
     :param file_like_obj: A hexstring or BytesIO tarball saved in memory
     with gzip encryption.
+    :returns file_data or status: Dictionary containing contents of json file or
+        FAILURE status
     """
-    file_data = {}
     try:
         tar = tarfile.open(fileobj=BytesIO(file_like_obj), mode='r:gz')
         files_check = tar.getmembers()
-        if len(files_check) > 1:
-            LOG.error('There are multiple files within the uploaded folder.')
-        file = files_check[1]
-        tarfile_obj = tar.extractfile(file)
-        file_data = tarfile_obj.read().decode('utf-8')
-        if '.json' in file.name:
+        json_files = []
+        for file in files_check:
+            if '.json' in file.name:
+                json_files.append(file)
+        if len(json_files) > 1:
+            LOG.error('Cannot process multiple files.')
+            return FAILURE_CONFIRM_STATUS
+        if json_files:
+            file = json_files[0]
+            tarfile_obj = tar.extractfile(file)
+            file_data = tarfile_obj.read().decode('utf-8')
             try:
                 file_data = json.loads(file_data)
             except ValueError:
-                LOG.error('File does not contain valid JSON')
+                LOG.error('Uploaded file does not contain valid JSON.')
+                return FAILURE_CONFIRM_STATUS
+        else:
+            LOG.error('Uploaded file does not contain a JSON file.')
+            return FAILURE_CONFIRM_STATUS
         return file_data
     except Exception as err:
-        print('Error: %s' % str(err))
-        LOG.error('The file could not be read due to the following error: ', str(err))
-        return file_data
+        LOG.error('Uploaded file could not be read due to the following error: ', str(err))
+        return FAILURE_CONFIRM_STATUS
 
 
 def validate_contents(url):
     """
     Extract the file response from the url and validate the contents.
 
-    :param url: The url where the file is located.
+    :param url: String containing the url where the file is located.
     :returns None
     """
     try:
         download_response = requests.get(url)
         contents = extract_tar_gz(download_response.content)
-        is_valid = verify_report_details(contents)
-        return is_valid
+        if contents == FAILURE_CONFIRM_STATUS:
+            return contents
+        status = verify_report_details(contents)
+        if status == SUCCESS_CONFIRM_STATUS:
+            LOG.info('Uploaded file contained a valid QPC report with report_platform_id "%s".',
+                     contents.get('report_platform_id'))
+        else:
+            LOG.error('Uploaded file does not contain a valid QPC report.')
+        return status
 
     except requests.exceptions.HTTPError as err:
         raise KafkaMsgHandlerError('Unable to download file. Error: ', str(err))
@@ -93,42 +109,44 @@ def verify_report_details(report_contents):
     """
     Verify that the report contents are a valid deployments report.
 
-    Args:
-        report_contents (dict): dictionary with report details
-    Returns:
-        boolean regarding report validity
+    :param report_contents: dictionary with report details
+    :returns success or failure report validity
     """
-    DEPLOYMENTS_REPORT_TYPE = 'deployments'
-    SYSTEM_FINGERPRINTS_KEY = 'system_fingerprints'
-    valid = True
+    status = SUCCESS_CONFIRM_STATUS
+    message = 'Report is missing required field "%s".'
+
+    # validate report_platform_id
+    report_platform_id = report_contents.get('report_platform_id', None)
+    if not report_platform_id:
+        LOG.error(message % 'report_platform_id')
+        status = FAILURE_CONFIRM_STATUS
 
     # validate report id
     report_id = report_contents.get('report_id', None)
     if not report_id:
-        # terminate if there is not a report id
-        print('Not a valid QPC report')
-        valid = False
+        LOG.error(message % 'report_id')
+        status = FAILURE_CONFIRM_STATUS
 
     # validate version type
     report_version = report_contents.get('report_version', None)
     if not report_version:
-        # terminate if there is not a report version
-        print('Not a valid QPC report.')
-        valid = False
+        LOG.error(message % 'report_version')
+        status = FAILURE_CONFIRM_STATUS
 
     # validate report type
     report_type = report_contents.get('report_type', '')
-    if report_type != DEPLOYMENTS_REPORT_TYPE:
-        # terminate if different from deployments type
-        print('Not a valid QPC report')
-        valid = False
+    if report_type != 'deployments':
+        LOG.error('Report has a missing or invalid value for required field "%s".'
+                  % 'report_type')
+        status = FAILURE_CONFIRM_STATUS
 
     # validate system fingerprints
-    fingerprints = report_contents.get(SYSTEM_FINGERPRINTS_KEY, None)
+    fingerprints = report_contents.get('system_fingerprints', None)
     if not fingerprints:
-        valid = False
+        LOG.error(message % 'system_fingerprints')
+        status = FAILURE_CONFIRM_STATUS
 
-    return valid
+    return status
 
 
 def handle_message(msg):
@@ -147,53 +165,77 @@ def handle_message(msg):
     In the future if we want to maintain a URL to our report files
     in the upload service we could look for hashes for files that
     we have previously validated on the qpc topic.
-    Args:
-        None
-    Returns:
-        None
+    :param None
+    :returns None
     """
-    if msg.topic == AVAILABLE_TOPIC:
+    if msg.topic == QPC_TOPIC:
 
         value = json.loads(msg.value.decode('utf-8'))
+        message = 'The following message was placed on the "%s" topic: %s' % (QPC_TOPIC, msg)
+        LOG.info(message)
+        try:
+            status = validate_contents(value['url'])
+            return status
+        except KafkaMsgHandlerError as error:
+            LOG.error('Unable to extract payload. Error: %s', str(error))
+
+    elif msg.topic == AVAILABLE_TOPIC:
+        value = json.loads(msg.value.decode('utf-8'))
         service = value.get('service')
-
-        if service == 'available':
-            value = json.loads(msg.value.decode('utf-8'))
-            message = 'The following message was placed on the "%s" topic: %s' % (QPC_TOPIC, msg)
-            LOG.info(message)
-            print(message)
-            try:
-                valid = validate_contents(value['url'])
-                print(valid)
-                return valid
-            except KafkaMsgHandlerError as error:
-                LOG.error('Unable to extract payload. Error: %s', str(error))
-
         # Decide if we want to keep track of confirmed messages.
         # If so we will have to store the hash for qpc topic msg and
         # look for them on a list here to get the validated url.
-        LOG.info('File available: %s', value['url'])
+        LOG.info('File available: %s for service %s' % (value['url'], service))
     else:
         LOG.error('Unexpected Message')
     return None
+
+
+async def send_confirmation(file_hash, status):  # pragma: no cover
+    """
+    Send kafka validation message to Insights Upload service.
+
+    When a new file lands for topic 'qpc' we must validate it
+    so that it will be made permanently available to other
+    apps listening on the 'available' topic.
+    :param: file_hash (String): Hash for file being confirmed.
+    :param: status (String): Either 'success' or 'failure'
+    :returns None
+    """
+    producer = AIOKafkaProducer(
+        loop=EVENT_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
+    )
+    try:
+        await producer.start()
+    except KafkaConnectionError:
+        await producer.stop()
+        raise KafkaMsgHandlerError('Unable to connect to kafka server.  Closing producer.')
+    try:
+        validation = {
+            'hash': file_hash,
+            'validation': status
+        }
+        msg = bytes(json.dumps(validation), 'utf-8')
+        await producer.send_and_wait('uploadvalidation', msg)
+    finally:
+        await producer.stop()
 
 
 async def process_messages():  # pragma: no cover
     """
     Process asyncio MSG_PENDING_QUEUE and send validation status.
 
-    Args:
-        None
-    Returns:
-        None
+    :param None
+    :returns None
     """
     while True:
         msg = await MSG_PENDING_QUEUE.get()
-        valid = handle_message(msg)
-        if valid:
-            print('The report is valid!')
-        else:
-            print('The report is not valid!')
+        status = handle_message(msg)
+        if status:
+            value = json.loads(msg.value.decode('utf-8'))
+            LOG.info('Sending confirmation "%s", for msg with hash "%s".'
+                     % (status, value['hash']))
+            await send_confirmation(value['hash'], status)
 
 
 async def listen_for_messages(consumer):  # pragma: no cover
@@ -202,10 +244,8 @@ async def listen_for_messages(consumer):  # pragma: no cover
 
     Once a message from one of these topics arrives, we add
     them to the MSG_PENDING_QUEUE.
-    Args:
-        None
-    Returns:
-        None
+    :param consumer : Kafka consumer
+    :returns None
     """
     try:
         await consumer.start()
@@ -227,10 +267,8 @@ def asyncio_worker_thread(loop):  # pragma: no cover
     """
     Worker thread function to run the asyncio event loop.
 
-    Args:
-        None
-    Returns:
-        None
+    :param None
+    :returns None
     """
     consumer = AIOKafkaConsumer(
         AVAILABLE_TOPIC, QPC_TOPIC,
@@ -250,10 +288,8 @@ def initialize_kafka_handler():  # pragma: no cover
     """
     Create asyncio tasks and daemon thread to run event loop.
 
-    Args:
-        None
-    Returns:
-        None
+    :param None
+    :returns None
     """
     event_loop_thread = threading.Thread(target=asyncio_worker_thread, args=(EVENT_LOOP,))
     event_loop_thread.daemon = True
