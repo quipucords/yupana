@@ -178,6 +178,7 @@ def handle_message(msg):
             return status
         except KafkaMsgHandlerError as error:
             LOG.error('Unable to extract payload. Error: %s', str(error))
+            return FAILURE_CONFIRM_STATUS
 
     elif msg.topic == AVAILABLE_TOPIC:
         value = json.loads(msg.value.decode('utf-8'))
