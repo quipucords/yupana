@@ -81,7 +81,7 @@ def extract_tar_gz(file_like_obj):
         return FAILURE_CONFIRM_STATUS
 
 
-def validate_contents(url):
+def download_and_validate_contents(url):
     """
     Extract the file response from the url and validate the contents.
 
@@ -116,19 +116,19 @@ def verify_report_details(report_contents):
     message = 'Report is missing required field "%s".'
 
     # validate report_platform_id
-    report_platform_id = report_contents.get('report_platform_id', None)
+    report_platform_id = report_contents.get('report_platform_id')
     if not report_platform_id:
         LOG.error(message % 'report_platform_id')
         status = FAILURE_CONFIRM_STATUS
 
     # validate report id
-    report_id = report_contents.get('report_id', None)
+    report_id = report_contents.get('report_id')
     if not report_id:
         LOG.error(message % 'report_id')
         status = FAILURE_CONFIRM_STATUS
 
     # validate version type
-    report_version = report_contents.get('report_version', None)
+    report_version = report_contents.get('report_version')
     if not report_version:
         LOG.error(message % 'report_version')
         status = FAILURE_CONFIRM_STATUS
@@ -141,7 +141,7 @@ def verify_report_details(report_contents):
         status = FAILURE_CONFIRM_STATUS
 
     # validate system fingerprints
-    fingerprints = report_contents.get('system_fingerprints', None)
+    fingerprints = report_contents.get('system_fingerprints')
     if not fingerprints:
         LOG.error(message % 'system_fingerprints')
         status = FAILURE_CONFIRM_STATUS
@@ -174,7 +174,7 @@ def handle_message(msg):
         message = 'The following message was placed on the "%s" topic: %s' % (QPC_TOPIC, msg)
         LOG.info(message)
         try:
-            status = validate_contents(value['url'])
+            status = download_and_validate_contents(value['url'])
             return status
         except KafkaMsgHandlerError as error:
             LOG.error('Unable to extract payload. Error: %s', str(error))

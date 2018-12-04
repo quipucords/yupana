@@ -196,29 +196,31 @@ class KafkaMsgHandlerTest(TestCase):
                                  'http://insights-upload.com/quarnantine/file_to_validate')
         advisor_msg = KafkaMsg('platform.upload.advisor', 'http://insights-upload.com/quarnantine/file_to_validate')
         # Verify that when extract_payload is successful with 'qpc' message that SUCCESS_CONFIRM_STATUS is returned
-        with patch('processor.kafka_msg_handler.validate_contents', return_value=msg_handler.SUCCESS_CONFIRM_STATUS):
+        with patch('processor.kafka_msg_handler.download_and_validate_contents',
+                   return_value=msg_handler.SUCCESS_CONFIRM_STATUS):
             self.assertEqual(msg_handler.handle_message(qpc_msg), msg_handler.SUCCESS_CONFIRM_STATUS)
         # Verify that when extract_payload is not successful with 'qpc' message that FAILURE_CONFIRM_STATUS is returned
-        with patch('processor.kafka_msg_handler.validate_contents', side_effect=msg_handler.KafkaMsgHandlerError):
+        with patch('processor.kafka_msg_handler.download_and_validate_contents',
+                   side_effect=msg_handler.KafkaMsgHandlerError):
             self.assertEqual(msg_handler.handle_message(qpc_msg), msg_handler.FAILURE_CONFIRM_STATUS)
         # Verify that when None status is returned for non-qpc messages (we don't confirm these)
         self.assertEqual(msg_handler.handle_message(available_msg), None)
         self.assertEqual(msg_handler.handle_message(advisor_msg), None)
 
-    def test_validate_contents(self):
+    def test_download_and_validate_contents(self):
         """Test validating the contents."""
         pass
 
-    def test_validate_contents_bad_url(self):
+    def test_download_and_validate_contents_bad_url(self):
         """Test to verify extracting payload exceptions are handled."""
         payload_url = 'http://insights-upload.com/quarnantine/file_to_validate'
         with requests_mock.mock() as m:
             m.get(payload_url, exc=HTTPError)
             with self.assertRaises(msg_handler.KafkaMsgHandlerError):
-                msg_handler.validate_contents(payload_url)
+                msg_handler.download_and_validate_contents(payload_url)
 
-    def test_validate_contents_success(self):
-        """Test to verify extracting payload is successful."""
+    def test_download_and_validate_contents_success(self):
+        """Test to verify extracting contents is successful."""
         report_json = {
             'report_id': 1,
             'report_type': 'deployments',
@@ -232,11 +234,11 @@ class KafkaMsgHandlerTest(TestCase):
         buffer_content = create_tar_buffer(test_dict)
         with requests_mock.mock() as m:
             m.get(payload_url, content=buffer_content)
-            status = msg_handler.validate_contents(payload_url)
+            status = msg_handler.download_and_validate_contents(payload_url)
             self.assertEqual(msg_handler.SUCCESS_CONFIRM_STATUS, status)
 
-    def test_validate_contents_invalid_report(self):
-        """Test to verify extracting payload fails when report is invalid."""
+    def test_download_and_validate_contents_invalid_report(self):
+        """Test to verify extracting contents fails when report is invalid."""
         report_json = {
             'report_type': 'deployments',
             'report_version': '1.0.0.1b025b8',
@@ -249,11 +251,11 @@ class KafkaMsgHandlerTest(TestCase):
         buffer_content = create_tar_buffer(test_dict)
         with requests_mock.mock() as m:
             m.get(payload_url, content=buffer_content)
-            status = msg_handler.validate_contents(payload_url)
+            status = msg_handler.download_and_validate_contents(payload_url)
             self.assertEqual(msg_handler.FAILURE_CONFIRM_STATUS, status)
 
-    def test_validate_contents_raises_error(self):
-        """Test to verify extracting payload fails when error is raised."""
+    def test_download_and_validate_contents_raises_error(self):
+        """Test to verify extracting contents fails when error is raised."""
         report_json = {
             'report_id': 1,
             'report_type': 'deployments',
@@ -269,11 +271,11 @@ class KafkaMsgHandlerTest(TestCase):
             m.get(payload_url, content=buffer_content)
             with patch('processor.kafka_msg_handler.extract_tar_gz', side_effect=HTTPError):
                 with self.assertRaises(msg_handler.KafkaMsgHandlerError):
-                    status = msg_handler.validate_contents(payload_url)
+                    status = msg_handler.download_and_validate_contents(payload_url)
                     self.assertEqual(msg_handler.FAILURE_CONFIRM_STATUS, status)
 
-    def test_validate_contents_failure(self):
-        """Test to verify extracting payload fails when contents errors."""
+    def test_download_and_validate_contents_failure(self):
+        """Test to verify extracting contents fails when contents errors."""
         report_json = {}
         payload_url = 'http://insights-upload.com/quarnantine/file_to_validate'
         test_dict = dict()
@@ -282,5 +284,5 @@ class KafkaMsgHandlerTest(TestCase):
         with requests_mock.mock() as m:
             m.get(payload_url, content=buffer_content)
             with patch('processor.kafka_msg_handler.extract_tar_gz', return_value=msg_handler.FAILURE_CONFIRM_STATUS):
-                status = msg_handler.validate_contents(payload_url)
+                status = msg_handler.download_and_validate_contents(payload_url)
                 self.assertEqual(msg_handler.FAILURE_CONFIRM_STATUS, status)
