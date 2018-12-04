@@ -240,7 +240,7 @@ async def send_confirmation(file_hash, status):  # pragma: no cover
     )
     try:
         await producer.start()
-    except KafkaConnectionError:
+    except (KafkaConnectionError, TimeoutError):
         await producer.stop()
         raise KafkaMsgHandlerError('Unable to connect to kafka server.  Closing producer.')
     try:
@@ -249,7 +249,7 @@ async def send_confirmation(file_hash, status):  # pragma: no cover
             'validation': status
         }
         msg = bytes(json.dumps(validation), 'utf-8')
-        await producer.send_and_wait('uploadvalidation', msg)
+        await producer.send_and_wait(VALIDATION_TOPIC, msg)
     finally:
         await producer.stop()
 
