@@ -149,13 +149,17 @@ def verify_report_details(report_contents):
     if fingerprints and report_platform_id:
         verified_fingerprints = verify_report_fingerprints(fingerprints, report_platform_id)
         if verified_fingerprints:
-            # FIXME: Cody add stuff here
-            pass
+            upload_to_host_inventory(verified_fingerprints)
         else:
             LOG.error('Report "%s" contained no valid fingerprints.' % report_platform_id)
             status = FAILURE_CONFIRM_STATUS
 
     return status
+
+
+def upload_to_host_inventory(fingerprints):
+    """Scaffolding for host inventory upload."""
+    pass
 
 
 def verify_report_fingerprints(fingerprints, report_platform_id):
@@ -169,6 +173,7 @@ def verify_report_fingerprints(fingerprints, report_platform_id):
         for fact in canonical_facts:
             if fingerprint.get(fact):
                 found_facts = True
+                break
         if found_facts:
             verified_fingerprints.append(fingerprint)
         else:
