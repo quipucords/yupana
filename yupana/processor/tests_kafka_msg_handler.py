@@ -175,7 +175,7 @@ class KafkaMsgHandlerTest(TestCase):
                                                               report_platform_id)
         self.assertNotIn(invalid_print, valid_prints)
 
-        # test that if there are no valid fingerprints we return {}
+        # test that if there are no valid fingerprints we return []
         fingerprints = [invalid_print]
         valid_prints = msg_handler.verify_report_fingerprints(fingerprints,
                                                               report_platform_id)
