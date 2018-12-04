@@ -72,7 +72,7 @@ class KafkaMsgHandlerTest(TestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'system_fingerprints': [{'key': 'value'}]}
+            'system_fingerprints': [{'bios_uuid': 'value'}]}
 
         status = msg_handler.verify_report_details(report_json)
         self.assertEqual(status, msg_handler.SUCCESS_CONFIRM_STATUS)
@@ -85,6 +85,19 @@ class KafkaMsgHandlerTest(TestCase):
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'system_fingerprints': [{'key': 'value'}]}
+
+        status = msg_handler.verify_report_details(report_json)
+        self.assertEqual(status, msg_handler.FAILURE_CONFIRM_STATUS)
+
+    def test_verify_report_fails_no_canonical_facts(self):
+        """Test to verify a QPC report with the correct structure passes validation."""
+        report_json = {
+            'report_id': 1,
+            'report_type': 'deployments',
+            'report_version': '1.0.0.1b025b8',
+            'status': 'completed',
+            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'system_fingerprints': [{'name': 'value'}]}
 
         status = msg_handler.verify_report_details(report_json)
         self.assertEqual(status, msg_handler.FAILURE_CONFIRM_STATUS)
@@ -138,6 +151,35 @@ class KafkaMsgHandlerTest(TestCase):
 
         status = msg_handler.verify_report_details(report_json)
         self.assertEqual(status, msg_handler.FAILURE_CONFIRM_STATUS)
+
+    def test_verify_report_fingerprints(self):
+        """Test fingerprint verification."""
+        # test all valid fingerprints
+        fingerprints = [{'bios_uuid': 'value', 'name': 'value'},
+                        {'insights_client_id': 'value', 'name': 'foo'},
+                        {'ip_addresses': 'value', 'name': 'foo'},
+                        {'mac_addresses': 'value', 'name': 'foo'},
+                        {'vm_uuid': 'value', 'name': 'foo'},
+                        {'etc_machine_id': 'value'},
+                        {'subscription_manager_id': 'value'}]
+        report_platform_id = 'be3075ac-84d3-4b62-9f5c-a418a36f802d'
+        valid_prints = msg_handler.verify_report_fingerprints(fingerprints,
+                                                              report_platform_id)
+
+        self.assertEqual(valid_prints, fingerprints)
+
+        # test that invalid fingerprints are removed
+        invalid_print = {'no': 'canonical facts', 'metadata': []}
+        fingerprints.append(invalid_print)
+        valid_prints = msg_handler.verify_report_fingerprints(fingerprints,
+                                                              report_platform_id)
+        self.assertNotIn(invalid_print, valid_prints)
+
+        # test that if there are no valid fingerprints we return {}
+        fingerprints = [invalid_print]
+        valid_prints = msg_handler.verify_report_fingerprints(fingerprints,
+                                                              report_platform_id)
+        self.assertEqual([], valid_prints)
 
     def test_extract_tar_gz_success(self):
         """Testing the extract method with valid buffer content."""
@@ -227,7 +269,7 @@ class KafkaMsgHandlerTest(TestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'system_fingerprints': [{'key': 'value'}]}
+            'system_fingerprints': [{'insights_client_id': 'value'}]}
         payload_url = 'http://insights-upload.com/quarnantine/file_to_validate'
         test_dict = dict()
         test_dict['file.json'] = report_json

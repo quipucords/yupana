@@ -146,7 +146,34 @@ def verify_report_details(report_contents):
         LOG.error(message % 'system_fingerprints')
         status = FAILURE_CONFIRM_STATUS
 
+    if fingerprints and report_platform_id:
+        verified_fingerprints = verify_report_fingerprints(fingerprints, report_platform_id)
+        if verified_fingerprints:
+            report_contents['system_fingerprints'] = verified_fingerprints
+            # TODO: cody will put stuff here
+        else:
+            LOG.error('Report "%s" contained no valid fingerprints.' % report_platform_id)
+            status = FAILURE_CONFIRM_STATUS
+
     return status
+
+
+def verify_report_fingerprints(fingerprints, report_platform_id):
+    """Verify that report fingerprints contain canonical facts."""
+    canonical_facts = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addresses',
+                       'vm_uuid', 'etc_machine_id', 'subscription_manager_id']
+    message = 'report_platform_id: "%s"| Removing invalid fingerprint. No canonical facts: %s.'
+    verified_fingerprints = []
+    for fingerprint in fingerprints:
+        found_facts = False
+        for fact in canonical_facts:
+            if fingerprint.get(fact):
+                found_facts = True
+        if found_facts:
+            verified_fingerprints.append(fingerprint)
+        else:
+            LOG.warning(message % (report_platform_id, fingerprint.pop('metadata', None)))
+    return verified_fingerprints
 
 
 def handle_message(msg):
