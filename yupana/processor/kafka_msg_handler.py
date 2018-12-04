@@ -149,8 +149,8 @@ def verify_report_details(report_contents):
     if fingerprints and report_platform_id:
         verified_fingerprints = verify_report_fingerprints(fingerprints, report_platform_id)
         if verified_fingerprints:
-            report_contents['system_fingerprints'] = verified_fingerprints
-            # TODO: cody will put stuff here
+            # FIXME: Cody add stuff here
+            pass
         else:
             LOG.error('Report "%s" contained no valid fingerprints.' % report_platform_id)
             status = FAILURE_CONFIRM_STATUS
