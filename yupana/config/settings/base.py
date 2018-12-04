@@ -50,7 +50,7 @@ ALLOWED_HOSTS = ENVIRONMENT.get_value('DJANGO_ALLOWED_HOSTS', default=['*'])
 # https://docs.python.org/3.6/library/logging.html
 LOGGING = {
     'version': 1,
-    'disable_existing_loggers': True,
+    'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
             'format': '%(asctime)s | %(levelname)s | '
