@@ -102,7 +102,6 @@ def verify_report_fingerprints(fingerprints, report_platform_id):
     """Verify that report fingerprints contain canonical facts."""
     canonical_facts = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addresses',
                        'vm_uuid', 'etc_machine_id', 'subscription_manager_id']
-    message = 'report_platform_id: "%s"| Removing invalid fingerprint. No canonical facts: %s.'
     valid_fingerprints = []
     invalid_fingerprints = []
     for fingerprint in fingerprints:
@@ -116,10 +115,10 @@ def verify_report_fingerprints(fingerprints, report_platform_id):
         else:
             fingerprint.pop('metadata', None)
             invalid_fingerprints.append(fingerprint)
-    fp_msg = 'The results of the fingerprint verification is %s/%s are valid.'
-    LOG.info(fp_msg % (len(valid_fingerprints), len(fingerprints)))
+    fp_msg = 'Report with report_platform_id "%s" contains %s/%s valid fingerprints.'
+    LOG.info(fp_msg % (report_platform_id, len(valid_fingerprints), len(fingerprints)))
     if invalid_fingerprints:
-        message = 'report_platform_id: "%s"| These fingerprints were removed because they had no canonical facts. \n %s'
+        message = 'report_platform_id: "%s"| These fingerprints were removed because they had no canonical facts: %s'
         LOG.debug(message % (report_platform_id, invalid_fingerprints))
     return (valid_fingerprints, invalid_fingerprints)
 
@@ -148,11 +147,9 @@ def verify_report_details(report_contents):
                   % 'report_type')
         return (FAILURE_CONFIRM_STATUS, None, None)
 
-    fingerprints = verify_report_fingerprints(report_contents['system_fingerprints'],
-                                              report_contents['report_platform_id'])
-    valid_fingerprints = fingerprints[0]
-    invalid_fingerprints = fingerprints[1]
-
+    valid_fingerprints, invalid_fingerprints = \
+        verify_report_fingerprints(report_contents['system_fingerprints'],
+                                   report_contents['report_platform_id'])
     if not valid_fingerprints:
         err_msg = 'Report "%s" contained no valid fingerprints.'
         LOG.error(err_msg % report_contents['report_platform_id'])
@@ -173,7 +170,7 @@ def upload_to_host_inventory(account_number, fingerprints, report_platform_id):
     Verify that the report contents are a valid deployments report.
 
     :param account_number: <str> of the User's account number.
-    :param fingerprints: a list of dictionaries that have ben validated.
+    :param fingerprints: a list of dictionaries that have been validated.
     :param report_platform_id: <str> of the report platform id
     :returns True or False for if fingerprints is uploaded to inventory.
     """
@@ -216,13 +213,13 @@ def upload_to_host_inventory(account_number, fingerprints, report_platform_id):
         if request.status_code not in [200, 201]:
             failed_fingerprints.append(fingerprint)
     successful = len(fingerprints) - len(failed_fingerprints)
-    upload_msg = '%s/%s fingerprints were upload to the host inventory system.'
+    upload_msg = '%s/%s fingerprints were uploaded to the host inventory system.'
     if successful != len(fingerprints):
         LOG.warning(upload_msg % (successful, len(fingerprints)))
     else:
         LOG.info(upload_msg % (successful, len(fingerprints)))
     if failed_fingerprints:
-        message = 'report_platform_id: "%s"| These fingerprints failed to upload to host inventory system. \n %s'
+        message = 'report_platform_id: "%s"| These fingerprints failed to upload to host inventory system: %s'
         LOG.debug(message % (report_platform_id, failed_fingerprints))
     return True
 
@@ -276,7 +273,7 @@ async def process_messages():  # pragma: no cover
                 status = results_tuple[0]
                 valid_prints = results_tuple[1]
             else:
-                results_tuple = (FAILURE_CONFIRM_STATUS, None, None)
+                status = FAILURE_CONFIRM_STATUS
             LOG.info('Sending confirmation "%s", for msg with hash "%s".'
                      % (status, msg_value['hash']))
             await send_confirmation(msg_value['hash'], status)
