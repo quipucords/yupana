@@ -90,6 +90,7 @@ objects:
     app-domain: ${APP_DOMAIN}
     insights-kafka-server-host: ${KAFKA_HOST}.${KAFKA_NAMESPACE}.svc
     insights-kafka-server-port: ${KAFKA_PORT}
+    insights-host-inventory-url: ${INSIGHTS_HOST_INVENTORY_URL}
     log-level: INFO
 - apiVersion: v1
   kind: Service
@@ -287,6 +288,12 @@ objects:
                 configMapKeyRef:
                   name: yupana-env
                   key: insights-kafka-server-port
+                  optional: false
+            - name: INSIGHTS_HOST_INVENTORY_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: yupana-env
+                  key: insights-host-inventory-url
                   optional: false
           livenessProbe:
             failureThreshold: 3
