@@ -142,12 +142,12 @@ def verify_report_details(report_contents):
         check = report_contents.get(key)
         if not check:
             LOG.error(missing_message % key)
-            return (FAILURE_CONFIRM_STATUS, None, None)
+            return (FAILURE_CONFIRM_STATUS, [], [])
 
     if report_contents['report_type'] != 'deployments':
         LOG.error('Report has an invalid value for required field "%s".'
                   % 'report_type')
-        return (FAILURE_CONFIRM_STATUS, None, None)
+        return (FAILURE_CONFIRM_STATUS, [], [])
 
     valid_fingerprints, invalid_fingerprints = \
         verify_report_fingerprints(report_contents['system_fingerprints'],
@@ -155,16 +155,9 @@ def verify_report_details(report_contents):
     if not valid_fingerprints:
         err_msg = 'Report "%s" contained no valid fingerprints.'
         LOG.error(err_msg % report_contents['report_platform_id'])
-        return (FAILURE_CONFIRM_STATUS, None, None)
+        return (FAILURE_CONFIRM_STATUS, [], [])
     else:
-        if not invalid_fingerprints:
-            return (SUCCESS_CONFIRM_STATUS,
-                    valid_fingerprints,
-                    None)
-        else:
-            return (SUCCESS_CONFIRM_STATUS,
-                    valid_fingerprints,
-                    invalid_fingerprints)
+        return (SUCCESS_CONFIRM_STATUS, valid_fingerprints, invalid_fingerprints)
 
 
 def upload_to_host_inventory(account_number, fingerprints, report_platform_id):

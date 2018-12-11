@@ -86,7 +86,7 @@ class KafkaMsgHandlerTest(TestCase):
         status = msg_handler.verify_report_details(report_json)
         accept_return = (msg_handler.SUCCESS_CONFIRM_STATUS,
                          [{'bios_uuid': 'value'}],
-                         None)
+                         [])
         self.assertEqual(status, accept_return)
 
     def test_verify_report_success_mixed_fingerprints(self):
@@ -115,7 +115,7 @@ class KafkaMsgHandlerTest(TestCase):
             'system_fingerprints': [{'key': 'value'}]}
 
         status = msg_handler.verify_report_details(report_json)
-        failure = (msg_handler.FAILURE_CONFIRM_STATUS, None, None)
+        failure = (msg_handler.FAILURE_CONFIRM_STATUS, [], [])
         self.assertEqual(status, failure)
 
     def test_verify_report_fails_no_canonical_facts(self):
@@ -129,7 +129,7 @@ class KafkaMsgHandlerTest(TestCase):
             'system_fingerprints': [{'name': 'value'}]}
 
         status = msg_handler.verify_report_details(report_json)
-        failure = (msg_handler.FAILURE_CONFIRM_STATUS, None, None)
+        failure = (msg_handler.FAILURE_CONFIRM_STATUS, [], [])
         self.assertEqual(status, failure)
 
     def test_verify_report_invalid_report_type(self):
@@ -143,7 +143,7 @@ class KafkaMsgHandlerTest(TestCase):
             'system_fingerprints': [{'key': 'value'}]}
 
         status = msg_handler.verify_report_details(report_json)
-        failure = (msg_handler.FAILURE_CONFIRM_STATUS, None, None)
+        failure = (msg_handler.FAILURE_CONFIRM_STATUS, [], [])
         self.assertEqual(status, failure)
 
     def test_verify_report_missing_version(self):
@@ -156,7 +156,7 @@ class KafkaMsgHandlerTest(TestCase):
             'system_fingerprints': [{'key': 'value'}]}
 
         status = msg_handler.verify_report_details(report_json)
-        failure = (msg_handler.FAILURE_CONFIRM_STATUS, None, None)
+        failure = (msg_handler.FAILURE_CONFIRM_STATUS, [], [])
         self.assertEqual(status, failure)
 
     def test_verify_report_missing_platform_id(self):
@@ -169,7 +169,7 @@ class KafkaMsgHandlerTest(TestCase):
             'system_fingerprints': [{'key': 'value'}]}
 
         status = msg_handler.verify_report_details(report_json)
-        failure = (msg_handler.FAILURE_CONFIRM_STATUS, None, None)
+        failure = (msg_handler.FAILURE_CONFIRM_STATUS, [], [])
         self.assertEqual(status, failure)
 
     def test_verify_report_missing_fingerprints(self):
@@ -183,7 +183,7 @@ class KafkaMsgHandlerTest(TestCase):
             'system_fingerprints': []}
 
         status = msg_handler.verify_report_details(report_json)
-        failure = (msg_handler.FAILURE_CONFIRM_STATUS, None, None)
+        failure = (msg_handler.FAILURE_CONFIRM_STATUS, [], [])
         self.assertEqual(status, failure)
 
     def test_verify_report_fingerprints(self):
@@ -304,7 +304,7 @@ class KafkaMsgHandlerTest(TestCase):
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'system_fingerprints': [{'key': 'value'}]}
         status = msg_handler.verify_report_details(report_json)
-        failure = (msg_handler.FAILURE_CONFIRM_STATUS, None, None)
+        failure = (msg_handler.FAILURE_CONFIRM_STATUS, [], [])
         self.assertEqual(failure, status)
 
     def test_download_and_validate_contents_raises_error(self):
