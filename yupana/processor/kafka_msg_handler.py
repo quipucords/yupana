@@ -193,18 +193,13 @@ def upload_to_host_inventory(account_number, fingerprints, report_platform_id):
         facts['namespace'] = 'qpc'
         facts['facts'] = fingerprint
         body['facts'] = [facts]
-        if INSIGHTS_HOST_INVENTORY_URL:
-            try:
-                request = requests.post(INSIGHTS_HOST_INVENTORY_URL,
-                                        data=json.dumps(body),
-                                        headers=identity_header)
-            except requests.exceptions.RequestException as err:
-                err_msg = 'Posting to (%s) returned error: %s'
-                LOG.debug(err_msg % (INSIGHTS_HOST_INVENTORY_URL, err))
-        else:
-            msg = 'Environment variable INSIGHTS_HOST_INVENTORY_URL can not be empty.'
-            LOG.error(msg)
-            return False
+        try:
+            request = requests.post(INSIGHTS_HOST_INVENTORY_URL,
+                                    data=json.dumps(body),
+                                    headers=identity_header)
+        except requests.exceptions.RequestException as err:
+            err_msg = 'Posting to (%s) returned error: %s'
+            LOG.debug(err_msg % (INSIGHTS_HOST_INVENTORY_URL, err))
         if request.status_code not in [200, 201]:
             failed_fingerprints.append(fingerprint)
     successful = len(fingerprints) - len(failed_fingerprints)

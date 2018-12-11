@@ -387,22 +387,6 @@ class KafkaMsgHandlerTest(TestCase):
                                                       report_platform_id)
         self.assertEqual(False, status)
 
-    def test_no_host_url_inventory_upload(self):
-        """Testing no environment variable for inventory url."""
-        account_number = '00001'
-        report_platform_id = '0001-cody'
-        fingerprints = [{'bios_uuid': 'value', 'name': 'value'},
-                        {'insights_client_id': 'value', 'name': 'foo'},
-                        {'ip_addresses': 'value', 'name': 'foo'},
-                        {'mac_addresses': 'value', 'name': 'foo'},
-                        {'vm_uuid': 'value', 'name': 'foo'},
-                        {'etc_machine_id': 'value'},
-                        {'subscription_manager_id': 'value'}]
-        status = msg_handler.upload_to_host_inventory(account_number,
-                                                      fingerprints,
-                                                      report_platform_id)
-        self.assertEqual(False, status)
-
     def test_successful_host_inventory_upload(self):
         """Testing successful upload to host inventory."""
         account_number = '00001'
