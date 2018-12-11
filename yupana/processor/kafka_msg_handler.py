@@ -17,6 +17,7 @@
 """Kafka message handler."""
 
 import asyncio
+import base64
 import json
 import logging
 import tarfile
@@ -27,7 +28,8 @@ import requests
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from kafka.errors import ConnectionError as KafkaConnectionError
 
-from config.settings.base import INSIGHTS_KAFKA_ADDRESS
+from config.settings.base import (INSIGHTS_HOST_INVENTORY_URL,
+                                  INSIGHTS_KAFKA_ADDRESS)
 
 LOG = logging.getLogger(__name__)
 EVENT_LOOP = asyncio.get_event_loop()
@@ -50,8 +52,8 @@ def extract_tar_gz(file_like_obj):
 
     :param file_like_obj: A hexstring or BytesIO tarball saved in memory
     with gzip encryption.
-    :returns file_data or status: Dictionary containing contents of json file or
-        FAILURE status
+    :returns file_data or False: Dictionary containing contents of json file or
+        False
     """
     try:
         tar = tarfile.open(fileobj=BytesIO(file_like_obj), mode='r:gz')
@@ -62,7 +64,7 @@ def extract_tar_gz(file_like_obj):
                 json_files.append(file)
         if len(json_files) > 1:
             LOG.error('Cannot process multiple files.')
-            return FAILURE_CONFIRM_STATUS
+            return False
         if json_files:
             file = json_files[0]
             tarfile_obj = tar.extractfile(file)
@@ -71,38 +73,55 @@ def extract_tar_gz(file_like_obj):
                 file_data = json.loads(file_data)
             except ValueError:
                 LOG.error('Uploaded file does not contain valid JSON.')
-                return FAILURE_CONFIRM_STATUS
+                return False
         else:
             LOG.error('Uploaded file does not contain a JSON file.')
-            return FAILURE_CONFIRM_STATUS
+            return False
         return file_data
     except Exception as err:
         LOG.error('Uploaded file could not be read due to the following error: ', str(err))
-        return FAILURE_CONFIRM_STATUS
+        return False
 
 
-def download_and_validate_contents(url):
+def download_response_content(msg_value):
     """
-    Extract the file response from the url and validate the contents.
+    Extract the response content from the url.
 
-    :param url: String containing the url where the file is located.
-    :returns None
+    :param msg_value: the value of the kakfa message
+    :returns content: The content of the tar.gz
     """
     try:
-        download_response = requests.get(url)
+        download_response = requests.get(msg_value['url'])
         contents = extract_tar_gz(download_response.content)
-        if contents == FAILURE_CONFIRM_STATUS:
-            return contents
-        status = verify_report_details(contents)
-        if status == SUCCESS_CONFIRM_STATUS:
-            LOG.info('Uploaded file contained a valid QPC report with report_platform_id "%s".',
-                     contents.get('report_platform_id'))
-        else:
-            LOG.error('Uploaded file does not contain a valid QPC report.')
-        return status
-
+        return contents
     except requests.exceptions.HTTPError as err:
         raise KafkaMsgHandlerError('Unable to download file. Error: ', str(err))
+
+
+def verify_report_fingerprints(fingerprints, report_platform_id):
+    """Verify that report fingerprints contain canonical facts."""
+    canonical_facts = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addresses',
+                       'vm_uuid', 'etc_machine_id', 'subscription_manager_id']
+    message = 'report_platform_id: "%s"| Removing invalid fingerprint. No canonical facts: %s.'
+    valid_fingerprints = []
+    invalid_fingerprints = []
+    for fingerprint in fingerprints:
+        found_facts = False
+        for fact in canonical_facts:
+            if fingerprint.get(fact):
+                found_facts = True
+                break
+        if found_facts:
+            valid_fingerprints.append(fingerprint)
+        else:
+            fingerprint.pop('metadata', None)
+            invalid_fingerprints.append(fingerprint)
+    fp_msg = 'The results of the fingerprint verification is %s/%s are valid.'
+    LOG.info(fp_msg % (len(valid_fingerprints), len(fingerprints)))
+    if invalid_fingerprints:
+        message = 'report_platform_id: "%s"| These fingerprints were removed because they had no canonical facts. \n %s'
+        LOG.debug(message % (report_platform_id, invalid_fingerprints))
+    return (valid_fingerprints, invalid_fingerprints)
 
 
 def verify_report_details(report_contents):
@@ -112,116 +131,100 @@ def verify_report_details(report_contents):
     :param report_contents: dictionary with report details
     :returns success or failure report validity
     """
-    status = SUCCESS_CONFIRM_STATUS
-    message = 'Report is missing required field "%s".'
+    missing_message = 'Report is missing required field "%s".'
+    required_keys = ['report_platform_id',
+                     'report_id',
+                     'report_version',
+                     'report_type',
+                     'system_fingerprints']
+    for key in required_keys:
+        check = report_contents.get(key)
+        if not check:
+            LOG.error(missing_message % key)
+            return (FAILURE_CONFIRM_STATUS, None, None)
 
-    # validate report_platform_id
-    report_platform_id = report_contents.get('report_platform_id')
-    if not report_platform_id:
-        LOG.error(message % 'report_platform_id')
-        status = FAILURE_CONFIRM_STATUS
-
-    # validate report id
-    report_id = report_contents.get('report_id')
-    if not report_id:
-        LOG.error(message % 'report_id')
-        status = FAILURE_CONFIRM_STATUS
-
-    # validate version type
-    report_version = report_contents.get('report_version')
-    if not report_version:
-        LOG.error(message % 'report_version')
-        status = FAILURE_CONFIRM_STATUS
-
-    # validate report type
-    report_type = report_contents.get('report_type', '')
-    if report_type != 'deployments':
-        LOG.error('Report has a missing or invalid value for required field "%s".'
+    if report_contents['report_type'] != 'deployments':
+        LOG.error('Report has an invalid value for required field "%s".'
                   % 'report_type')
-        status = FAILURE_CONFIRM_STATUS
+        return (FAILURE_CONFIRM_STATUS, None, None)
 
-    # validate system fingerprints
-    fingerprints = report_contents.get('system_fingerprints')
-    if not fingerprints:
-        LOG.error(message % 'system_fingerprints')
-        status = FAILURE_CONFIRM_STATUS
+    fingerprints = verify_report_fingerprints(report_contents['system_fingerprints'],
+                                              report_contents['report_platform_id'])
+    valid_fingerprints = fingerprints[0]
+    invalid_fingerprints = fingerprints[1]
 
-    if fingerprints and report_platform_id:
-        verified_fingerprints = verify_report_fingerprints(fingerprints, report_platform_id)
-        if verified_fingerprints:
-            upload_to_host_inventory(verified_fingerprints)
-        else:
-            LOG.error('Report "%s" contained no valid fingerprints.' % report_platform_id)
-            status = FAILURE_CONFIRM_STATUS
-
-    return status
-
-
-def upload_to_host_inventory(fingerprints):
-    """Scaffolding for host inventory upload."""
-    pass
-
-
-def verify_report_fingerprints(fingerprints, report_platform_id):
-    """Verify that report fingerprints contain canonical facts."""
-    canonical_facts = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addresses',
-                       'vm_uuid', 'etc_machine_id', 'subscription_manager_id']
-    message = 'report_platform_id: "%s"| Removing invalid fingerprint. No canonical facts: %s.'
-    verified_fingerprints = []
-    for fingerprint in fingerprints:
-        found_facts = False
-        for fact in canonical_facts:
-            if fingerprint.get(fact):
-                found_facts = True
-                break
-        if found_facts:
-            verified_fingerprints.append(fingerprint)
-        else:
-            LOG.warning(message % (report_platform_id, fingerprint.pop('metadata', None)))
-    return verified_fingerprints
-
-
-def handle_message(msg):
-    """
-    Handle messages from pending queue with QPC_TOPIC & AVALIABLE_TOPIC.
-
-    The QPC report payload will land on the qpc topic.
-    These messages will be extracted into the local report
-    directory structure.  Once the file has been verified
-    (successfully extracted) we will report the status to
-    the Insights Upload Service so the file can be made available
-    to other apps on the service.
-    Messages on the available topic are messages that have
-    been verified by an app on the Insights upload service.
-    For now we are just logging the URL for demonstration purposes.
-    In the future if we want to maintain a URL to our report files
-    in the upload service we could look for hashes for files that
-    we have previously validated on the qpc topic.
-    :param None
-    :returns None
-    """
-    if msg.topic == QPC_TOPIC:
-
-        value = json.loads(msg.value.decode('utf-8'))
-        message = 'The following message was placed on the "%s" topic: %s' % (QPC_TOPIC, msg)
-        LOG.info(message)
-        try:
-            status = download_and_validate_contents(value['url'])
-            return status
-        except KafkaMsgHandlerError as error:
-            LOG.error('Unable to extract payload. Error: %s', str(error))
-            return FAILURE_CONFIRM_STATUS
-
-    elif msg.topic == AVAILABLE_TOPIC:
-        value = json.loads(msg.value.decode('utf-8'))
-        service = value.get('service')
-        # Decide if we want to keep track of confirmed messages.
-        # If so we will have to store the hash for qpc topic msg and
-        # look for them on a list here to get the validated url.
-        LOG.info('File available: %s for service %s' % (value['url'], service))
+    if not valid_fingerprints:
+        err_msg = 'Report "%s" contained no valid fingerprints.'
+        LOG.error(err_msg % report_contents['report_platform_id'])
+        return (FAILURE_CONFIRM_STATUS, None, None)
     else:
-        LOG.error('Unexpected Message')
-    return None
+        if not invalid_fingerprints:
+            return (SUCCESS_CONFIRM_STATUS,
+                    valid_fingerprints,
+                    None)
+        else:
+            return (SUCCESS_CONFIRM_STATUS,
+                    valid_fingerprints,
+                    invalid_fingerprints)
+
+
+def upload_to_host_inventory(account_number, fingerprints, report_platform_id):
+    """
+    Verify that the report contents are a valid deployments report.
+
+    :param account_number: <str> of the User's account number.
+    :param fingerprints: a list of dictionaries that have ben validated.
+    :param report_platform_id: <str> of the report platform id
+    :returns True or False for if fingerprints is uploaded to inventory.
+    """
+    if account_number in [None, 'null', '']:
+        LOG.error('An account number is required to upload to host inventory.')
+        return False
+    identity_string = '{"identity": {"account_number": "%s"}}' % str(account_number)
+    bytes_string = identity_string.encode()
+    x_rh_identity_value = base64.b64encode(bytes_string).decode()
+    identity_header = {'x-rh-identity': x_rh_identity_value,
+                       'Content-Type': 'application/json'}
+    failed_fingerprints = []
+    for fingerprint in fingerprints:
+        body = dict()
+        facts = dict()
+        body['account'] = account_number
+        body['bios_uuid'] = fingerprint.get('bios_uuid')
+        body['display_name'] = fingerprint.get('name')
+        body['ip_addresses'] = fingerprint.get('ip_addresses')
+        body['mac_addresses'] = fingerprint.get('mac_addresses')
+        body['insights_id'] = fingerprint.get('insights_client_id')
+        body['rhel_machine_id'] = fingerprint.get('etc_machine_id')
+        body['subscription_manager_id'] = fingerprint.get('subscription_manager_id')
+        body['fqdn'] = fingerprint.get('name')
+        facts['namespace'] = 'qpc'
+        facts['facts'] = fingerprint
+        body['facts'] = [facts]
+        if INSIGHTS_HOST_INVENTORY_URL:
+            try:
+                request = requests.post(INSIGHTS_HOST_INVENTORY_URL,
+                                        data=json.dumps(body),
+                                        headers=identity_header)
+            except requests.exceptions.RequestException as err:
+                err_msg = 'Posting to (%s) returned error: %s'
+                LOG.debug(err_msg % (INSIGHTS_HOST_INVENTORY_URL, err))
+        else:
+            msg = 'Environment variable INSIGHTS_HOST_INVENTORY_URL can not be empty.'
+            LOG.error(msg)
+            return False
+        if request.status_code not in [200, 201]:
+            failed_fingerprints.append(fingerprint)
+    successful = len(fingerprints) - len(failed_fingerprints)
+    upload_msg = '%s/%s fingerprints were upload to the host inventory system.'
+    if successful != len(fingerprints):
+        LOG.warning(upload_msg % (successful, len(fingerprints)))
+    else:
+        LOG.info(upload_msg % (successful, len(fingerprints)))
+    if failed_fingerprints:
+        message = 'report_platform_id: "%s"| These fingerprints failed to upload to host inventory system. \n %s'
+        LOG.debug(message % (report_platform_id, failed_fingerprints))
+    return True
 
 
 async def send_confirmation(file_hash, status):  # pragma: no cover
@@ -263,12 +266,26 @@ async def process_messages():  # pragma: no cover
     """
     while True:
         msg = await MSG_PENDING_QUEUE.get()
-        status = handle_message(msg)
-        if status:
-            value = json.loads(msg.value.decode('utf-8'))
+        if msg.topic == QPC_TOPIC:
+            message = 'The following message was placed on the "%s" topic: %s'
+            LOG.info(message % (QPC_TOPIC, msg))
+            msg_value = json.loads(msg.value.decode('utf-8'))
+            content = download_response_content(msg_value)
+            if content:
+                results_tuple = verify_report_details(content)
+                status = results_tuple[0]
+                valid_prints = results_tuple[1]
+            else:
+                results_tuple = (FAILURE_CONFIRM_STATUS, None, None)
             LOG.info('Sending confirmation "%s", for msg with hash "%s".'
-                     % (status, value['hash']))
-            await send_confirmation(value['hash'], status)
+                     % (status, msg_value['hash']))
+            await send_confirmation(msg_value['hash'], status)
+            if status == SUCCESS_CONFIRM_STATUS:
+                upload_to_host_inventory(msg_value['rh_account'],
+                                         valid_prints,
+                                         content['report_platform_id'])
+        else:
+            LOG.info('Unexpected Message')
 
 
 async def listen_for_messages(consumer):  # pragma: no cover

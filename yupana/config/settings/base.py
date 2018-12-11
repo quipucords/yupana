@@ -44,6 +44,7 @@ SECRET_KEY = ENVIRONMENT.get_value('DJANGO_SECRET_KEY',
                                    default='base')
 DEBUG = ENVIRONMENT.bool('DJANGO_DEBUG', default=False)
 ALLOWED_HOSTS = ENVIRONMENT.get_value('DJANGO_ALLOWED_HOSTS', default=['*'])
+INSIGHTS_HOST_INVENTORY_URL = ENVIRONMENT.get_value('INSIGHTS_HOST_INVENTORY_URL', default=None)
 
 # Logging
 # https://docs.djangoproject.com/en/dev/topics/logging/
