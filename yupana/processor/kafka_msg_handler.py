@@ -120,7 +120,9 @@ def verify_report_fingerprints(fingerprints, report_platform_id):
     if invalid_fingerprints:
         message = 'report_platform_id: "%s"| These fingerprints were removed because they had no canonical facts: %s'
         LOG.debug(message % (report_platform_id, invalid_fingerprints))
-    return (valid_fingerprints, invalid_fingerprints)
+
+    # Invalid fingerprints is for future use.
+    return valid_fingerprints, invalid_fingerprints
 
 
 def verify_report_details(report_contents):
