@@ -199,10 +199,10 @@ def upload_to_host_inventory(account_number, fingerprints, report_platform_id):
                                     headers=identity_header)
 
             if response.status_code not in [200, 201]:
-                LOG.error('Unexpected response from host inventory service (status=%s): %s') % (response.status_code, response.json())
+                LOG.error('Unexpected response from host inventory service (status=%s): %s', response.status_code, response.json())
                 failed_fingerprints.append(fingerprint)
             else:
-                LOG.error('Success response from host inventory service (status=%s): %s') % (response.status_code, response.json())
+                LOG.error('Success response from host inventory service (status=%s): %s', response.status_code, response.json())
 
         except requests.exceptions.RequestException as err:
             err_msg = 'Posting to (%s) returned error: %s'
