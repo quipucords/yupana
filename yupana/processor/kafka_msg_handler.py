@@ -199,14 +199,15 @@ def upload_to_host_inventory(account_number, fingerprints, report_platform_id):
                                     headers=identity_header)
 
             if response.status_code not in [200, 201]:
-                LOG.error('Unexpected response from host inventory service (status=%s): %s', response.status_code, response.json())
+                LOG.warning('Unexpected response from host inventory service (status=%s): %s', response.status_code, response.json())
                 failed_fingerprints.append(fingerprint)
             else:
-                LOG.error('Success response from host inventory service (status=%s): %s', response.status_code, response.json())
+                LOG.info('Success response from host inventory service (status=%s): %s', response.status_code, response.json())
 
         except requests.exceptions.RequestException as err:
+            failed_fingerprints.append(fingerprint)
             err_msg = 'Posting to (%s) returned error: %s'
-            LOG.debug(err_msg % (INSIGHTS_HOST_INVENTORY_URL, err))
+            LOG.error(err_msg % (INSIGHTS_HOST_INVENTORY_URL, err))
 
     successful = len(fingerprints) - len(failed_fingerprints)
     upload_msg = '%s/%s fingerprints were uploaded to the host inventory system.'
@@ -281,7 +282,7 @@ async def process_messages():  # pragma: no cover
                                          valid_prints,
                                          content['report_platform_id'])
         else:
-            LOG.info('Unexpected Message')
+            LOG.info('Unexpected Message: %s', msg)
 
 
 async def listen_for_messages(consumer):  # pragma: no cover
