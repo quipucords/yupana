@@ -194,14 +194,20 @@ def upload_to_host_inventory(account_number, fingerprints, report_platform_id):
         facts['facts'] = fingerprint
         body['facts'] = [facts]
         try:
-            request = requests.post(INSIGHTS_HOST_INVENTORY_URL,
+            response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
                                     data=json.dumps(body),
                                     headers=identity_header)
+
+            if response.status_code not in [200, 201]:
+                LOG.error('Unexpected response from host inventory service (status=%s): %s') % (response.status_code, response.json())
+                failed_fingerprints.append(fingerprint)
+            else:
+                LOG.error('Success response from host inventory service (status=%s): %s') % (response.status_code, response.json())
+
         except requests.exceptions.RequestException as err:
             err_msg = 'Posting to (%s) returned error: %s'
             LOG.debug(err_msg % (INSIGHTS_HOST_INVENTORY_URL, err))
-        if request.status_code not in [200, 201]:
-            failed_fingerprints.append(fingerprint)
+
     successful = len(fingerprints) - len(failed_fingerprints)
     upload_msg = '%s/%s fingerprints were uploaded to the host inventory system.'
     if successful != len(fingerprints):
