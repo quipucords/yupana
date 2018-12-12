@@ -99,7 +99,12 @@ def download_response_content(msg_value):
 
 
 def verify_report_fingerprints(fingerprints, report_platform_id):
-    """Verify that report fingerprints contain canonical facts."""
+    """Verify that report fingerprints contain canonical facts.
+
+    :param fingerprints: list of fingerprints
+    :param report_platform_id: str containing report_platform_id
+    :returns valid_fingerprints (list), invalid_fingerprints(list)
+    """
     canonical_facts = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addresses',
                        'vm_uuid', 'etc_machine_id', 'subscription_manager_id']
     valid_fingerprints = []
@@ -209,7 +214,7 @@ def upload_to_host_inventory(account_number, fingerprints, report_platform_id):
     else:
         LOG.info(upload_msg % (successful, len(fingerprints)))
     if failed_fingerprints:
-        message = 'report_platform_id: "%s"| These fingerprints failed to upload to host inventory system: %s'
+        message = 'report_platform_id: "%s"| The following fingerprints failed to upload to host inventory system: %s'
         LOG.debug(message % (report_platform_id, failed_fingerprints))
     return True
 
