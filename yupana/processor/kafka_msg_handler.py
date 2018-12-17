@@ -22,7 +22,9 @@ import json
 import logging
 import tarfile
 import threading
+from http import HTTPStatus
 from io import BytesIO
+
 
 import requests
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
@@ -39,6 +41,14 @@ AVAILABLE_TOPIC = 'platform.upload.available'
 VALIDATION_TOPIC = 'platform.upload.validation'
 SUCCESS_CONFIRM_STATUS = 'success'
 FAILURE_CONFIRM_STATUS = 'failure'
+CANONICAL_FACTS = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addresses',
+                   'vm_uuid', 'etc_machine_id', 'subscription_manager_id']
+
+
+class QPCReportException(Exception):
+    """Use to report errors during qpc report processing."""
+
+    pass
 
 
 class KafkaMsgHandlerError(Exception):
@@ -47,66 +57,129 @@ class KafkaMsgHandlerError(Exception):
     pass
 
 
-def extract_tar_gz(file_like_obj):
-    """Retrieve the contents of a tar.gz file like object.
+def unpack_consumer_record(upload_service_message):
+    """Retreive report URL from kafka.
 
-    :param file_like_obj: A hexstring or BytesIO tarball saved in memory
-    with gzip encryption.
-    :returns file_data or False: Dictionary containing contents of json file or
-        False
+    :param upload_service_message: the value of the kakfa message from file
+        upload service.
+    :returns: str containing the url to the qpc report's tar.gz file.
     """
     try:
-        tar = tarfile.open(fileobj=BytesIO(file_like_obj), mode='r:gz')
+        json_message = json.loads(upload_service_message.value.decode('utf-8'))
+        LOG.info('Message received on %s topic for rh_account=%s',
+                 upload_service_message.topic,
+                 json_message.get('rh_account', 'None'))
+        LOG.debug('Message: %s', upload_service_message)
+        return json_message
+    except ValueError:
+        raise QPCReportException('Upload service kafka message does not contain valid JSON.')
+
+
+def download_response_content(upload_service_message):
+    """
+    Download report.
+
+    :param upload_service_message: the value of the kakfa message
+    :returns content: The tar.gz binary content or None if there are errors.
+    """
+    try:
+        report_url = upload_service_message.get('url', None)
+        if not report_url:
+            raise QPCReportException(
+                'Invalid kafka message from file upload service.  Missing report url.  Message: %s',
+                upload_service_message)
+
+        download_response = requests.get(report_url)
+        if download_response.status_code != HTTPStatus.OK:
+            raise QPCReportException(
+                'Could not download report file at URL %s.  Message: %s',
+                report_url,
+                upload_service_message)
+
+        return download_response.content
+    except requests.exceptions.HTTPError as err:
+        raise QPCReportException(
+            'Unexpected http error while requesting %s.  Message: %s, Error: %s',
+            report_url,
+            upload_service_message,
+            err)
+
+
+def extract_report_from_tar_gz(report_tar_gz):
+    """Extract deployment report from tar.gz file.
+
+    :param report_tar_gz: A hexstring or BytesIO tarball
+        saved in memory with gzip compression.
+    :returns: Deployment report as dict
+    """
+    try:
+        tar = tarfile.open(fileobj=BytesIO(report_tar_gz), mode='r:gz')
         files_check = tar.getmembers()
         json_files = []
         for file in files_check:
             if '.json' in file.name:
                 json_files.append(file)
         if len(json_files) > 1:
-            LOG.error('Cannot process multiple files.')
-            return False
+            raise QPCReportException('Report tar.gz cannot contain multiple files.')
         if json_files:
             file = json_files[0]
             tarfile_obj = tar.extractfile(file)
-            file_data = tarfile_obj.read().decode('utf-8')
+            report_json_str = tarfile_obj.read().decode('utf-8')
             try:
-                file_data = json.loads(file_data)
-            except ValueError:
-                LOG.error('Uploaded file does not contain valid JSON.')
-                return False
-        else:
-            LOG.error('Uploaded file does not contain a JSON file.')
-            return False
-        return file_data
+                deployment_report = json.loads(report_json_str)
+                return deployment_report
+            except ValueError as error:
+                raise QPCReportException('Uploaded file does not contain valid JSON. Error: %s' % str(error))
+        raise QPCReportException('Uploaded file does not contain a JSON file.')
     except Exception as err:
-        LOG.error('Uploaded file could not be read due to the following error: ', str(err))
-        return False
+        raise QPCReportException('Uploaded file could not be read due to the following error: %s' % str(err))
 
 
-def download_response_content(msg_value):
+def verify_report_details(deployments_report):
     """
-    Extract the response content from the url.
+    Verify that the report contents are a valid deployments report.
 
-    :param msg_value: the value of the kakfa message
-    :returns content: The content of the tar.gz
+    :param deployments_report: dict with report
+    :returns: tuple contain list of valid and invalid fingerprints
     """
-    try:
-        download_response = requests.get(msg_value['url'])
-        contents = extract_tar_gz(download_response.content)
-        return contents
-    except requests.exceptions.HTTPError as err:
-        raise KafkaMsgHandlerError('Unable to download file. Error: ', str(err))
+    missing_message = 'Report is missing required field "%s".'
+    required_keys = ['report_platform_id',
+                     'report_id',
+                     'report_version',
+                     'report_type',
+                     'system_fingerprints']
+    for key in required_keys:
+        check = deployments_report.get(key)
+        if not check:
+            raise QPCReportException(missing_message % key)
+
+    if deployments_report['report_type'] != 'deployments':
+        raise QPCReportException('Report has an invalid value for required field "%s".'
+                                 % 'report_type')
+
+    valid_fingerprints, invalid_fingerprints = \
+        verify_report_fingerprints(deployments_report)
+    if not valid_fingerprints:
+        err_msg = 'Report "%s" contained no valid fingerprints.'
+        raise QPCReportException(err_msg % deployments_report['report_platform_id'])
+    else:
+        return valid_fingerprints, invalid_fingerprints
 
 
-def verify_report_fingerprints(fingerprints, report_platform_id):
-    """Verify that report fingerprints contain canonical facts."""
-    canonical_facts = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addresses',
-                       'vm_uuid', 'etc_machine_id', 'subscription_manager_id']
+def verify_report_fingerprints(deployments_report):
+    """Verify that report fingerprints contain canonical facts.
+
+    :param fingerprints: list of deployment report fingerprints
+    :param report_platform_id: globally unique id for this report
+    """
+    fingerprints = deployments_report['system_fingerprints']
+    report_platform_id = deployments_report['report_platform_id']
+
     valid_fingerprints = []
     invalid_fingerprints = []
     for fingerprint in fingerprints:
         found_facts = False
-        for fact in canonical_facts:
+        for fact in CANONICAL_FACTS:
             if fingerprint.get(fact):
                 found_facts = True
                 break
@@ -119,45 +192,10 @@ def verify_report_fingerprints(fingerprints, report_platform_id):
     LOG.info(fp_msg % (report_platform_id, len(valid_fingerprints), len(fingerprints)))
     if invalid_fingerprints:
         message = 'report_platform_id: "%s"| These fingerprints were removed because they had no canonical facts: %s'
-        LOG.debug(message % (report_platform_id, invalid_fingerprints))
+        LOG.warning(message % (report_platform_id, invalid_fingerprints))
 
     # Invalid fingerprints is for future use.
     return valid_fingerprints, invalid_fingerprints
-
-
-def verify_report_details(report_contents):
-    """
-    Verify that the report contents are a valid deployments report.
-
-    :param report_contents: dictionary with report details
-    :returns success or failure report validity
-    """
-    missing_message = 'Report is missing required field "%s".'
-    required_keys = ['report_platform_id',
-                     'report_id',
-                     'report_version',
-                     'report_type',
-                     'system_fingerprints']
-    for key in required_keys:
-        check = report_contents.get(key)
-        if not check:
-            LOG.error(missing_message % key)
-            return (FAILURE_CONFIRM_STATUS, [], [])
-
-    if report_contents['report_type'] != 'deployments':
-        LOG.error('Report has an invalid value for required field "%s".'
-                  % 'report_type')
-        return (FAILURE_CONFIRM_STATUS, [], [])
-
-    valid_fingerprints, invalid_fingerprints = \
-        verify_report_fingerprints(report_contents['system_fingerprints'],
-                                   report_contents['report_platform_id'])
-    if not valid_fingerprints:
-        err_msg = 'Report "%s" contained no valid fingerprints.'
-        LOG.error(err_msg % report_contents['report_platform_id'])
-        return (FAILURE_CONFIRM_STATUS, [], [])
-    else:
-        return (SUCCESS_CONFIRM_STATUS, valid_fingerprints, invalid_fingerprints)
 
 
 def upload_to_host_inventory(account_number, fingerprints, report_platform_id):
@@ -169,9 +207,6 @@ def upload_to_host_inventory(account_number, fingerprints, report_platform_id):
     :param report_platform_id: <str> of the report platform id
     :returns True or False for if fingerprints is uploaded to inventory.
     """
-    if account_number in [None, 'null', '']:
-        LOG.error('An account number is required to upload to host inventory.')
-        return False
     identity_string = '{"identity": {"account_number": "%s"}}' % str(account_number)
     bytes_string = identity_string.encode()
     x_rh_identity_value = base64.b64encode(bytes_string).decode()
@@ -179,8 +214,7 @@ def upload_to_host_inventory(account_number, fingerprints, report_platform_id):
                        'Content-Type': 'application/json'}
     failed_fingerprints = []
     for fingerprint in fingerprints:
-        body = dict()
-        facts = dict()
+        body = {}
         body['account'] = account_number
         body['bios_uuid'] = fingerprint.get('bios_uuid')
         body['display_name'] = fingerprint.get('name')
@@ -190,34 +224,42 @@ def upload_to_host_inventory(account_number, fingerprints, report_platform_id):
         body['rhel_machine_id'] = fingerprint.get('etc_machine_id')
         body['subscription_manager_id'] = fingerprint.get('subscription_manager_id')
         body['fqdn'] = fingerprint.get('name')
-        facts['namespace'] = 'qpc'
-        facts['facts'] = fingerprint
-        body['facts'] = [facts]
+        body['facts'] = [{
+            'namespace': 'qpc',
+            'facts': fingerprint
+        }]
         try:
             response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
-                                    data=json.dumps(body),
-                                    headers=identity_header)
+                                     data=json.dumps(body),
+                                     headers=identity_header)
 
-            if response.status_code not in [200, 201]:
-                LOG.warning('Unexpected response from host inventory service (status=%s): %s', response.status_code, response.json())
+            if response.status_code not in [HTTPStatus.OK, HTTPStatus.CREATED]:
+                LOG.warning('Failed to add to host inventory '
+                            '(account=%s, report_platform_id=%s, host_name=%s).  '
+                            'Response json: %s',
+                            account_number,
+                            report_platform_id,
+                            body.get('display_name'),
+                            response.json())
                 failed_fingerprints.append(fingerprint)
             else:
-                LOG.info('Success response from host inventory service (status=%s): %s', response.status_code, response.json())
+                LOG.debug('Success response from host inventory service (status=%s): %s',
+                          response.status_code, response.json())
 
         except requests.exceptions.RequestException as err:
             failed_fingerprints.append(fingerprint)
             err_msg = 'Posting to (%s) returned error: %s'
-            LOG.error(err_msg % (INSIGHTS_HOST_INVENTORY_URL, err))
+            LOG.error(err_msg, INSIGHTS_HOST_INVENTORY_URL, err)
 
     successful = len(fingerprints) - len(failed_fingerprints)
-    upload_msg = '%s/%s fingerprints were uploaded to the host inventory system.'
+    upload_msg = '%s/%s fingerprints from report %s were uploaded to the host inventory system.'
     if successful != len(fingerprints):
-        LOG.warning(upload_msg % (successful, len(fingerprints)))
+        LOG.warning(upload_msg, successful, len(fingerprints), report_platform_id)
     else:
-        LOG.info(upload_msg % (successful, len(fingerprints)))
+        LOG.info(upload_msg, successful, len(fingerprints), report_platform_id)
     if failed_fingerprints:
         message = 'report_platform_id: "%s"| These fingerprints failed to upload to host inventory system: %s'
-        LOG.debug(message % (report_platform_id, failed_fingerprints))
+        LOG.debug(message, report_platform_id, failed_fingerprints)
     return True
 
 
@@ -259,30 +301,36 @@ async def process_messages():  # pragma: no cover
     :returns None
     """
     while True:
-        msg = await MSG_PENDING_QUEUE.get()
-        if msg.topic == QPC_TOPIC:
-            message = 'The following message was placed on the "%s" topic: %s'
-            LOG.info(message % (QPC_TOPIC, msg))
-            msg_value = json.loads(msg.value.decode('utf-8'))
-            content = download_response_content(msg_value)
-            if content:
-                results_tuple = verify_report_details(content)
-                status = results_tuple[0]
-                valid_prints = results_tuple[1]
-            else:
-                status = FAILURE_CONFIRM_STATUS
-            LOG.info('Sending confirmation "%s", for msg with hash "%s".'
-                     % (status, msg_value['hash']))
-            await send_confirmation(msg_value['hash'], status)
-            if status == SUCCESS_CONFIRM_STATUS:
-                account_number = msg_value['rh_account']
+        consumer_record = await MSG_PENDING_QUEUE.get()
+        if consumer_record.topic == QPC_TOPIC:
+            try:
+                consumer_record_hash = consumer_record['hash']
+                upload_service_message = unpack_consumer_record(consumer_record)
+                report_tar_gz = download_response_content(upload_service_message)
+                qpc_deployments_report = extract_report_from_tar_gz(report_tar_gz)
+                valid_fingerprints, invalid_fingerprints = \
+                    verify_report_details(qpc_deployments_report)
+                report_platform_id = qpc_deployments_report.get('report_platform_id')
+                account_number = upload_service_message.get('rh_account')
                 if not account_number:
-                    account_number = '123456789'
+                    raise QPCReportException('Message missing rh_account.')
+                LOG.info('Report %s produce %s valid and %s invalid fingerprints for account %s. '
+                         'Sending confirmation message to platform (kafka hash = %s)',
+                         report_platform_id,
+                         len(valid_fingerprints),
+                         len(invalid_fingerprints),
+                         account_number,
+                         consumer_record_hash)
+                await send_confirmation(consumer_record_hash, SUCCESS_CONFIRM_STATUS)
                 upload_to_host_inventory(account_number,
-                                         valid_prints,
-                                         content['report_platform_id'])
+                                         valid_fingerprints,
+                                         report_platform_id)
+            except QPCReportException as error:
+                LOG.error('Error processing records.  Message: %s, Error: %s', consumer_record, error)
+                await send_confirmation(consumer_record_hash, FAILURE_CONFIRM_STATUS)
+
         else:
-            LOG.info('Unexpected Message: %s', msg)
+            LOG.debug('Unexpected Message: %s', consumer_record)
 
 
 async def listen_for_messages(consumer):  # pragma: no cover

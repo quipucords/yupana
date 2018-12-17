@@ -47,7 +47,7 @@ def status(request):
         {
             "api_version": 1,
             "commit": "178d2ea",
-            "server_address": "127.0.0.1:8000",
+            "server_address": "127.0.0.1:8001",
             "platform_info": {
                 "system": "Darwin",
                 "node": "node-1.example.com",
@@ -70,7 +70,6 @@ def status(request):
                 "django_filters": "1.0.4",
                 "http.server": "0.6"
                 }
-            "server_address": "127.0.0.1:8000"
         }
     """
     status_info = Status()
