@@ -304,8 +304,8 @@ async def process_messages():  # pragma: no cover
         consumer_record = await MSG_PENDING_QUEUE.get()
         if consumer_record.topic == QPC_TOPIC:
             try:
-                consumer_record_hash = consumer_record['hash']
                 upload_service_message = unpack_consumer_record(consumer_record)
+                message_hash = upload_service_message['hash']
                 report_tar_gz = download_response_content(upload_service_message)
                 qpc_deployments_report = extract_report_from_tar_gz(report_tar_gz)
                 valid_fingerprints, invalid_fingerprints = \
@@ -320,14 +320,14 @@ async def process_messages():  # pragma: no cover
                          len(valid_fingerprints),
                          len(invalid_fingerprints),
                          account_number,
-                         consumer_record_hash)
-                await send_confirmation(consumer_record_hash, SUCCESS_CONFIRM_STATUS)
+                         message_hash)
+                await send_confirmation(message_hash, SUCCESS_CONFIRM_STATUS)
                 upload_to_host_inventory(account_number,
                                          valid_fingerprints,
                                          report_platform_id)
             except QPCReportException as error:
                 LOG.error('Error processing records.  Message: %s, Error: %s', consumer_record, error)
-                await send_confirmation(consumer_record_hash, FAILURE_CONFIRM_STATUS)
+                await send_confirmation(message_hash, FAILURE_CONFIRM_STATUS)
 
         else:
             LOG.debug('Unexpected Message: %s', consumer_record)
