@@ -55,7 +55,7 @@ def format_message(prefix, message, account_number=None, report_id=None):
     :returns: (str) containing formatted message
     """
     actual_message = None
-    if not (report_id and account_number):
+    if not report_id and not account_number:
         actual_message = 'Report %s - %s' % (prefix, message)
     elif account_number and not report_id:
         actual_message = 'Report(account=%s) %s - %s' % (account_number, prefix, message)
@@ -107,7 +107,7 @@ def unpack_consumer_record(upload_service_message):
         raise QPCKafkaMsgException(format_message(prefix, 'Upload service message not JSON.'))
 
 
-def download_response_content(upload_service_message, account_number=None):
+def download_response_content(upload_service_message, account_number):
     """
     Download report.
 
@@ -125,10 +125,7 @@ def download_response_content(upload_service_message, account_number=None):
                     'kafka message missing report url.  Message: %s' % upload_service_message,
                     account_number=account_number))
 
-        LOG.info(format_message(
-            prefix,
-            'downloading %s' % report_url,
-            account_number=account_number
+        LOG.info(format_message(prefix,'downloading %s' % report_url,account_number=account_number
         ))
         download_response = requests.get(report_url)
         if download_response.status_code != HTTPStatus.OK:
