@@ -84,7 +84,7 @@ class KafkaMsgHandlerError(Exception):
 
 
 def unpack_consumer_record(upload_service_message):
-    """Retreive report URL from kafka.
+    """Retrieve report URL from kafka.
 
     :param upload_service_message: the value of the kakfa message from file
         upload service.
@@ -107,15 +107,15 @@ def unpack_consumer_record(upload_service_message):
         raise QPCKafkaMsgException(format_message(prefix, 'Upload service message not JSON.'))
 
 
-def download_response_content(upload_service_message):
+def download_response_content(upload_service_message, account_number=None):
     """
     Download report.
 
     :param upload_service_message: the value of the kakfa message
+    :param account_number: <str> of the User's account number.
     :returns content: The tar.gz binary content or None if there are errors.
     """
     prefix = 'REPORT DOWNLOAD'
-    account_number = upload_service_message.get('rh_account')
     try:
         report_url = upload_service_message.get('url', None)
         if not report_url:
@@ -238,10 +238,12 @@ def verify_report_details(account_number, deployments_report):
                 report_id=report_id))
 
     valid_fingerprints, invalid_fingerprints = verify_report_fingerprints(account_number, deployments_report)
+    number_valid = len(valid_fingerprints)
+    total = number_valid + len(invalid_fingerprints)
     LOG.info(format_message(
         prefix,
-        '%s valid and %s invalid fingerprints' % (
-            len(valid_fingerprints), len(invalid_fingerprints)),
+        '%s/%s are valid fingerprints' % (
+            number_valid, total),
         account_number=account_number,
         report_id=report_id
     ))
@@ -290,6 +292,50 @@ def verify_report_fingerprints(account_number, deployments_report):
 
     # Invalid fingerprints is for future use.
     return valid_fingerprints, invalid_fingerprints
+
+
+async def send_confirmation(file_hash, status, account_number=None, report_id=None):  # pragma: no cover
+    """
+    Send kafka validation message to Insights Upload service.
+
+    When a new file lands for topic 'qpc' we must validate it
+    so that it will be made permanently available to other
+    apps listening on the 'available' topic.
+    :param: file_hash (String): Hash for file being confirmed.
+    :param: status (String): Either 'success' or 'failure'
+    :param account_number: <str> of the User's account number.
+    :param report_id: <str> of the report platform id
+    :returns None
+    """
+    prefix = 'REPORT VALIDATION STATE ON KAFKA'
+    producer = AIOKafkaProducer(
+        loop=EVENT_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
+    )
+    try:
+        await producer.start()
+    except (KafkaConnectionError, TimeoutError):
+        await producer.stop()
+        raise KafkaMsgHandlerError(
+            format_message(
+                prefix,
+                'Unable to connect to kafka server.  Closing producer.',
+                account_number=account_number,
+                report_id=report_id))
+    try:
+        validation = {
+            'hash': file_hash,
+            'validation': status
+        }
+        msg = bytes(json.dumps(validation), 'utf-8')
+        await producer.send_and_wait(VALIDATION_TOPIC, msg)
+        LOG.info(
+            format_message(
+                prefix,
+                'Send %s validation status to file upload on kafka' % status,
+                account_number=account_number,
+                report_id=report_id))
+    finally:
+        await producer.stop()
 
 
 def upload_to_host_inventory(account_number, report_id, fingerprints):
@@ -350,8 +396,12 @@ def upload_to_host_inventory(account_number, report_id, fingerprints):
                     'fingerprint': fingerprint})
 
     successful = len(fingerprints) - len(failed_fingerprints)
-    upload_msg = format_message(prefix, '%s/%s fingerprints uploaded to host inventory' %
-                                (successful, len(fingerprints)))
+    upload_msg = format_message(
+        prefix, '%s/%s fingerprints uploaded to host inventory' %
+        (successful, len(fingerprints)),
+        account_number=account_number,
+        report_id=report_id
+    )
     if successful != len(fingerprints):
         LOG.warning(upload_msg)
     else:
@@ -368,50 +418,6 @@ def upload_to_host_inventory(account_number, report_id, fingerprints):
                 account_number=account_number,
                 report_id=report_id
             ))
-
-
-async def send_confirmation(file_hash, status, account_number=None, report_id=None):  # pragma: no cover
-    """
-    Send kafka validation message to Insights Upload service.
-
-    When a new file lands for topic 'qpc' we must validate it
-    so that it will be made permanently available to other
-    apps listening on the 'available' topic.
-    :param: file_hash (String): Hash for file being confirmed.
-    :param: status (String): Either 'success' or 'failure'
-    :param account_number: <str> of the User's account number.
-    :param report_id: <str> of the report platform id
-    :returns None
-    """
-    prefix = 'REPORT VALIDATION STATE ON KAFKA'
-    producer = AIOKafkaProducer(
-        loop=EVENT_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
-    )
-    try:
-        await producer.start()
-    except (KafkaConnectionError, TimeoutError):
-        await producer.stop()
-        raise KafkaMsgHandlerError(
-            format_message(
-                prefix,
-                'Unable to connect to kafka server.  Closing producer.',
-                account_number=account_number,
-                report_id=report_id))
-    try:
-        validation = {
-            'hash': file_hash,
-            'validation': status
-        }
-        msg = bytes(json.dumps(validation), 'utf-8')
-        await producer.send_and_wait(VALIDATION_TOPIC, msg)
-        LOG.info(
-            format_message(
-                prefix,
-                'Send %s validation status to file upload on kafka' % status,
-                account_number=account_number,
-                report_id=report_id))
-    finally:
-        await producer.stop()
 
 
 async def process_messages():  # pragma: no cover
@@ -435,7 +441,7 @@ async def process_messages():  # pragma: no cover
                             'Message missing rh_account.'))
                 try:
                     message_hash = upload_service_message['hash']
-                    report_tar_gz = download_response_content(upload_service_message)
+                    report_tar_gz = download_response_content(upload_service_message, account_number=account_number)
                     qpc_deployments_report = extract_report_from_tar_gz(account_number, report_tar_gz)
                     valid_fingerprints, _ = verify_report_details(
                         account_number, qpc_deployments_report)
