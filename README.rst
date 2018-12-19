@@ -66,7 +66,7 @@ There is a known limitation with docker-compose and Linux environments with SELi
 
     "mkdir: cannot create directory '/var/lib/pgsql/data/userdata': Permission denied" can be resolved by granting ./pg_data ownership permissions to uid:26 (postgres user in centos/postgresql-96-centos7)
   
-If this error is encountered, the following command can be used to grant `./pg_data` ownership permissions to uid:26 as the error suggests ::
+If this error is encountered, the following command can be used to grant ``pg_data`` ownership permissions to uid:26 as the error suggests ::
 
   setfacl -m u:26:-wx ./pg_data/
 
