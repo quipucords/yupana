@@ -100,7 +100,7 @@ def unpack_consumer_record(upload_service_message):
                                 account_number=account_number))
         LOG.debug(format_message(
             prefix,
-            'Message: %s' % upload_service_message,
+            'Message: %s' % str(upload_service_message),
             account_number=account_number))
         return json_message
     except ValueError:
