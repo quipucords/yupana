@@ -242,7 +242,8 @@ def verify_report_details(account_number, deployments_report):
         prefix,
         '%s valid and %s invalid fingerprints' % (
             len(valid_fingerprints), len(invalid_fingerprints)),
-        account_number=account_number
+        account_number=account_number,
+        report_id=report_id
     ))
     if not valid_fingerprints:
         raise QPCReportException(
@@ -439,7 +440,10 @@ async def process_messages():  # pragma: no cover
                     valid_fingerprints, _ = verify_report_details(
                         account_number, qpc_deployments_report)
                     report_id = qpc_deployments_report.get('report_platform_id')
-                    await send_confirmation(message_hash, SUCCESS_CONFIRM_STATUS)
+                    await send_confirmation(message_hash,
+                                            SUCCESS_CONFIRM_STATUS,
+                                            account_number=account_number,
+                                            report_id=report_id)
                     upload_to_host_inventory(account_number,
                                              report_id,
                                              valid_fingerprints)
@@ -448,7 +452,7 @@ async def process_messages():  # pragma: no cover
                         prefix,
                         'Error processing records.  Message: %s, Error: %s' % (consumer_record, error),
                         account_number=account_number))
-                    await send_confirmation(message_hash, FAILURE_CONFIRM_STATUS)
+                    await send_confirmation(message_hash, FAILURE_CONFIRM_STATUS, account_number=account_number)
             except QPCKafkaMsgException as message_error:
                 LOG.error(prefix, 'Error processing records.  Message: %s, Error: %s', consumer_record, message_error)
                 await send_confirmation(message_hash, FAILURE_CONFIRM_STATUS)
