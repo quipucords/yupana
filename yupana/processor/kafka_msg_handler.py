@@ -90,7 +90,7 @@ def unpack_consumer_record(upload_service_message):
         upload service.
     :returns: str containing the url to the qpc report's tar.gz file.
     """
-    prefix = 'NEW REPORT_UPLOAD'
+    prefix = 'NEW REPORT UPLOAD'
     try:
         json_message = json.loads(upload_service_message.value.decode('utf-8'))
         message = 'received on %s topic' % upload_service_message.topic
@@ -125,6 +125,11 @@ def download_response_content(upload_service_message):
                     'kafka message missing report url.  Message: %s' % upload_service_message,
                     account_number=account_number))
 
+        LOG.info(format_message(
+            prefix,
+            'downloading %s' % report_url,
+            account_number=account_number
+        ))
         download_response = requests.get(report_url)
         if download_response.status_code != HTTPStatus.OK:
             raise QPCReportException(
@@ -135,6 +140,11 @@ def download_response_content(upload_service_message):
                                    upload_service_message),
                                account_number=account_number))
 
+        LOG.info(format_message(
+            prefix,
+            'successfully downloaded %s' % report_url,
+            account_number=account_number
+        ))
         return download_response.content
     except requests.exceptions.HTTPError as err:
         raise QPCReportException(
@@ -228,6 +238,12 @@ def verify_report_details(account_number, deployments_report):
                 report_id=report_id))
 
     valid_fingerprints, invalid_fingerprints = verify_report_fingerprints(account_number, deployments_report)
+    LOG.info(format_message(
+        prefix,
+        '%s valid and %s invalid fingerprints' % (
+            len(valid_fingerprints), len(invalid_fingerprints)),
+        account_number=account_number
+    ))
     if not valid_fingerprints:
         raise QPCReportException(
             format_message(
@@ -366,7 +382,7 @@ async def send_confirmation(file_hash, status, account_number=None, report_id=No
     :param report_id: <str> of the report platform id
     :returns None
     """
-    prefix = 'REPORT VALIDATION STATE ON KAFAK'
+    prefix = 'REPORT VALIDATION STATE ON KAFKA'
     producer = AIOKafkaProducer(
         loop=EVENT_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
     )
