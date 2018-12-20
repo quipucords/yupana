@@ -125,8 +125,8 @@ def download_response_content(upload_service_message, account_number):
                     'kafka message missing report url.  Message: %s' % upload_service_message,
                     account_number=account_number))
 
-        LOG.info(format_message(prefix,'downloading %s' % report_url,account_number=account_number
-        ))
+        LOG.info(format_message(prefix, 'downloading %s' % report_url, account_number=account_number
+                                ))
         download_response = requests.get(report_url)
         if download_response.status_code != HTTPStatus.OK:
             raise QPCReportException(
@@ -194,6 +194,8 @@ def extract_report_from_tar_gz(account_number, report_tar_gz):
             format_message(prefix,
                            'Tar contains no JSON files.',
                            account_number=account_number))
+    except QPCReportException as qpc_err:
+        raise qpc_err
     except Exception as err:
         raise QPCReportException(
             format_message(prefix,
@@ -451,10 +453,7 @@ async def process_messages():  # pragma: no cover
                                              report_id,
                                              valid_fingerprints)
                 except QPCReportException as error:
-                    LOG.error(format_message(
-                        prefix,
-                        'Error processing records.  Message: %s, Error: %s' % (consumer_record, error),
-                        account_number=account_number))
+                    LOG.error(error)
                     await send_confirmation(message_hash, FAILURE_CONFIRM_STATUS, account_number=account_number)
             except QPCKafkaMsgException as message_error:
                 LOG.error(prefix, 'Error processing records.  Message: %s, Error: %s', consumer_record, message_error)
