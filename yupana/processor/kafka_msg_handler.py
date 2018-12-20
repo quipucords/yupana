@@ -72,7 +72,12 @@ class QPCReportException(Exception):
 
 
 class QPCKafkaMsgException(Exception):
-    """Use to report errors with kafka message."""
+    """Use to report errors with kafka message.
+
+    Used when we think the kafka message is useful
+    in debugging.  Error with external services
+    (connected via kafka).
+    """
 
     pass
 
@@ -129,7 +134,7 @@ def download_response_content(upload_service_message, account_number):
                                 ))
         download_response = requests.get(report_url)
         if download_response.status_code != HTTPStatus.OK:
-            raise QPCReportException(
+            raise QPCKafkaMsgException(
                 format_message(prefix,
                                'HTTP status code %s returned for URL %s.  Message: %s' % (
                                    download_response.status_code,
