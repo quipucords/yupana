@@ -65,6 +65,11 @@ Assuming the default .env file values are used, to access the database directly 
 There is a known limitation with docker-compose and Linux environments with SELinux enabled. You may see the following error during the postgres container deployment::
 
     "mkdir: cannot create directory '/var/lib/pgsql/data/userdata': Permission denied" can be resolved by granting ./pg_data ownership permissions to uid:26 (postgres user in centos/postgresql-96-centos7)
+  
+If this error is encountered, the following command can be used to grant ``pg_data`` ownership permissions to uid:26 as the error suggests ::
+
+  setfacl -m u:26:-wx ./pg_data/
+
 
 If a docker container running Postgres is not feasible, it is possible to run Postgres locally as documented in the Postgres tutorial_. The default port for local Postgres installations is ``5432``. Make sure to modify the `.env` file accordingly. To initialize the database run ::
 
