@@ -218,15 +218,20 @@ def verify_report_details(account_number, deployments_report):
                      'report_type',
                      'system_fingerprints']
     report_id = deployments_report.get('report_platform_id')
+    missing_keys = []
     for key in required_keys:
         required_key = deployments_report.get(key)
         if not required_key:
-            raise QPCReportException(
-                format_message(
-                    prefix,
-                    'Report is missing required field %s.' % key,
-                    account_number=account_number,
-                    report_id=report_id))
+            missing_keys.append(key)
+
+    if missing_keys:
+        missing_keys_str = ', '.join(missing_keys)
+        raise QPCReportException(
+            format_message(
+                prefix,
+                'Report is missing required fields: %s.' % missing_keys_str,
+                account_number=account_number,
+                report_id=report_id))
 
     if deployments_report['report_type'] != 'deployments':
         raise QPCReportException(
