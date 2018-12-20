@@ -199,7 +199,7 @@ def extract_report_from_tar_gz(account_number, report_tar_gz):
     except Exception as err:
         raise QPCReportException(
             format_message(prefix,
-                           'Unexpected read-error: %s' % str(err),
+                           'Unexpected error reading tar.gz: %s' % str(err),
                            account_number=account_number))
 
 
