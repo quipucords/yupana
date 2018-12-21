@@ -395,7 +395,7 @@ class KafkaMsgHandlerTest(TestCase):
     def test_no_account_number_inventory_upload(self):
         """Testing no account number present when uploading to inventory."""
         account_number = None
-        report_platform_id = '0001-cody'
+        report_platform_id = '0001-kevan'
         fingerprints = [{'bios_uuid': 'value', 'name': 'value'},
                         {'insights_client_id': 'value', 'name': 'foo'},
                         {'ip_addresses': 'value', 'name': 'foo'},
@@ -410,7 +410,7 @@ class KafkaMsgHandlerTest(TestCase):
     def test_successful_host_inventory_upload(self):
         """Testing successful upload to host inventory."""
         account_number = '00001'
-        report_platform_id = '0001-cody'
+        report_platform_id = '0001-kevan'
         fingerprints = [{'bios_uuid': 'value', 'name': 'value'},
                         {'insights_client_id': 'value', 'name': 'foo'},
                         {'ip_addresses': 'value', 'name': 'foo'},
@@ -432,7 +432,7 @@ class KafkaMsgHandlerTest(TestCase):
         bad_resp = requests.exceptions.ConnectionError()
         mock_request.side_effect = [good_resp, bad_resp]
         account_number = '00001'
-        report_platform_id = '0001-cody'
+        report_platform_id = '0001-kevan'
         fingerprints = [{'bios_uuid': 'value', 'name': 'value'},
                         {'insights_client_id': 'value', 'name': 'foo'}]
         with patch('processor.kafka_msg_handler.INSIGHTS_HOST_INVENTORY_URL', value='not none'):
