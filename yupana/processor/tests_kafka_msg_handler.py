@@ -57,7 +57,7 @@ class KafkaMsg:
     def __init__(self, topic, url):
         """Initialize the message."""
         self.topic = topic
-        value_dict = {'url': url}
+        value_dict = {'url': url, 'rh_account': '1234'}
         value_str = json.dumps(value_dict)
         self.value = value_str.encode('utf-8')
 
@@ -67,11 +67,30 @@ class KafkaMsgHandlerTest(TestCase):
 
     def setUp(self):
         """Create test setup."""
-        self.payload_url = 'http://insights-upload.com/quarnantine/file_to_validate'
+        self.payload_url = 'http://insights-upload.com/q/file_to_validate'
 
     def tearDown(self):
         """Remove test setup."""
         pass
+
+    def test_format_message_no_account_report(self):
+        """Test format message without account or report id."""
+        msg = msg_handler.format_message('p', 'm')
+        self.assertEquals(msg, 'Report p - m')
+
+    def test_unpack_consumer_record(self):
+        """Test format message without account or report id."""
+        fake_record = KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
+        msg = msg_handler.unpack_consumer_record(fake_record)
+        self.assertEquals(msg, {'url': 'http://internet.com', 'rh_account': '1234'})
+
+    def test_unpack_consumer_record_not_json(self):
+        """Test format message without account or report id."""
+        fake_record = KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
+        fake_record.value = 'not json'.encode('utf-8')
+
+        with self.assertRaises(msg_handler.QPCKafkaMsgException):
+            msg_handler.unpack_consumer_record(fake_record)
 
     def test_verify_report_success(self):
         """Test to verify a QPC report with the correct structure passes validation."""
@@ -267,12 +286,19 @@ class KafkaMsgHandlerTest(TestCase):
         with self.assertRaises(msg_handler.QPCReportException):
             msg_handler.extract_report_from_tar_gz('1234', buffer_content)
 
-    def test_download_response_contnent_bad_url(self):
+    def test_download_response_content_bad_url(self):
         """Test to verify extracting payload exceptions are handled."""
         with requests_mock.mock() as m:
             m.get(self.payload_url, exc=HTTPError)
             with self.assertRaises(msg_handler.QPCReportException):
                 msg_handler.download_report('1234', {'url': self.payload_url})
+
+    def test_download_response_content_missing_url(self):
+        """Test case where url is missing."""
+        with requests_mock.mock() as m:
+            m.get(self.payload_url, exc=HTTPError)
+            with self.assertRaises(msg_handler.QPCReportException):
+                msg_handler.download_report('1234', {})
 
     def test_download_report_success(self):
         """Test to verify extracting contents is successful."""
@@ -324,17 +350,15 @@ class KafkaMsgHandlerTest(TestCase):
                     content = msg_handler.download_report('1234', value)
                     self.assertEqual(content, buffer_content)
 
-    def test_download_and_validate_contents_failure(self):
-        """Test to verify extracting contents fails when contents errors."""
+    def test_download_with_404(self):
+        """Test downloading a URL and getting 404."""
         report_json = {}
         test_dict = dict()
         test_dict['file.json'] = report_json
-        buffer_content = create_tar_buffer(test_dict)
         with requests_mock.mock() as m:
-            m.get(self.payload_url, content=buffer_content)
-            with patch('processor.kafka_msg_handler.extract_report_from_tar_gz', return_value=False):
-                content = msg_handler.download_report('1234', {'url': self.payload_url})
-                self.assertEqual(content, buffer_content)
+            m.get(self.payload_url, status_code=404)
+            with self.assertRaises(msg_handler.QPCKafkaMsgException):
+                msg_handler.download_report('1234', {'url': self.payload_url})
 
     def test_value_error_extract_report_from_tar_gz(self):
         """Testing value error when extracting json from tar.gz."""
