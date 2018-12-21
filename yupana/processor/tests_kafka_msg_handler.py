@@ -83,11 +83,11 @@ class KafkaMsgHandlerTest(TestCase):
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'system_fingerprints': [{'bios_uuid': 'value'}]}
 
-        status = msg_handler.verify_report_details(report_json)
-        accept_return = (msg_handler.SUCCESS_CONFIRM_STATUS,
-                         [{'bios_uuid': 'value'}],
-                         [])
-        self.assertEqual(status, accept_return)
+        valid, invalid = msg_handler.verify_report_details('1234', report_json)
+        expect_valid = [{'bios_uuid': 'value'}]
+        expect_invalid = []
+        self.assertEqual(valid, expect_valid)
+        self.assertEqual(invalid, expect_invalid)
 
     def test_verify_report_success_mixed_fingerprints(self):
         """Test to verify a QPC report with the correct structure passes validation."""
@@ -99,11 +99,11 @@ class KafkaMsgHandlerTest(TestCase):
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'system_fingerprints': [{'bios_uuid': 'value'}, {'invalid': 'value'}]}
 
-        status = msg_handler.verify_report_details(report_json)
-        accept_return = (msg_handler.SUCCESS_CONFIRM_STATUS,
-                         [{'bios_uuid': 'value'}],
-                         [{'invalid': 'value'}])
-        self.assertEqual(status, accept_return)
+        valid, invalid = msg_handler.verify_report_details('12345', report_json)
+        expect_valid = [{'bios_uuid': 'value'}]
+        expect_invalid = [{'invalid': 'value'}]
+        self.assertEqual(valid, expect_valid)
+        self.assertEqual(invalid, expect_invalid)
 
     def test_verify_report_missing_id(self):
         """Test to verify a QPC report with a missing id is failed."""
@@ -114,9 +114,8 @@ class KafkaMsgHandlerTest(TestCase):
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'system_fingerprints': [{'key': 'value'}]}
 
-        status = msg_handler.verify_report_details(report_json)
-        failure = (msg_handler.FAILURE_CONFIRM_STATUS, [], [])
-        self.assertEqual(status, failure)
+        with self.assertRaises(msg_handler.QPCReportException):
+            _, _ = msg_handler.verify_report_details('1234', report_json)
 
     def test_verify_report_fails_no_canonical_facts(self):
         """Test to verify a QPC report with the correct structure passes validation."""
@@ -128,9 +127,8 @@ class KafkaMsgHandlerTest(TestCase):
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'system_fingerprints': [{'name': 'value'}]}
 
-        status = msg_handler.verify_report_details(report_json)
-        failure = (msg_handler.FAILURE_CONFIRM_STATUS, [], [])
-        self.assertEqual(status, failure)
+        with self.assertRaises(msg_handler.QPCReportException):
+            _, _ = msg_handler.verify_report_details('1234', report_json)
 
     def test_verify_report_invalid_report_type(self):
         """Test to verify a QPC report with an invalid report_type is failed."""
@@ -142,9 +140,8 @@ class KafkaMsgHandlerTest(TestCase):
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'system_fingerprints': [{'key': 'value'}]}
 
-        status = msg_handler.verify_report_details(report_json)
-        failure = (msg_handler.FAILURE_CONFIRM_STATUS, [], [])
-        self.assertEqual(status, failure)
+        with self.assertRaises(msg_handler.QPCReportException):
+            _, _ = msg_handler.verify_report_details('1234', report_json)
 
     def test_verify_report_missing_version(self):
         """Test to verify a QPC report missing report_version is failed."""
@@ -155,9 +152,8 @@ class KafkaMsgHandlerTest(TestCase):
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'system_fingerprints': [{'key': 'value'}]}
 
-        status = msg_handler.verify_report_details(report_json)
-        failure = (msg_handler.FAILURE_CONFIRM_STATUS, [], [])
-        self.assertEqual(status, failure)
+        with self.assertRaises(msg_handler.QPCReportException):
+            _, _ = msg_handler.verify_report_details('1234', report_json)
 
     def test_verify_report_missing_platform_id(self):
         """Test to verify a QPC report missing report_platform_id is failed."""
@@ -168,9 +164,8 @@ class KafkaMsgHandlerTest(TestCase):
             'status': 'completed',
             'system_fingerprints': [{'key': 'value'}]}
 
-        status = msg_handler.verify_report_details(report_json)
-        failure = (msg_handler.FAILURE_CONFIRM_STATUS, [], [])
-        self.assertEqual(status, failure)
+        with self.assertRaises(msg_handler.QPCReportException):
+            _, _ = msg_handler.verify_report_details('1234', report_json)
 
     def test_verify_report_missing_fingerprints(self):
         """Test to verify a QPC report with empty fingerprints is failed."""
@@ -182,9 +177,8 @@ class KafkaMsgHandlerTest(TestCase):
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'system_fingerprints': []}
 
-        status = msg_handler.verify_report_details(report_json)
-        failure = (msg_handler.FAILURE_CONFIRM_STATUS, [], [])
-        self.assertEqual(status, failure)
+        with self.assertRaises(msg_handler.QPCReportException):
+            _, _ = msg_handler.verify_report_details('1234', report_json)
 
     def test_verify_report_fingerprints(self):
         """Test fingerprint verification."""
@@ -198,26 +192,33 @@ class KafkaMsgHandlerTest(TestCase):
                  {'subscription_manager_id': 'value'}]
         invalid = [{'not_valid': 'value'}]
         fingerprints = valid + invalid
-        report_platform_id = 'be3075ac-84d3-4b62-9f5c-a418a36f802d'
-        prints = msg_handler.verify_report_fingerprints(fingerprints,
-                                                        report_platform_id)
-        self.assertEqual(prints[0], valid)
-        self.assertEqual(prints[1], invalid)
+        report_json = {
+            'report_id': 1,
+            'report_type': 'deployments',
+            'report_version': '1.0.0.1b025b8',
+            'status': 'completed',
+            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'system_fingerprints': fingerprints}
+        actual_valid, actual_invalid = msg_handler.verify_report_fingerprints('1234',
+                                                                              report_json)
+        self.assertEqual(actual_valid, valid)
+        self.assertEqual(actual_invalid, invalid)
 
         # test that invalid fingerprints are removed
         invalid_print = {'no': 'canonical facts', 'metadata': []}
         fingerprints.append(invalid_print)
-        valid_prints = msg_handler.verify_report_fingerprints(fingerprints,
-                                                              report_platform_id)
+        valid_prints, _ = msg_handler.verify_report_fingerprints('1234',
+                                                                 report_json)
         self.assertNotIn(invalid_print, valid_prints)
 
         # test that if there are no valid fingerprints we return []
         fingerprints = [invalid_print]
-        valid_prints = msg_handler.verify_report_fingerprints(fingerprints,
-                                                              report_platform_id)
-        self.assertEqual([], valid_prints[0])
+        report_json['system_fingerprints'] = fingerprints
+        valid_prints, _ = msg_handler.verify_report_fingerprints('1234',
+                                                                 report_json)
+        self.assertEqual([], valid_prints)
 
-    def test_extract_tar_gz_success(self):
+    def test_extract_report_from_tar_gz_success(self):
         """Testing the extract method with valid buffer content."""
         report_json = {
             'report_id': 1,
@@ -229,10 +230,10 @@ class KafkaMsgHandlerTest(TestCase):
         test_dict = dict()
         test_dict['file.json'] = report_json
         buffer_content = create_tar_buffer(test_dict)
-        result = msg_handler.extract_tar_gz(buffer_content)
+        result = msg_handler.extract_report_from_tar_gz('1234', buffer_content)
         self.assertEqual(result, report_json)
 
-    def test_extract_tar_gz_failure(self):
+    def test_extract_report_from_tar_gz_failure(self):
         """Testing the extract method failure too many json files."""
         report_json = {
             'report_id': 1,
@@ -245,39 +246,35 @@ class KafkaMsgHandlerTest(TestCase):
         test_dict['file.json'] = report_json
         test_dict['file_2.json'] = report_json
         buffer_content = create_tar_buffer(test_dict)
-        result = msg_handler.extract_tar_gz(buffer_content)
-        self.assertEqual(False, result)
+        with self.assertRaises(msg_handler.QPCReportException):
+            msg_handler.extract_report_from_tar_gz('1234', buffer_content)
 
-    def test_extract_tar_gz_failure_no_json(self):
+    def test_extract_report_from_tar_gz_failure_no_json(self):
         """Testing the extract method failure no json file."""
         report_json = 'No valid report'
         test_dict = dict()
         test_dict['file.txt'] = report_json
         buffer_content = create_tar_buffer(test_dict)
-        result = msg_handler.extract_tar_gz(buffer_content)
-        self.assertEqual(False, result)
+        with self.assertRaises(msg_handler.QPCReportException):
+            msg_handler.extract_report_from_tar_gz('1234', buffer_content)
 
-    def test_extract_tar_gz_failure_invalid_json(self):
+    def test_extract_report_from_tar_gz_failure_invalid_json(self):
         """Testing the extract method failure invalid json."""
         report_json = None
         test_dict = dict()
         test_dict['file.json'] = report_json
         buffer_content = create_tar_buffer(test_dict)
-        result = msg_handler.extract_tar_gz(buffer_content)
-        self.assertEqual(False, result)
-
-    def test_download_and_validate_contents(self):
-        """Test validating the contents."""
-        pass
+        with self.assertRaises(msg_handler.QPCReportException):
+            msg_handler.extract_report_from_tar_gz('1234', buffer_content)
 
     def test_download_response_contnent_bad_url(self):
         """Test to verify extracting payload exceptions are handled."""
         with requests_mock.mock() as m:
             m.get(self.payload_url, exc=HTTPError)
-            with self.assertRaises(msg_handler.KafkaMsgHandlerError):
-                msg_handler.download_response_content({'url': self.payload_url})
+            with self.assertRaises(msg_handler.QPCReportException):
+                msg_handler.download_report('1234', {'url': self.payload_url})
 
-    def test_download_response_content_success(self):
+    def test_download_report_success(self):
         """Test to verify extracting contents is successful."""
         report_json = {
             'report_id': 1,
@@ -292,8 +289,8 @@ class KafkaMsgHandlerTest(TestCase):
         buffer_content = create_tar_buffer(test_dict)
         with requests_mock.mock() as m:
             m.get(self.payload_url, content=buffer_content)
-            status = msg_handler.download_response_content(value)
-            self.assertEqual(report_json, status)
+            content = msg_handler.download_report('1234', value)
+            self.assertEqual(buffer_content, content)
 
     def test_download_and_validate_contents_invalid_report(self):
         """Test to verify extracting contents fails when report is invalid."""
@@ -303,9 +300,9 @@ class KafkaMsgHandlerTest(TestCase):
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'system_fingerprints': [{'key': 'value'}]}
-        status = msg_handler.verify_report_details(report_json)
-        failure = (msg_handler.FAILURE_CONFIRM_STATUS, [], [])
-        self.assertEqual(failure, status)
+
+        with self.assertRaises(msg_handler.QPCReportException):
+            _, _ = msg_handler.verify_report_details('1234', report_json)
 
     def test_download_and_validate_contents_raises_error(self):
         """Test to verify extracting contents fails when error is raised."""
@@ -322,10 +319,10 @@ class KafkaMsgHandlerTest(TestCase):
         buffer_content = create_tar_buffer(test_dict)
         with requests_mock.mock() as m:
             m.get(self.payload_url, content=buffer_content)
-            with patch('processor.kafka_msg_handler.extract_tar_gz', side_effect=HTTPError):
-                with self.assertRaises(msg_handler.KafkaMsgHandlerError):
-                    status = msg_handler.download_response_content(value)
-                    self.assertEqual(False, status)
+            with patch('requests.get', side_effect=HTTPError):
+                with self.assertRaises(msg_handler.QPCReportException):
+                    content = msg_handler.download_report('1234', value)
+                    self.assertEqual(content, buffer_content)
 
     def test_download_and_validate_contents_failure(self):
         """Test to verify extracting contents fails when contents errors."""
@@ -335,11 +332,11 @@ class KafkaMsgHandlerTest(TestCase):
         buffer_content = create_tar_buffer(test_dict)
         with requests_mock.mock() as m:
             m.get(self.payload_url, content=buffer_content)
-            with patch('processor.kafka_msg_handler.extract_tar_gz', return_value=False):
-                status = msg_handler.download_response_content({'url': self.payload_url})
-                self.assertEqual(False, status)
+            with patch('processor.kafka_msg_handler.extract_report_from_tar_gz', return_value=False):
+                content = msg_handler.download_report('1234', {'url': self.payload_url})
+                self.assertEqual(content, buffer_content)
 
-    def test_value_error_extract_tar_gz(self):
+    def test_value_error_extract_report_from_tar_gz(self):
         """Testing value error when extracting json from tar.gz."""
         invalid_json = '["report_id": 1]'
         tar_buffer = io.BytesIO()
@@ -352,10 +349,10 @@ class KafkaMsgHandlerTest(TestCase):
             tar_file.addfile(tarinfo=info, fileobj=file_buffer)
         tar_buffer.seek(0)
         buffer_content = tar_buffer.getvalue()
-        status = msg_handler.extract_tar_gz(buffer_content)
-        self.assertEqual(False, status)
+        with self.assertRaises(msg_handler.QPCReportException):
+            msg_handler.extract_report_from_tar_gz('1234', buffer_content)
 
-    def test_no_json_files_extract_tar_gz(self):
+    def test_no_json_files_extract_report_from_tar_gz(self):
         """Testing no json files found in tar.gz."""
         invalid_json = '["report_id": 1]'
         tar_buffer = io.BytesIO()
@@ -368,8 +365,8 @@ class KafkaMsgHandlerTest(TestCase):
             tar_file.addfile(tarinfo=info, fileobj=file_buffer)
         tar_buffer.seek(0)
         buffer_content = tar_buffer.getvalue()
-        status = msg_handler.extract_tar_gz(buffer_content)
-        self.assertEqual(False, status)
+        with self.assertRaises(msg_handler.QPCReportException):
+            msg_handler.extract_report_from_tar_gz('1234', buffer_content)
 
     def test_no_account_number_inventory_upload(self):
         """Testing no account number present when uploading to inventory."""
@@ -382,10 +379,9 @@ class KafkaMsgHandlerTest(TestCase):
                         {'vm_uuid': 'value', 'name': 'foo'},
                         {'etc_machine_id': 'value'},
                         {'subscription_manager_id': 'value'}]
-        status = msg_handler.upload_to_host_inventory(account_number,
-                                                      fingerprints,
-                                                      report_platform_id)
-        self.assertEqual(False, status)
+        msg_handler.upload_to_host_inventory(account_number,
+                                             report_platform_id,
+                                             fingerprints)
 
     def test_successful_host_inventory_upload(self):
         """Testing successful upload to host inventory."""
@@ -400,10 +396,9 @@ class KafkaMsgHandlerTest(TestCase):
                         {'subscription_manager_id': 'value'}]
         with patch('processor.kafka_msg_handler.INSIGHTS_HOST_INVENTORY_URL', value='not none'):
             with patch('processor.kafka_msg_handler.requests', status_code=200):
-                status = msg_handler.upload_to_host_inventory(account_number,
-                                                              fingerprints,
-                                                              report_platform_id)
-        self.assertEqual(True, status)
+                msg_handler.upload_to_host_inventory(account_number,
+                                                     report_platform_id,
+                                                     fingerprints)
 
     @patch('processor.kafka_msg_handler.requests.post')
     def test_host_url_exceptions(self, mock_request):
@@ -417,7 +412,6 @@ class KafkaMsgHandlerTest(TestCase):
         fingerprints = [{'bios_uuid': 'value', 'name': 'value'},
                         {'insights_client_id': 'value', 'name': 'foo'}]
         with patch('processor.kafka_msg_handler.INSIGHTS_HOST_INVENTORY_URL', value='not none'):
-            status = msg_handler.upload_to_host_inventory(account_number,
-                                                          fingerprints,
-                                                          report_platform_id)
-        self.assertEqual(True, status)
+            msg_handler.upload_to_host_inventory(account_number,
+                                                 report_platform_id,
+                                                 fingerprints)

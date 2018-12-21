@@ -112,12 +112,12 @@ def unpack_consumer_record(upload_service_message):
         raise QPCKafkaMsgException(format_message(prefix, 'Upload service message not JSON.'))
 
 
-def download_response_content(upload_service_message, account_number):
+def download_report(account_number, upload_service_message):
     """
     Download report.
 
-    :param upload_service_message: the value of the kakfa message
     :param account_number: <str> of the User's account number.
+    :param upload_service_message: the value of the kakfa message
     :returns content: The tar.gz binary content or None if there are errors.
     """
     prefix = 'REPORT DOWNLOAD'
@@ -450,7 +450,7 @@ async def process_messages():  # pragma: no cover
                             'Message missing rh_account.'))
                 try:
                     message_hash = upload_service_message['hash']
-                    report_tar_gz = download_response_content(upload_service_message, account_number=account_number)
+                    report_tar_gz = download_report(account_number, upload_service_message)
                     qpc_deployments_report = extract_report_from_tar_gz(account_number, report_tar_gz)
                     valid_fingerprints, _ = verify_report_details(
                         account_number, qpc_deployments_report)
