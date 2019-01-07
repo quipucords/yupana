@@ -1,6 +1,6 @@
 -i https://pypi.python.org/simple
 django-environ==0.4.5
-django==2.1.4
+django==2.1.5
 djangorestframework==3.9.0
 gunicorn==19.9.0
 psycopg2-binary==2.7.6.1
