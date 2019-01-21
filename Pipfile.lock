@@ -78,10 +78,10 @@
         },
         "kafka-python": {
             "hashes": [
-                "sha256:078acdcd1fc6eddacc46d437c664998b4cf7613b7e79ced66a460965f2648f88",
-                "sha256:0b56f286b674dcb331d80c1d39a01a753cc3acc962bee707da5f207db74f0a26"
+                "sha256:99c4ff3b69f6e959307d1184e6ece8276b5e3f52cab0e8919dbd61e79914ec1c",
+                "sha256:2014bbbe618f3224e68b07cf9b44c702b28913c551e6f63246bf9b4477ca3add"
             ],
-            "version": "==1.4.3"
+            "version": "==1.4.4"
         },
         "psycopg2-binary": {
             "hashes": [
