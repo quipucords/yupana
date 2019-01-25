@@ -22,7 +22,6 @@ import json
 import logging
 import tarfile
 import threading
-import time
 from http import HTTPStatus
 from io import BytesIO
 
