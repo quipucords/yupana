@@ -22,6 +22,7 @@ import json
 import logging
 import tarfile
 import threading
+import time
 from http import HTTPStatus
 from io import BytesIO
 
@@ -43,6 +44,8 @@ SUCCESS_CONFIRM_STATUS = 'success'
 FAILURE_CONFIRM_STATUS = 'failure'
 CANONICAL_FACTS = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addresses',
                    'vm_uuid', 'etc_machine_id', 'subscription_manager_id']
+SESSION_TIMEOUT = 300 * 1000
+REQUEST_TIMEOUT = 500 * 1000
 
 
 def format_message(prefix, message, account_number=None, report_id=None):
@@ -54,7 +57,6 @@ def format_message(prefix, message, account_number=None, report_id=None):
     :param report_id: (str) The qpc report id.
     :returns: (str) containing formatted message
     """
-    actual_message = None
     if not report_id and not account_number:
         actual_message = 'Report %s - %s' % (prefix, message)
     elif account_number and not report_id:
@@ -510,7 +512,8 @@ def asyncio_worker_thread(loop):  # pragma: no cover
     consumer = AIOKafkaConsumer(
         AVAILABLE_TOPIC, QPC_TOPIC,
         loop=EVENT_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS,
-        group_id='qpc-group'
+        group_id='qpc-group', session_timeout_ms=SESSION_TIMEOUT,
+        request_timeout_ms=REQUEST_TIMEOUT
     )
 
     loop.create_task(process_messages())
