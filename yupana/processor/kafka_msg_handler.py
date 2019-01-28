@@ -43,6 +43,7 @@ SUCCESS_CONFIRM_STATUS = 'success'
 FAILURE_CONFIRM_STATUS = 'failure'
 CANONICAL_FACTS = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addresses',
                    'vm_uuid', 'etc_machine_id', 'subscription_manager_id']
+# we will want to revert these to the defaults when we improve processing/ACK time in yupana
 SESSION_TIMEOUT = 300 * 1000
 REQUEST_TIMEOUT = 500 * 1000
 
