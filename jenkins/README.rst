@@ -18,24 +18,17 @@ You can access the deployment jobs via `Jenkins`_. The job for ci is called ``de
 Deployment
 ==========
 
-If you make changes to the deployment `template <../openshift/yupana-template.yaml>`_, you must delete the yupana app within subscriptions-ci and subscriptions-qa projects and redeploy via Jenkins. You can do this by completing the following steps ::
+If you make changes to the deployment `template <../openshift/yupana-template.yaml>`_, you must delete the yupana app within each project (subscriptions-ci, subscriptions-qa, subscriptions-stage, subscriptions-prod) and redeploy via Jenkins. You can do this by completing the following steps ::
 
     oc login https://api.insights-dev.openshift.com:443 --token=<your-token>
-    oc project subscriptions-ci
+    oc project NAME_OF_PROJECT
     oc delete all -l app=yupana
     oc delete persistentvolumeclaim yupana-pgsql
     oc delete configmaps yupana-env
     oc delete secret yupana-secret
     oc delete secret yupana-pgsql
 
-    oc project subscriptions-qa
-    oc delete all -l app=yupana
-    oc delete persistentvolumeclaim yupana-pgsql
-    oc delete configmaps yupana-env
-    oc delete secret yupana-secret
-    oc delete secret yupana-pgsql
-
-After deleting the app, you should visit `Jenkins`_ and choose ``Build Now`` for the ``deploy-yupana-ci/qa`` projects.
+After deleting the app, you should visit `Jenkins`_ and choose ``Build Now`` for the ``deploy-yupana-ci/qa/stage/prod`` projects.
 
 .. _Jenkins: https://sonar-jenkins.rhev-ci-vms.eng.rdu2.redhat.com/
 .. |license| image:: https://img.shields.io/github/license/quipucords/yupana.svg

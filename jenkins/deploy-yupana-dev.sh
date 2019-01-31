@@ -28,6 +28,7 @@ if [ -z "$BUILD_CONFIG" ]; then
       --param KAFKA_HOST=${KAFKA_HOST} \
       --param KAFKA_PORT=${KAFKA_PORT} \
       --param KAFKA_NAMESPACE=${KAFKA_NAMESPACE} \
+      --param INSIGHTS_HOST_INVENTORY_URL=${INSIGHTS_HOST_INVENTORY_URL} \
 
   echo "Find build id"
   BUILD_ID=`oc get builds | grep ${APP_NAME} | tail -1 | awk '{print $1}'`
