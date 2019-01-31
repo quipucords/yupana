@@ -1,6 +1,6 @@
 curl -d "{\"text\": \"${OPENSHIFT_PROJECT}/${APP_NAME} (STATUS) - Deploy build started.\"}" -H "Content-Type: application/json" -X POST ${SLACK_QPC_BOTS}
 
-oc login https://${PREPROD_OPENSHIFT_HOST}:${PREPROD_OPENSHIFT_PORT} --token=${PREPROD_OPENSHIFT_TOKEN}
+oc login https://${OPENSHIFT_HOST}:${OPENSHIFT_PORT} --token=${PROD_OPENSHIFT_TOKEN}
 
 oc project ${OPENSHIFT_PROJECT}
 
@@ -132,17 +132,17 @@ echo "Scaling up new deployment $test_rc_id"
 oc scale --replicas=1 rc $RC_ID
 
 
-echo "Checking for successful deployment at http://${APP_NAME}-${OPENSHIFT_PROJECT}.${PREPROD_OPENSHIFT_APP_DOMAIN}${APP_READINESS_PROBE}"
+echo "Checking for successful deployment at http://${APP_NAME}-${OPENSHIFT_PROJECT}.${OPENSHIFT_APP_DOMAIN}${APP_READINESS_PROBE}"
 set +e
 rc=1
 count=0
 attempts=100
 while [ $rc -ne 0 -a $count -lt $attempts ]; do
-  CURL_RES=`curl -I --connect-timeout 2 http://${APP_NAME}-${OPENSHIFT_PROJECT}.${PREPROD_OPENSHIFT_APP_DOMAIN}${APP_READINESS_PROBE} 2> /dev/null | head -n 1 | cut -d$' ' -f2`
+  CURL_RES=`curl -I --connect-timeout 2 http://${APP_NAME}-${OPENSHIFT_PROJECT}.${OPENSHIFT_APP_DOMAIN}${APP_READINESS_PROBE} 2> /dev/null | head -n 1 | cut -d$' ' -f2`
   if [[ $CURL_RES == "200" ]]; then
     rc=0
-    echo "Successful test against http://${APP_NAME}-${OPENSHIFT_PROJECT}.${PREPROD_OPENSHIFT_APP_DOMAIN}${APP_READINESS_PROBE}"
-    curl -d "{\"text\": \"${OPENSHIFT_PROJECT}/${APP_NAME} (SUCCESS) - Successful test against http://${APP_NAME}-${OPENSHIFT_PROJECT}.${PREPROD_OPENSHIFT_APP_DOMAIN}${APP_READINESS_PROBE}.\"}" -H "Content-Type: application/json" -X POST ${SLACK_QPC_BOTS}
+    echo "Successful test against http://${APP_NAME}-${OPENSHIFT_PROJECT}.${OPENSHIFT_APP_DOMAIN}${APP_READINESS_PROBE}"
+    curl -d "{\"text\": \"${OPENSHIFT_PROJECT}/${APP_NAME} (SUCCESS) - Successful test against http://${APP_NAME}-${OPENSHIFT_PROJECT}.${OPENSHIFT_APP_DOMAIN}${APP_READINESS_PROBE}.\"}" -H "Content-Type: application/json" -X POST ${SLACK_QPC_BOTS}
     break
   fi
   count=$(($count+1))
