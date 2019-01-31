@@ -1,6 +1,8 @@
 curl -d "{\"text\": \"${OPENSHIFT_PROJECT}/${APP_NAME} (STATUS) - Deploy build started.\"}" -H "Content-Type: application/json" -X POST ${SLACK_QPC_BOTS}
 
-oc login https://${OPENSHIFT_HOST}:${OPENSHIFT_PORT} --token=${PROD_OPENSHIFT_TOKEN}
+# for ci/qa projects, we need to change the OPENSHIFT_TOKEN to PREPROD_OPENSHIFT_TOKEN
+# for stage/prod projects, we need to change the OPENSHIFT_TOKEN to PROD_OPENSHIFT_TOKEN
+oc login https://${OPENSHIFT_HOST}:${OPENSHIFT_PORT} --token=${OPENSHIFT_TOKEN}
 
 oc project ${OPENSHIFT_PROJECT}
 
