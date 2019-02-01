@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "f37bc11f990301f72afff02cda7b311a9fadda0f607897bd73e130ae670cfe92"
+            "sha256": "fd5b4eab346a9a84be7ab467efaa7d991e7f42d87089010f3eb3693e039011fc"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -95,7 +95,6 @@
             "hashes": [
                 "sha256:e8c11ff5ca53de6c3d91e1510500611cafd1d247a937ec6c588a0a7cc3bef93c"
             ],
-            "index": "pypi",
             "version": "==0.5.0"
         },
         "psycopg2-binary": {
@@ -182,11 +181,10 @@
         },
         "astroid": {
             "hashes": [
-                "sha256:292fa429e69d60e4161e7612cb7cc8fa3609e2e309f80c224d93a76d5e7b58be",
-                "sha256:c7013d119ec95eb626f7a2011f0b63d0c9a095df9ad06d8507b37084eada1a8d"
+                "sha256:35b032003d6a863f5dcd7ec11abd5cd5893428beaa31ab164982403bcb311f22",
+                "sha256:6a5d668d7dc69110de01cdf7aeec69a679ef486862a0850cc0fd5571505b6b7e"
             ],
-            "index": "pypi",
-            "version": "==2.0.4"
+            "version": "==2.1.0"
         },
         "autopep8": {
             "hashes": [
