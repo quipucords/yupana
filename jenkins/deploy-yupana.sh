@@ -1,6 +1,8 @@
 curl -d "{\"text\": \"${OPENSHIFT_PROJECT}/${APP_NAME} (STATUS) - Deploy build started.\"}" -H "Content-Type: application/json" -X POST ${SLACK_QPC_BOTS}
 
-oc login https://${PREPROD_OPENSHIFT_HOST}:${PREPROD_OPENSHIFT_PORT} --token=${PREPROD_OPENSHIFT_TOKEN}
+# for ci/qa projects, we need to change the OPENSHIFT_TOKEN to PREPROD_OPENSHIFT_TOKEN
+# for stage/prod projects, we need to change the OPENSHIFT_TOKEN to PROD_OPENSHIFT_TOKEN
+oc login https://${OPENSHIFT_HOST}:${OPENSHIFT_PORT} --token=${OPENSHIFT_TOKEN}
 
 oc project ${OPENSHIFT_PROJECT}
 
@@ -28,6 +30,7 @@ if [ -z "$BUILD_CONFIG" ]; then
       --param KAFKA_HOST=${KAFKA_HOST} \
       --param KAFKA_PORT=${KAFKA_PORT} \
       --param KAFKA_NAMESPACE=${KAFKA_NAMESPACE} \
+      --param INSIGHTS_HOST_INVENTORY_URL=${INSIGHTS_HOST_INVENTORY_URL} \
 
   echo "Find build id"
   BUILD_ID=`oc get builds | grep ${APP_NAME} | tail -1 | awk '{print $1}'`
@@ -131,17 +134,17 @@ echo "Scaling up new deployment $test_rc_id"
 oc scale --replicas=1 rc $RC_ID
 
 
-echo "Checking for successful deployment at http://${APP_NAME}-${OPENSHIFT_PROJECT}.${PREPROD_OPENSHIFT_APP_DOMAIN}${APP_READINESS_PROBE}"
+echo "Checking for successful deployment at http://${APP_NAME}-${OPENSHIFT_PROJECT}.${OPENSHIFT_APP_DOMAIN}${APP_READINESS_PROBE}"
 set +e
 rc=1
 count=0
 attempts=100
 while [ $rc -ne 0 -a $count -lt $attempts ]; do
-  CURL_RES=`curl -I --connect-timeout 2 http://${APP_NAME}-${OPENSHIFT_PROJECT}.${PREPROD_OPENSHIFT_APP_DOMAIN}${APP_READINESS_PROBE} 2> /dev/null | head -n 1 | cut -d$' ' -f2`
+  CURL_RES=`curl -I --connect-timeout 2 http://${APP_NAME}-${OPENSHIFT_PROJECT}.${OPENSHIFT_APP_DOMAIN}${APP_READINESS_PROBE} 2> /dev/null | head -n 1 | cut -d$' ' -f2`
   if [[ $CURL_RES == "200" ]]; then
     rc=0
-    echo "Successful test against http://${APP_NAME}-${OPENSHIFT_PROJECT}.${PREPROD_OPENSHIFT_APP_DOMAIN}${APP_READINESS_PROBE}"
-    curl -d "{\"text\": \"${OPENSHIFT_PROJECT}/${APP_NAME} (SUCCESS) - Successful test against http://${APP_NAME}-${OPENSHIFT_PROJECT}.${PREPROD_OPENSHIFT_APP_DOMAIN}${APP_READINESS_PROBE}.\"}" -H "Content-Type: application/json" -X POST ${SLACK_QPC_BOTS}
+    echo "Successful test against http://${APP_NAME}-${OPENSHIFT_PROJECT}.${OPENSHIFT_APP_DOMAIN}${APP_READINESS_PROBE}"
+    curl -d "{\"text\": \"${OPENSHIFT_PROJECT}/${APP_NAME} (SUCCESS) - Successful test against http://${APP_NAME}-${OPENSHIFT_PROJECT}.${OPENSHIFT_APP_DOMAIN}${APP_READINESS_PROBE}.\"}" -H "Content-Type: application/json" -X POST ${SLACK_QPC_BOTS}
     break
   fi
   count=$(($count+1))
