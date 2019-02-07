@@ -21,13 +21,13 @@ django-prometheus = "==1.0.15"
 [dev-packages]
 
 autopep8 = "==1.4.3"
-flake8 = "==3.6.0"
+flake8 = "==3.7.5"
 coverage = "==4.5.2"
 codecov = "==2.0.15"
 pylint = "==2.2.2"
 requests-mock = "==1.5.2"
 sphinx-rtd-theme = "==0.4.2"
-sphinx = "==1.8.3"
+sphinx = "==1.8.4"
 sphinx-autobuild = "==0.7.1"
 tox = "==3.7.0"
 
