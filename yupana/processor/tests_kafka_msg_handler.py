@@ -19,6 +19,7 @@
 import io
 import json
 import tarfile
+import uuid
 from unittest.mock import patch
 
 import processor.kafka_msg_handler as msg_handler
@@ -68,6 +69,13 @@ class KafkaMsgHandlerTest(TestCase):
     def setUp(self):
         """Create test setup."""
         self.payload_url = 'http://insights-upload.com/q/file_to_validate'
+        self.uuid = str(uuid.uuid4())
+        self.uuid2 = str(uuid.uuid4())
+        self.uuid3 = str(uuid.uuid4())
+        self.uuid4 = str(uuid.uuid4())
+        self.uuid5 = str(uuid.uuid4())
+        self.uuid6 = str(uuid.uuid4())
+        self.uuid7 = str(uuid.uuid4())
 
     def tearDown(self):
         """Remove test setup."""
@@ -96,15 +104,15 @@ class KafkaMsgHandlerTest(TestCase):
         """Test to verify a QPC report with the correct structure passes validation."""
         report_json = {
             'report_id': 1,
-            'report_type': 'deployments',
+            'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {'uuid': {'bios_uuid': 'value'}}}
+            'hosts': {self.uuid: {'bios_uuid': 'value'}}}
 
         valid, invalid = msg_handler.verify_report_details('1234', report_json)
-        expect_valid = [{'bios_uuid': 'value'}]
-        expect_invalid = []
+        expect_valid = {self.uuid: {'bios_uuid': 'value'}}
+        expect_invalid = {}
         self.assertEqual(valid, expect_valid)
         self.assertEqual(invalid, expect_invalid)
 
@@ -112,26 +120,27 @@ class KafkaMsgHandlerTest(TestCase):
         """Test to verify a QPC report with the correct structure passes validation."""
         report_json = {
             'report_id': 1,
-            'report_type': 'deployments',
+            'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': [{'bios_uuid': 'value'}, {'invalid': 'value'}]}
+            'hosts': {self.uuid: {'bios_uuid': 'value'},
+                      self.uuid2: {'invalid': 'value'}}}
 
         valid, invalid = msg_handler.verify_report_details('12345', report_json)
-        expect_valid = [{'bios_uuid': 'value'}]
-        expect_invalid = [{'invalid': 'value'}]
+        expect_valid = {self.uuid: {'bios_uuid': 'value'}}
+        expect_invalid = {self.uuid2: {'invalid': 'value'}}
         self.assertEqual(valid, expect_valid)
         self.assertEqual(invalid, expect_invalid)
 
     def test_verify_report_missing_id(self):
         """Test to verify a QPC report with a missing id is failed."""
         report_json = {
-            'report_type': 'deployments',
+            'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': [{'key': 'value'}]}
+            'hosts': {self.uuid: {'key': 'value'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
             _, _ = msg_handler.verify_report_details('1234', report_json)
@@ -140,11 +149,11 @@ class KafkaMsgHandlerTest(TestCase):
         """Test to verify a QPC report with the correct structure passes validation."""
         report_json = {
             'report_id': 1,
-            'report_type': 'deployments',
+            'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': [{'name': 'value'}]}
+            'hosts': {self.uuid: {'name': 'value'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
             _, _ = msg_handler.verify_report_details('1234', report_json)
@@ -157,7 +166,7 @@ class KafkaMsgHandlerTest(TestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': [{'key': 'value'}]}
+            'hosts': {self.uuid: {'key': 'value'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
             _, _ = msg_handler.verify_report_details('1234', report_json)
@@ -166,10 +175,10 @@ class KafkaMsgHandlerTest(TestCase):
         """Test to verify a QPC report missing report_version is failed."""
         report_json = {
             'report_id': 1,
-            'report_type': 'deployments',
+            'report_type': 'insights',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': [{'key': 'value'}]}
+            'hosts': {self.uuid: {'key': 'value'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
             _, _ = msg_handler.verify_report_details('1234', report_json)
@@ -178,10 +187,10 @@ class KafkaMsgHandlerTest(TestCase):
         """Test to verify a QPC report missing report_platform_id is failed."""
         report_json = {
             'report_id': 1,
-            'report_type': 'deployments',
+            'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
-            'hosts': [{'key': 'value'}]}
+            'hosts': {self.uuid: {'key': 'value'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
             _, _ = msg_handler.verify_report_details('1234', report_json)
@@ -190,62 +199,66 @@ class KafkaMsgHandlerTest(TestCase):
         """Test to verify a QPC report with empty fingerprints is failed."""
         report_json = {
             'report_id': 1,
-            'report_type': 'deployments',
+            'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': []}
+            'hosts': {}}
 
         with self.assertRaises(msg_handler.QPCReportException):
             _, _ = msg_handler.verify_report_details('1234', report_json)
 
-    def test_verify_report_fingerprints(self):
-        """Test fingerprint verification."""
-        # test all valid fingerprints
-        valid = [{'bios_uuid': 'value', 'name': 'value'},
-                 {'insights_client_id': 'value', 'name': 'foo'},
-                 {'ip_addresses': 'value', 'name': 'foo'},
-                 {'mac_addresses': 'value', 'name': 'foo'},
-                 {'vm_uuid': 'value', 'name': 'foo'},
-                 {'etc_machine_id': 'value'},
-                 {'subscription_manager_id': 'value'}]
-        invalid = [{'not_valid': 'value'}]
-        fingerprints = valid + invalid
+    def test_verify_report_hosts(self):
+        """Test host verification."""
+        # test all valid hosts
+        uuid8 = str(uuid.uuid4())
+        uuid9 = str(uuid.uuid4())
+
+        valid = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                 self.uuid3: {'ip_addresses': 'value', 'name': 'foo'},
+                 self.uuid4: {'mac_addresses': 'value', 'name': 'foo'},
+                 self.uuid5: {'vm_uuid': 'value', 'name': 'foo'},
+                 self.uuid6: {'etc_machine_id': 'value'},
+                 self.uuid7: {'subscription_manager_id': 'value'}
+                 }
+        invalid = {uuid8: {'not_valid': 'value'}}
+        hosts = dict(valid)
+        hosts.update(invalid)
         report_json = {
             'report_id': 1,
             'report_type': 'deployments',
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': fingerprints}
-        actual_valid, actual_invalid = msg_handler.verify_report_fingerprints('1234',
-                                                                              report_json)
+            'hosts': hosts}
+        actual_valid, actual_invalid = msg_handler.verify_report_hosts('1234',
+                                                                       report_json)
         self.assertEqual(actual_valid, valid)
         self.assertEqual(actual_invalid, invalid)
 
         # test that invalid fingerprints are removed
-        invalid_print = {'no': 'canonical facts', 'metadata': []}
-        fingerprints.append(invalid_print)
-        valid_prints, _ = msg_handler.verify_report_fingerprints('1234',
-                                                                 report_json)
-        self.assertNotIn(invalid_print, valid_prints)
+        invalid_host = {uuid9: {'no': 'canonical facts', 'metadata': []}}
+        hosts.update(invalid_host)
+        valid_hosts, _ = msg_handler.verify_report_hosts('1234',
+                                                         report_json)
+        self.assertEqual(valid_hosts.get(uuid9), None)
 
-        # test that if there are no valid fingerprints we return []
-        fingerprints = [invalid_print]
-        report_json['hosts'] = fingerprints
-        valid_prints, _ = msg_handler.verify_report_fingerprints('1234',
-                                                                 report_json)
-        self.assertEqual([], valid_prints)
+        # test that if there are no valid fingerprints we return {}
+        report_json['hosts'] = invalid_host
+        valid_hosts, _ = msg_handler.verify_report_hosts('1234',
+                                                         report_json)
+        self.assertEqual({}, valid_hosts)
 
     def test_extract_report_from_tar_gz_success(self):
         """Testing the extract method with valid buffer content."""
         report_json = {
             'report_id': 1,
-            'report_type': 'deployments',
+            'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': [{'key': 'value'}]}
+            'hosts': {self.uuid: {'key': 'value'}}}
         test_dict = dict()
         test_dict['file.json'] = report_json
         buffer_content = create_tar_buffer(test_dict)
@@ -256,11 +269,11 @@ class KafkaMsgHandlerTest(TestCase):
         """Testing the extract method failure too many json files."""
         report_json = {
             'report_id': 1,
-            'report_type': 'deployments',
+            'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': [{'key': 'value'}]}
+            'hosts': {self.uuid: {'key': 'value'}}}
         test_dict = dict()
         test_dict['file.json'] = report_json
         test_dict['file_2.json'] = report_json
@@ -304,11 +317,11 @@ class KafkaMsgHandlerTest(TestCase):
         """Test to verify extracting contents is successful."""
         report_json = {
             'report_id': 1,
-            'report_type': 'deployments',
+            'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': [{'insights_client_id': 'value'}]}
+            'hosts': {self.uuid: {'insights_client_id': 'value'}}}
         value = {'url': self.payload_url, 'rh_account': '00001'}
         test_dict = dict()
         test_dict['file.json'] = report_json
@@ -321,11 +334,11 @@ class KafkaMsgHandlerTest(TestCase):
     def test_download_and_validate_contents_invalid_report(self):
         """Test to verify extracting contents fails when report is invalid."""
         report_json = {
-            'report_type': 'deployments',
+            'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': [{'key': 'value'}]}
+            'hosts': {self.uuid: {'key': 'value'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
             _, _ = msg_handler.verify_report_details('1234', report_json)
@@ -334,11 +347,11 @@ class KafkaMsgHandlerTest(TestCase):
         """Test to verify extracting contents fails when error is raised."""
         report_json = {
             'report_id': 1,
-            'report_type': 'deployments',
+            'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': [{'key': 'value'}]}
+            'hosts': {self.uuid: {'key': 'value'}}}
         value = {'url': self.payload_url, 'rh_account': '00001'}
         test_dict = dict()
         test_dict['file.json'] = report_json
@@ -396,33 +409,33 @@ class KafkaMsgHandlerTest(TestCase):
         """Testing no account number present when uploading to inventory."""
         account_number = None
         report_platform_id = '0001-kevan'
-        fingerprints = [{'bios_uuid': 'value', 'name': 'value'},
-                        {'insights_client_id': 'value', 'name': 'foo'},
-                        {'ip_addresses': 'value', 'name': 'foo'},
-                        {'mac_addresses': 'value', 'name': 'foo'},
-                        {'vm_uuid': 'value', 'name': 'foo'},
-                        {'etc_machine_id': 'value'},
-                        {'subscription_manager_id': 'value'}]
+        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                 self.uuid3: {'ip_addresses': 'value', 'name': 'foo'},
+                 self.uuid4: {'mac_addresses': 'value', 'name': 'foo'},
+                 self.uuid5: {'vm_uuid': 'value', 'name': 'foo'},
+                 self.uuid6: {'etc_machine_id': 'value'},
+                 self.uuid7: {'subscription_manager_id': 'value'}}
         msg_handler.upload_to_host_inventory(account_number,
                                              report_platform_id,
-                                             fingerprints)
+                                             hosts)
 
     def test_successful_host_inventory_upload(self):
         """Testing successful upload to host inventory."""
         account_number = '00001'
         report_platform_id = '0001-kevan'
-        fingerprints = [{'bios_uuid': 'value', 'name': 'value'},
-                        {'insights_client_id': 'value', 'name': 'foo'},
-                        {'ip_addresses': 'value', 'name': 'foo'},
-                        {'mac_addresses': 'value', 'name': 'foo'},
-                        {'vm_uuid': 'value', 'name': 'foo'},
-                        {'etc_machine_id': 'value'},
-                        {'subscription_manager_id': 'value'}]
+        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                 self.uuid3: {'ip_addresses': 'value', 'name': 'foo'},
+                 self.uuid4: {'mac_addresses': 'value', 'name': 'foo'},
+                 self.uuid5: {'vm_uuid': 'value', 'name': 'foo'},
+                 self.uuid6: {'etc_machine_id': 'value'},
+                 self.uuid7: {'subscription_manager_id': 'value'}}
         with patch('processor.kafka_msg_handler.INSIGHTS_HOST_INVENTORY_URL', value='not none'):
             with patch('processor.kafka_msg_handler.requests', status_code=200):
                 msg_handler.upload_to_host_inventory(account_number,
                                                      report_platform_id,
-                                                     fingerprints)
+                                                     hosts)
 
     @patch('processor.kafka_msg_handler.requests.post')
     def test_host_url_exceptions(self, mock_request):
@@ -433,9 +446,9 @@ class KafkaMsgHandlerTest(TestCase):
         mock_request.side_effect = [good_resp, bad_resp]
         account_number = '00001'
         report_platform_id = '0001-kevan'
-        fingerprints = [{'bios_uuid': 'value', 'name': 'value'},
-                        {'insights_client_id': 'value', 'name': 'foo'}]
+        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
         with patch('processor.kafka_msg_handler.INSIGHTS_HOST_INVENTORY_URL', value='not none'):
             msg_handler.upload_to_host_inventory(account_number,
                                                  report_platform_id,
-                                                 fingerprints)
+                                                 hosts)

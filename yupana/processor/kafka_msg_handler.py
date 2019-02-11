@@ -279,20 +279,19 @@ def verify_report_hosts(account_number, insights_report):
     report_id = insights_report['report_platform_id']
 
     prefix = 'VALIDATE hosts'
-    valid_hosts = []
-    invalid_hosts = []
-    for host in hosts.keys():
-        host_dict = hosts[host]
+    valid_hosts = {}
+    invalid_hosts = {}
+    for host_id, host in hosts.items():
         found_facts = False
         for fact in CANONICAL_FACTS:
-            if host_dict.get(fact):
+            if host.get(fact):
                 found_facts = True
                 break
         if found_facts:
-            valid_hosts.append(host_dict)
+            valid_hosts[host_id] = host
         else:
-            host_dict.pop('metadata', None)
-            invalid_hosts.append(host_dict)
+            host.pop('metadata', None)
+            invalid_hosts[host_id] = host
     if invalid_hosts:
         LOG.warning(
             format_message(
@@ -366,7 +365,7 @@ def upload_to_host_inventory(account_number, report_id, hosts):
     identity_header = {'x-rh-identity': x_rh_identity_value,
                        'Content-Type': 'application/json'}
     failed_hosts = []
-    for host in hosts:
+    for host_id, host in hosts.items():
         body = {}
         body['account'] = account_number
         body['bios_uuid'] = host.get('bios_uuid')
