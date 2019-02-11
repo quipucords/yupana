@@ -160,12 +160,12 @@ def download_report(account_number, upload_service_message):
 
 
 def extract_report_from_tar_gz(account_number, report_tar_gz):
-    """Extract Insight report from tar.gz file.
+    """Extract Insights report from tar.gz file.
 
     :param account_number: the account number associated with report
     :param report_tar_gz: A hexstring or BytesIO tarball
         saved in memory with gzip compression.
-    :returns: Insight report as dict
+    :returns: Insights report as dict
     """
     prefix = 'EXTRACT REPORT FROM TAR'
     try:
@@ -185,13 +185,13 @@ def extract_report_from_tar_gz(account_number, report_tar_gz):
             tarfile_obj = tar.extractfile(file)
             report_json_str = tarfile_obj.read().decode('utf-8')
             try:
-                Insight_report = json.loads(report_json_str)
+                insights_report = json.loads(report_json_str)
                 LOG.info(
                     format_message(
                         prefix, 'successful',
                         account_number=account_number,
-                        report_id=Insight_report.get('report_platform_id')))
-                return Insight_report
+                        report_id=insights_report.get('report_platform_id')))
+                return insights_report
             except ValueError as error:
                 raise QPCReportException(
                     format_message(prefix,

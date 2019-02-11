@@ -116,7 +116,7 @@ class KafkaMsgHandlerTest(TestCase):
         self.assertEqual(valid, expect_valid)
         self.assertEqual(invalid, expect_invalid)
 
-    def test_verify_report_success_mixed_fingerprints(self):
+    def test_verify_report_success_mixed_hosts(self):
         """Test to verify a QPC report with the correct structure passes validation."""
         report_json = {
             'report_id': 1,
@@ -195,8 +195,8 @@ class KafkaMsgHandlerTest(TestCase):
         with self.assertRaises(msg_handler.QPCReportException):
             _, _ = msg_handler.verify_report_details('1234', report_json)
 
-    def test_verify_report_missing_fingerprints(self):
-        """Test to verify a QPC report with empty fingerprints is failed."""
+    def test_verify_report_missing_hosts(self):
+        """Test to verify a QPC report with empty hosts is failed."""
         report_json = {
             'report_id': 1,
             'report_type': 'insights',
@@ -237,14 +237,14 @@ class KafkaMsgHandlerTest(TestCase):
         self.assertEqual(actual_valid, valid)
         self.assertEqual(actual_invalid, invalid)
 
-        # test that invalid fingerprints are removed
+        # test that invalid hosts are removed
         invalid_host = {uuid9: {'no': 'canonical facts', 'metadata': []}}
         hosts.update(invalid_host)
         valid_hosts, _ = msg_handler.verify_report_hosts('1234',
                                                          report_json)
         self.assertEqual(valid_hosts.get(uuid9), None)
 
-        # test that if there are no valid fingerprints we return {}
+        # test that if there are no valid hosts we return {}
         report_json['hosts'] = invalid_host
         valid_hosts, _ = msg_handler.verify_report_hosts('1234',
                                                          report_json)
