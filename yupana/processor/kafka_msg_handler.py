@@ -160,12 +160,12 @@ def download_report(account_number, upload_service_message):
 
 
 def extract_report_from_tar_gz(account_number, report_tar_gz):
-    """Extract deployment report from tar.gz file.
+    """Extract Insight report from tar.gz file.
 
     :param account_number: the account number associated with report
     :param report_tar_gz: A hexstring or BytesIO tarball
         saved in memory with gzip compression.
-    :returns: Deployment report as dict
+    :returns: Insight report as dict
     """
     prefix = 'EXTRACT REPORT FROM TAR'
     try:
@@ -185,13 +185,13 @@ def extract_report_from_tar_gz(account_number, report_tar_gz):
             tarfile_obj = tar.extractfile(file)
             report_json_str = tarfile_obj.read().decode('utf-8')
             try:
-                deployment_report = json.loads(report_json_str)
+                Insight_report = json.loads(report_json_str)
                 LOG.info(
                     format_message(
                         prefix, 'successful',
                         account_number=account_number,
-                        report_id=deployment_report.get('report_platform_id')))
-                return deployment_report
+                        report_id=Insight_report.get('report_platform_id')))
+                return Insight_report
             except ValueError as error:
                 raise QPCReportException(
                     format_message(prefix,
@@ -210,24 +210,24 @@ def extract_report_from_tar_gz(account_number, report_tar_gz):
                            account_number=account_number))
 
 
-def verify_report_details(account_number, deployments_report):
+def verify_report_details(account_number, insights_report):
     """
-    Verify that the report contents are a valid deployments report.
+    Verify that the report contents are a valid Insights report.
 
     :param account_number: the account number associated with report
-    :param deployments_report: dict with report
-    :returns: tuple contain list of valid and invalid fingerprints
+    :param insights_report: dict with report
+    :returns: tuple contain list of valid and invalid hosts
     """
     prefix = 'VERIFY REPORT STRUCTURE'
     required_keys = ['report_platform_id',
                      'report_id',
                      'report_version',
                      'report_type',
-                     'system_fingerprints']
-    report_id = deployments_report.get('report_platform_id')
+                     'hosts']
+    report_id = insights_report.get('report_platform_id')
     missing_keys = []
     for key in required_keys:
-        required_key = deployments_report.get(key)
+        required_key = insights_report.get(key)
         if not required_key:
             missing_keys.append(key)
 
@@ -240,69 +240,70 @@ def verify_report_details(account_number, deployments_report):
                 account_number=account_number,
                 report_id=report_id))
 
-    if deployments_report['report_type'] != 'deployments':
+    if insights_report['report_type'] != 'insights':
         raise QPCReportException(
             format_message(
                 prefix,
-                'Invalid report_type: %s' % deployments_report['report_type'],
+                'Invalid report_type: %s' % insights_report['report_type'],
                 account_number=account_number,
                 report_id=report_id))
 
-    valid_fingerprints, invalid_fingerprints = verify_report_fingerprints(account_number, deployments_report)
-    number_valid = len(valid_fingerprints)
-    total = number_valid + len(invalid_fingerprints)
+    valid_hosts, invalid_hosts = verify_report_hosts(account_number, insights_report)
+    number_valid = len(valid_hosts)
+    total = number_valid + len(invalid_hosts)
     LOG.info(format_message(
         prefix,
-        '%s/%s are valid fingerprints' % (
+        '%s/%s are valid hosts' % (
             number_valid, total),
         account_number=account_number,
         report_id=report_id
     ))
-    if not valid_fingerprints:
+    if not valid_hosts:
         raise QPCReportException(
             format_message(
                 prefix,
-                'contains no valid fingerprints.',
+                'contains no valid hosts.',
                 account_number=account_number,
                 report_id=report_id))
     else:
-        return valid_fingerprints, invalid_fingerprints
+        return valid_hosts, invalid_hosts
 
 
-def verify_report_fingerprints(account_number, deployments_report):
-    """Verify that report fingerprints contain canonical facts.
+def verify_report_hosts(account_number, insights_report):
+    """Verify that report hosts contain canonical facts.
 
     :param account_number: the account number associated with report
-    :param deployments_report: dict with report
+    :param insights_report: dict with report
     """
-    fingerprints = deployments_report['system_fingerprints']
-    report_id = deployments_report['report_platform_id']
+    hosts = insights_report['hosts']
+    report_id = insights_report['report_platform_id']
 
-    prefix = 'VALIDATE FINGERPRINTS'
-    valid_fingerprints = []
-    invalid_fingerprints = []
-    for fingerprint in fingerprints:
+    prefix = 'VALIDATE hosts'
+    valid_hosts = []
+    invalid_hosts = []
+    for host in hosts.keys():
+        host_dict = hosts[host]
         found_facts = False
         for fact in CANONICAL_FACTS:
-            if fingerprint.get(fact):
+            if host_dict.get(fact):
                 found_facts = True
                 break
         if found_facts:
-            valid_fingerprints.append(fingerprint)
+            valid_hosts.append(host_dict)
         else:
-            fingerprint.pop('metadata', None)
-            invalid_fingerprints.append(fingerprint)
-    if invalid_fingerprints:
+            host_dict.pop('metadata', None)
+            invalid_hosts.append(host_dict)
+    if invalid_hosts:
         LOG.warning(
             format_message(
                 prefix,
-                'Removed %d fingerprints with 0 canonical facts: %s' % (
-                    len(invalid_fingerprints), invalid_fingerprints),
+                'Removed %d hosts with 0 canonical facts: %s' % (
+                    len(invalid_hosts), invalid_hosts),
                 account_number=account_number,
                 report_id=report_id))
 
-    # Invalid fingerprints is for future use.
-    return valid_fingerprints, invalid_fingerprints
+    # Invalid hosts is for future use.
+    return valid_hosts, invalid_hosts
 
 
 async def send_confirmation(file_hash, status, account_number=None, report_id=None):  # pragma: no cover
@@ -349,13 +350,13 @@ async def send_confirmation(file_hash, status, account_number=None, report_id=No
         await producer.stop()
 
 
-def upload_to_host_inventory(account_number, report_id, fingerprints):
+def upload_to_host_inventory(account_number, report_id, hosts):
     """
-    Verify that the report contents are a valid deployments report.
+    Verify that the report contents are a valid Insights report.
 
     :param account_number: <str> of the User's account number.
     :param report_id: <str> of the report platform id
-    :param fingerprints: a list of dictionaries that have been validated.
+    :param hosts: a list of dictionaries that have been validated.
     :returns None
     """
     prefix = 'UPLOAD TO HOST INVENTORY'
@@ -364,21 +365,21 @@ def upload_to_host_inventory(account_number, report_id, fingerprints):
     x_rh_identity_value = base64.b64encode(bytes_string).decode()
     identity_header = {'x-rh-identity': x_rh_identity_value,
                        'Content-Type': 'application/json'}
-    failed_fingerprints = []
-    for fingerprint in fingerprints:
+    failed_hosts = []
+    for host in hosts:
         body = {}
         body['account'] = account_number
-        body['bios_uuid'] = fingerprint.get('bios_uuid')
-        body['display_name'] = fingerprint.get('name')
-        body['ip_addresses'] = fingerprint.get('ip_addresses')
-        body['mac_addresses'] = fingerprint.get('mac_addresses')
-        body['insights_id'] = fingerprint.get('insights_client_id')
-        body['rhel_machine_id'] = fingerprint.get('etc_machine_id')
-        body['subscription_manager_id'] = fingerprint.get('subscription_manager_id')
-        body['fqdn'] = fingerprint.get('name')
+        body['bios_uuid'] = host.get('bios_uuid')
+        body['display_name'] = host.get('name')
+        body['ip_addresses'] = host.get('ip_addresses')
+        body['mac_addresses'] = host.get('mac_addresses')
+        body['insights_id'] = host.get('insights_client_id')
+        body['rhel_machine_id'] = host.get('etc_machine_id')
+        body['subscription_manager_id'] = host.get('subscription_manager_id')
+        body['fqdn'] = host.get('name')
         body['facts'] = [{
             'namespace': 'qpc',
-            'facts': fingerprint
+            'facts': host
         }]
         try:
             response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
@@ -391,41 +392,41 @@ def upload_to_host_inventory(account_number, report_id, fingerprints):
                 except ValueError:
                     json_body = 'No JSON response'
 
-                failed_fingerprints.append(
+                failed_hosts.append(
                     {
                         'status_code': response.status_code,
                         'error': json_body,
                         'display_name': body.get('display_name'),
-                        'fingerprint': fingerprint})
+                        'host': host})
 
         except requests.exceptions.RequestException as err:
-            failed_fingerprints.append(
+            failed_hosts.append(
                 {
                     'status_code': 'None',
                     'error': str(err),
                     'display_name': body.get('display_name'),
-                    'fingerprint': fingerprint})
+                    'host': host})
 
-    successful = len(fingerprints) - len(failed_fingerprints)
+    successful = len(hosts) - len(failed_hosts)
     upload_msg = format_message(
-        prefix, '%s/%s fingerprints uploaded to host inventory' %
-        (successful, len(fingerprints)),
+        prefix, '%s/%s hosts uploaded to host inventory' %
+        (successful, len(hosts)),
         account_number=account_number,
         report_id=report_id
     )
-    if successful != len(fingerprints):
+    if successful != len(hosts):
         LOG.warning(upload_msg)
     else:
         LOG.info(upload_msg)
-    if failed_fingerprints:
-        for failed_info in failed_fingerprints:
+    if failed_hosts:
+        for failed_info in failed_hosts:
             LOG.error(format_message(
                 prefix,
-                'Host inventory returned %s for %s.  Error: %s.  Fingerprint: %s' % (
+                'Host inventory returned %s for %s.  Error: %s.  host: %s' % (
                     failed_info.get('status_code'),
                     failed_info.get('display_name'),
                     failed_info.get('error'),
-                    failed_info.get('fingerprint')),
+                    failed_info.get('host')),
                 account_number=account_number,
                 report_id=report_id
             ))
@@ -453,17 +454,17 @@ async def process_messages():  # pragma: no cover
                 try:
                     message_hash = upload_service_message['hash']
                     report_tar_gz = download_report(account_number, upload_service_message)
-                    qpc_deployments_report = extract_report_from_tar_gz(account_number, report_tar_gz)
-                    valid_fingerprints, _ = verify_report_details(
-                        account_number, qpc_deployments_report)
-                    report_id = qpc_deployments_report.get('report_platform_id')
+                    qpc_insights_report = extract_report_from_tar_gz(account_number, report_tar_gz)
+                    valid_hosts, _ = verify_report_details(
+                        account_number, qpc_insights_report)
+                    report_id = qpc_insights_report.get('report_platform_id')
                     await send_confirmation(message_hash,
                                             SUCCESS_CONFIRM_STATUS,
                                             account_number=account_number,
                                             report_id=report_id)
                     upload_to_host_inventory(account_number,
                                              report_id,
-                                             valid_fingerprints)
+                                             valid_hosts)
                 except QPCReportException as error:
                     LOG.error(error)
                     await send_confirmation(message_hash, FAILURE_CONFIRM_STATUS, account_number=account_number)

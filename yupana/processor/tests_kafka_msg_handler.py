@@ -100,7 +100,7 @@ class KafkaMsgHandlerTest(TestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'system_fingerprints': [{'bios_uuid': 'value'}]}
+            'hosts': {'uuid': {'bios_uuid': 'value'}}}
 
         valid, invalid = msg_handler.verify_report_details('1234', report_json)
         expect_valid = [{'bios_uuid': 'value'}]
@@ -116,7 +116,7 @@ class KafkaMsgHandlerTest(TestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'system_fingerprints': [{'bios_uuid': 'value'}, {'invalid': 'value'}]}
+            'hosts': [{'bios_uuid': 'value'}, {'invalid': 'value'}]}
 
         valid, invalid = msg_handler.verify_report_details('12345', report_json)
         expect_valid = [{'bios_uuid': 'value'}]
@@ -131,7 +131,7 @@ class KafkaMsgHandlerTest(TestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'system_fingerprints': [{'key': 'value'}]}
+            'hosts': [{'key': 'value'}]}
 
         with self.assertRaises(msg_handler.QPCReportException):
             _, _ = msg_handler.verify_report_details('1234', report_json)
@@ -144,7 +144,7 @@ class KafkaMsgHandlerTest(TestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'system_fingerprints': [{'name': 'value'}]}
+            'hosts': [{'name': 'value'}]}
 
         with self.assertRaises(msg_handler.QPCReportException):
             _, _ = msg_handler.verify_report_details('1234', report_json)
@@ -157,7 +157,7 @@ class KafkaMsgHandlerTest(TestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'system_fingerprints': [{'key': 'value'}]}
+            'hosts': [{'key': 'value'}]}
 
         with self.assertRaises(msg_handler.QPCReportException):
             _, _ = msg_handler.verify_report_details('1234', report_json)
@@ -169,7 +169,7 @@ class KafkaMsgHandlerTest(TestCase):
             'report_type': 'deployments',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'system_fingerprints': [{'key': 'value'}]}
+            'hosts': [{'key': 'value'}]}
 
         with self.assertRaises(msg_handler.QPCReportException):
             _, _ = msg_handler.verify_report_details('1234', report_json)
@@ -181,7 +181,7 @@ class KafkaMsgHandlerTest(TestCase):
             'report_type': 'deployments',
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
-            'system_fingerprints': [{'key': 'value'}]}
+            'hosts': [{'key': 'value'}]}
 
         with self.assertRaises(msg_handler.QPCReportException):
             _, _ = msg_handler.verify_report_details('1234', report_json)
@@ -194,7 +194,7 @@ class KafkaMsgHandlerTest(TestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'system_fingerprints': []}
+            'hosts': []}
 
         with self.assertRaises(msg_handler.QPCReportException):
             _, _ = msg_handler.verify_report_details('1234', report_json)
@@ -217,7 +217,7 @@ class KafkaMsgHandlerTest(TestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'system_fingerprints': fingerprints}
+            'hosts': fingerprints}
         actual_valid, actual_invalid = msg_handler.verify_report_fingerprints('1234',
                                                                               report_json)
         self.assertEqual(actual_valid, valid)
@@ -232,7 +232,7 @@ class KafkaMsgHandlerTest(TestCase):
 
         # test that if there are no valid fingerprints we return []
         fingerprints = [invalid_print]
-        report_json['system_fingerprints'] = fingerprints
+        report_json['hosts'] = fingerprints
         valid_prints, _ = msg_handler.verify_report_fingerprints('1234',
                                                                  report_json)
         self.assertEqual([], valid_prints)
@@ -245,7 +245,7 @@ class KafkaMsgHandlerTest(TestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'system_fingerprints': [{'key': 'value'}]}
+            'hosts': [{'key': 'value'}]}
         test_dict = dict()
         test_dict['file.json'] = report_json
         buffer_content = create_tar_buffer(test_dict)
@@ -260,7 +260,7 @@ class KafkaMsgHandlerTest(TestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'system_fingerprints': [{'key': 'value'}]}
+            'hosts': [{'key': 'value'}]}
         test_dict = dict()
         test_dict['file.json'] = report_json
         test_dict['file_2.json'] = report_json
@@ -308,7 +308,7 @@ class KafkaMsgHandlerTest(TestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'system_fingerprints': [{'insights_client_id': 'value'}]}
+            'hosts': [{'insights_client_id': 'value'}]}
         value = {'url': self.payload_url, 'rh_account': '00001'}
         test_dict = dict()
         test_dict['file.json'] = report_json
@@ -325,7 +325,7 @@ class KafkaMsgHandlerTest(TestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'system_fingerprints': [{'key': 'value'}]}
+            'hosts': [{'key': 'value'}]}
 
         with self.assertRaises(msg_handler.QPCReportException):
             _, _ = msg_handler.verify_report_details('1234', report_json)
@@ -338,7 +338,7 @@ class KafkaMsgHandlerTest(TestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'system_fingerprints': [{'key': 'value'}]}
+            'hosts': [{'key': 'value'}]}
         value = {'url': self.payload_url, 'rh_account': '00001'}
         test_dict = dict()
         test_dict['file.json'] = report_json
