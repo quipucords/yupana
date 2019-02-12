@@ -248,6 +248,32 @@ def verify_report_details(account_number, insights_report):
                 account_number=account_number,
                 report_id=report_id))
 
+    # validate hosts is a dictionary
+    invalid_hosts_message = 'Hosts must be a dictionary that is not empty. ' \
+                            'All keys must be strings and all values must be dictionaries.',
+    hosts = insights_report.get('hosts')
+    if not hosts or not isinstance(hosts, dict):
+        raise QPCReportException(
+            format_message(
+                prefix,
+                invalid_hosts_message,
+                account_number=account_number,
+                report_id=report_id))
+
+    invalid_host_dict_format = False
+    for host_id, host in hosts.items():
+        if not isinstance(host_id, str) or not isinstance(host, dict):
+            invalid_host_dict_format = True
+            break
+
+    if invalid_host_dict_format:
+        raise QPCReportException(
+            format_message(
+                prefix,
+                invalid_hosts_message,
+                account_number=account_number,
+                report_id=report_id))
+
     valid_hosts, invalid_hosts = verify_report_hosts(account_number, insights_report)
     number_valid = len(valid_hosts)
     total = number_valid + len(invalid_hosts)

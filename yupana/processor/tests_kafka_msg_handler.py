@@ -452,3 +452,63 @@ class KafkaMsgHandlerTest(TestCase):
             msg_handler.upload_to_host_inventory(account_number,
                                                  report_platform_id,
                                                  hosts)
+
+    def test_verify_report_fails_not_dict(self):
+        """Test to verify a QPC report with not dict."""
+        report_json = {
+            'report_id': 1,
+            'report_type': 'insights',
+            'report_version': '1.0.0.1b025b8',
+            'status': 'completed',
+            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'hosts': ['foo']}
+        value = {'url': self.payload_url, 'rh_account': '00001'}
+        test_dict = dict()
+        test_dict['file.json'] = report_json
+        buffer_content = create_tar_buffer(test_dict)
+        with requests_mock.mock() as m:
+            m.get(self.payload_url, content=buffer_content)
+            with patch('requests.get', side_effect=HTTPError):
+                with self.assertRaises(msg_handler.QPCReportException):
+                    content = msg_handler.download_report('1234', value)
+                    self.assertEqual(content, buffer_content)
+
+    def test_verify_report_fails_invalid_key(self):
+        """Test to verify a QPC report with dict not str key."""
+        report_json = {
+            'report_id': 1,
+            'report_type': 'insights',
+            'report_version': '1.0.0.1b025b8',
+            'status': 'completed',
+            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'hosts': {1: {'name': 'value'}}}
+        value = {'url': self.payload_url, 'rh_account': '00001'}
+        test_dict = dict()
+        test_dict['file.json'] = report_json
+        buffer_content = create_tar_buffer(test_dict)
+        with requests_mock.mock() as m:
+            m.get(self.payload_url, content=buffer_content)
+            with patch('requests.get', side_effect=HTTPError):
+                with self.assertRaises(msg_handler.QPCReportException):
+                    content = msg_handler.download_report('1234', value)
+                    self.assertEqual(content, buffer_content)
+
+    def test_verify_report_fails_invalid_value(self):
+        """Test to verify a QPC report with an array for value in hosts."""
+        report_json = {
+            'report_id': 1,
+            'report_type': 'insights',
+            'report_version': '1.0.0.1b025b8',
+            'status': 'completed',
+            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'hosts': {self.uuid: ['name']}}
+        value = {'url': self.payload_url, 'rh_account': '00001'}
+        test_dict = dict()
+        test_dict['file.json'] = report_json
+        buffer_content = create_tar_buffer(test_dict)
+        with requests_mock.mock() as m:
+            m.get(self.payload_url, content=buffer_content)
+            with patch('requests.get', side_effect=HTTPError):
+                with self.assertRaises(msg_handler.QPCReportException):
+                    content = msg_handler.download_report('1234', value)
+                    self.assertEqual(content, buffer_content)
