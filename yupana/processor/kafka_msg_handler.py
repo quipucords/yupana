@@ -304,7 +304,7 @@ def verify_report_hosts(account_number, insights_report):
     hosts = insights_report['hosts']
     report_id = insights_report['report_platform_id']
 
-    prefix = 'VALIDATE hosts'
+    prefix = 'VALIDATE HOSTS'
     valid_hosts = {}
     invalid_hosts = {}
     for host_id, host in hosts.items():
@@ -422,6 +422,7 @@ def upload_to_host_inventory(account_number, report_id, hosts):
                         'status_code': response.status_code,
                         'error': json_body,
                         'display_name': body.get('display_name'),
+                        'system_platform_id': host_id,
                         'host': host})
 
         except requests.exceptions.RequestException as err:
@@ -430,6 +431,7 @@ def upload_to_host_inventory(account_number, report_id, hosts):
                     'status_code': 'None',
                     'error': str(err),
                     'display_name': body.get('display_name'),
+                    'system_platform_id': host_id,
                     'host': host})
 
     successful = len(hosts) - len(failed_hosts)
@@ -447,10 +449,12 @@ def upload_to_host_inventory(account_number, report_id, hosts):
         for failed_info in failed_hosts:
             LOG.error(format_message(
                 prefix,
-                'Host inventory returned %s for %s.  Error: %s.  host: %s' % (
+                'Host inventory returned %s for %s.  Error: %s.  '
+                'system_platform_id: %s. host: %s' % (
                     failed_info.get('status_code'),
                     failed_info.get('display_name'),
                     failed_info.get('error'),
+                    failed_info.get('system_platform_id'),
                     failed_info.get('host')),
                 account_number=account_number,
                 report_id=report_id
