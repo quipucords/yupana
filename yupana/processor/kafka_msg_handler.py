@@ -279,7 +279,7 @@ def verify_report_details(account_number, insights_report):
     total = number_valid + len(invalid_hosts)
     LOG.info(format_message(
         prefix,
-        '%s/%s are valid hosts' % (
+        '%s/%s hosts are valid.' % (
             number_valid, total),
         account_number=account_number,
         report_id=report_id
@@ -288,7 +288,7 @@ def verify_report_details(account_number, insights_report):
         raise QPCReportException(
             format_message(
                 prefix,
-                'contains no valid hosts.',
+                'report does not contain any valid hosts.',
                 account_number=account_number,
                 report_id=report_id))
     else:
