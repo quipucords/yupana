@@ -222,9 +222,17 @@ def verify_report_details(account_number, insights_report):
     required_keys = ['report_platform_id',
                      'report_id',
                      'report_version',
-                     'report_type',
                      'hosts']
     report_id = insights_report.get('report_platform_id')
+
+    if insights_report.get('report_type') != 'insights':
+        raise QPCReportException(
+            format_message(
+                prefix,
+                'Attribute report_type missing or not equal to insights',
+                account_number=account_number,
+                report_id=report_id))
+
     missing_keys = []
     for key in required_keys:
         required_key = insights_report.get(key)
@@ -237,14 +245,6 @@ def verify_report_details(account_number, insights_report):
             format_message(
                 prefix,
                 'Report is missing required fields: %s.' % missing_keys_str,
-                account_number=account_number,
-                report_id=report_id))
-
-    if insights_report['report_type'] != 'insights':
-        raise QPCReportException(
-            format_message(
-                prefix,
-                'Invalid report_type: %s' % insights_report['report_type'],
                 account_number=account_number,
                 report_id=report_id))
 
