@@ -162,7 +162,7 @@ class KafkaMsgHandlerTest(TestCase):
         """Test to verify a QPC report with an invalid report_type is failed."""
         report_json = {
             'report_id': 1,
-            'report_type': 'details',
+            'report_type': 'deployments',
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
@@ -227,7 +227,7 @@ class KafkaMsgHandlerTest(TestCase):
         hosts.update(invalid)
         report_json = {
             'report_id': 1,
-            'report_type': 'deployments',
+            'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
