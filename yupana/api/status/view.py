@@ -30,7 +30,7 @@ from api.status.serializer import StatusSerializer
 def status(request):
     """Provide the server status information.
 
-    @api {get} /api/v1/status/ Request server status
+    @api {get} /r/insights/platform/subscriptions/api/v1/status/ Request server status
     @apiName GetStatus
     @apiGroup Status
     @apiVersion 1.0.0
