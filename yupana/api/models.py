@@ -19,3 +19,4 @@
 # flake8: noqa
 # pylint: disable=unused-import
 from api.status.model import Status
+from api.report.model import Report
