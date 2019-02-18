@@ -35,24 +35,24 @@ class Report(models.Model):
     FAILED_VALIDATION_REPORTING = 'failed to report validation'
     HOSTS_UPLOADED = 'hosts uploaded'
     FAILED_HOSTS_UPLOAD = 'failed to upload hosts'
-    STATE_CHOICES = ((NEW, NEW),
-                     (STARTED, STARTED),
-                     (DOWNLOADED, DOWNLOADED),
-                     (FAILED_DOWNLOAD, FAILED_DOWNLOAD),
-                     (VALIDATED, VALIDATED),
-                     (FAILED_VALIDATION, FAILED_VALIDATION),
-                     (VALIDATION_REPORTED, VALIDATION_REPORTED),
-                     (FAILED_VALIDATION_REPORTING, FAILED_VALIDATION_REPORTING),
-                     (HOSTS_UPLOADED, HOSTS_UPLOADED),
-                     (FAILED_HOSTS_UPLOAD, FAILED_HOSTS_UPLOAD))
+    STATE_CHOICES = (('NEW', NEW),
+                     ('STARTED', STARTED),
+                     ('DOWNLOADED', DOWNLOADED),
+                     ('FAILED_DOWNLOAD', FAILED_DOWNLOAD),
+                     ('VALIDATED', VALIDATED),
+                     ('FAILED_VALIDATION', FAILED_VALIDATION),
+                     ('VALIDATION_REPORTED', VALIDATION_REPORTED),
+                     ('FAILED_VALIDATION_REPORTING', FAILED_VALIDATION_REPORTING),
+                     ('HOSTS_UPLOADED', HOSTS_UPLOADED),
+                     ('FAILED_HOSTS_UPLOAD', FAILED_HOSTS_UPLOAD))
 
     state = models.CharField(
         max_length=28,
         choices=STATE_CHOICES,
         default=NEW
     )
-    stage_info = models.TextField(null=False)
-    retry_count = models.IntegerField(null=True)
+    state_info = models.TextField(null=False)
+    retry_count = models.PositiveSmallIntegerField(null=True)
     last_update_time = models.DateTimeField(null=True)
     failed_hosts = models.TextField(null=False)
     candidate_hosts = models.TextField(null=False)
@@ -63,7 +63,7 @@ class Report(models.Model):
             'upload_srv_kafka_msg:{}, ' \
             'report_json:{}, '\
             'state:{}, '\
-            'stage_info:{}, '\
+            'state_info:{}, '\
             'retry_count:{}, '\
             'last_update_time:{}, '\
             'failed_hosts:{}, '\
@@ -71,7 +71,7 @@ class Report(models.Model):
                                          self.upload_srv_kafka_msg,
                                          self.report_json,
                                          self.state,
-                                         self.stage_info,
+                                         self.state_info,
                                          self.retry_count,
                                          self.last_update_time,
                                          self.failed_hosts,
