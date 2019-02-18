@@ -11,8 +11,6 @@
 
 """Serializer for report progress."""
 
-from api.models import Report
-
 from rest_framework.serializers import (ChoiceField,
                                         DateField,
                                         IntegerField,
@@ -20,9 +18,12 @@ from rest_framework.serializers import (ChoiceField,
                                         ModelSerializer,
                                         UUIDField)
 
+from api.models import Report
+
 
 class ReportSerializer(ModelSerializer):
     """Serializer for the Report model."""
+
     report_platform_id = UUIDField(format='hex_verbose',
                                    read_only=True)
     upload_srv_kafka_msg = JSONField(read_only=True)

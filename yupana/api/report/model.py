@@ -18,6 +18,7 @@ from django.db import models
 
 class Report(models.Model):
     """Represents report progress."""
+
     report_platform_id = models.UUIDField(
         default=uuid.uuid4, editable=False)
 
