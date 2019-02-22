@@ -71,6 +71,9 @@ lint:
 collect-static:
 	$(PYTHON) $(PYDIR)/manage.py collectstatic --no-input
 
+server-makemigrations:
+	$(PYTHON) $(PYDIR)/manage.py makemigrations api --settings config.settings.local
+
 server-migrate:
 	DJANGO_READ_DOT_ENV_FILE=True $(PYTHON) $(PYDIR)/manage.py migrate -v 3
 
