@@ -11,16 +11,14 @@
 
 """Model for report progress."""
 
-import uuid
-
 from django.db import models
 
 
-class Report(models.Model):
-    """Represents report progress."""
+class AbstractReport(models.Model):
+    """Represents report information."""
 
-    report_platform_id = models.UUIDField(
-        default=uuid.uuid4, editable=False)
+    report_platform_id = models.CharField(max_length=50, null=True)
+    rh_account = models.TextField(null=True)
 
     upload_srv_kafka_msg = models.TextField(null=True)
     report_json = models.TextField(null=True)
@@ -51,15 +49,16 @@ class Report(models.Model):
         choices=STATE_CHOICES,
         default=NEW
     )
-    state_info = models.TextField(null=False)
+    state_info = models.TextField(null=True)
     retry_count = models.PositiveSmallIntegerField(null=True)
     last_update_time = models.DateTimeField(null=True)
-    failed_hosts = models.TextField(null=False)
-    candidate_hosts = models.TextField(null=False)
+    failed_hosts = models.TextField(null=True)
+    candidate_hosts = models.TextField(null=True)
 
     def __str__(self):
         """Convert to string."""
         return '{' + 'report_platform_id:{}, '\
+            'rh_account: {}, ' \
             'upload_srv_kafka_msg:{}, ' \
             'report_json:{}, '\
             'state:{}, '\
@@ -68,6 +67,7 @@ class Report(models.Model):
             'last_update_time:{}, '\
             'failed_hosts:{}, '\
             'candidate_hosts:{} '.format(self.report_platform_id,
+                                         self.rh_account,
                                          self.upload_srv_kafka_msg,
                                          self.report_json,
                                          self.state,
@@ -76,3 +76,20 @@ class Report(models.Model):
                                          self.last_update_time,
                                          self.failed_hosts,
                                          self.candidate_hosts) + '}'
+
+    class Meta:
+        """Metadata for report model."""
+
+        abstract = True
+
+
+class Report(AbstractReport):
+    """Represents report archives."""
+
+    pass
+
+
+class ReportArchive(AbstractReport):
+    """Represents report archives."""
+
+    pass

@@ -11,32 +11,32 @@
 
 """Serializer for report progress."""
 
-from rest_framework.serializers import (ChoiceField,
+from rest_framework.serializers import (CharField,
+                                        ChoiceField,
                                         DateField,
                                         IntegerField,
                                         JSONField,
-                                        ModelSerializer,
-                                        UUIDField)
+                                        ModelSerializer)
 
-from api.models import Report
+from api.models import ReportArchive
 
 
 class ReportSerializer(ModelSerializer):
     """Serializer for the Report model."""
 
-    report_platform_id = UUIDField(format='hex_verbose',
-                                   read_only=True)
+    report_platform_id = CharField(required=False)
+    rh_account = CharField(required=False)
     upload_srv_kafka_msg = JSONField(read_only=True)
     report_json = JSONField(read_only=True)
-    state = ChoiceField(read_only=True, choices=Report.NEW)
-    state_info = JSONField(read_only=True)
+    state = ChoiceField(read_only=True, choices=ReportArchive.STATE_CHOICES)
+    state_info = JSONField(null=True)
     retry_count = IntegerField(null=True)
     last_update_time = DateField(null=True)
-    failed_hosts = JSONField(read_only=True)
-    candidate_hosts = JSONField(read_only=True)
+    failed_hosts = JSONField(null=True)
+    candidate_hosts = JSONField(null=True)
 
     class Meta:
         """Meta class for ReportSerializer."""
 
-        model = Report
+        model = ReportArchive
         fields = '__all__'

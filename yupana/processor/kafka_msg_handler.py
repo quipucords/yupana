@@ -1,5 +1,5 @@
 #
-# Copyright 2018 Red Hat, Inc.
+# Copyright 2018-2019 Red Hat, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -22,19 +22,21 @@ import json
 import logging
 import tarfile
 import threading
+from datetime import datetime
 from http import HTTPStatus
 from io import BytesIO
-
 
 import requests
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from kafka.errors import ConnectionError as KafkaConnectionError
 
+from api.models import Report, ReportArchive
 from config.settings.base import (INSIGHTS_HOST_INVENTORY_URL,
                                   INSIGHTS_KAFKA_ADDRESS)
 
 LOG = logging.getLogger(__name__)
 EVENT_LOOP = asyncio.get_event_loop()
+PROCESSING_LOOP = asyncio.new_event_loop()
 MSG_PENDING_QUEUE = asyncio.Queue()
 QPC_TOPIC = 'platform.upload.qpc'
 AVAILABLE_TOPIC = 'platform.upload.available'
@@ -46,6 +48,9 @@ CANONICAL_FACTS = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addre
 # we will want to revert these to the defaults when we improve processing/ACK time in yupana
 SESSION_TIMEOUT = 300 * 1000
 REQUEST_TIMEOUT = 500 * 1000
+
+RETRY_TIME = 0  # this is the time in minutes that we want to wait to retry a report
+RETRIES_ALLOWED = 1  # this is the number of retries that we want to allow before failing a report
 
 
 def format_message(prefix, message, account_number=None, report_id=None):
@@ -346,7 +351,7 @@ async def send_confirmation(file_hash, status, account_number=None, report_id=No
     """
     prefix = 'REPORT VALIDATION STATE ON KAFKA'
     producer = AIOKafkaProducer(
-        loop=EVENT_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
+        loop=PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
     )
     try:
         await producer.start()
@@ -391,6 +396,8 @@ def upload_to_host_inventory(account_number, report_id, hosts):
     identity_header = {'x-rh-identity': x_rh_identity_value,
                        'Content-Type': 'application/json'}
     failed_hosts = []
+    successful_hosts = {}  # stroing the hosts that successfully upload here
+    failed_upload_hosts = {}  # storing the hosts that failed to upload here
     for host_id, host in hosts.items():
         body = {}
         body['account'] = account_number
@@ -424,6 +431,9 @@ def upload_to_host_inventory(account_number, report_id, hosts):
                         'display_name': body.get('display_name'),
                         'system_platform_id': host_id,
                         'host': host})
+                failed_upload_hosts[host_id] = host
+            else:
+                successful_hosts[host_id] = host
 
         except requests.exceptions.RequestException as err:
             failed_hosts.append(
@@ -433,6 +443,7 @@ def upload_to_host_inventory(account_number, report_id, hosts):
                     'display_name': body.get('display_name'),
                     'system_platform_id': host_id,
                     'host': host})
+            failed_upload_hosts[host_id] = host
 
     successful = len(hosts) - len(failed_hosts)
     upload_msg = format_message(
@@ -459,52 +470,281 @@ def upload_to_host_inventory(account_number, report_id, hosts):
                 account_number=account_number,
                 report_id=report_id
             ))
+    return successful_hosts, failed_upload_hosts
 
 
-async def process_messages():  # pragma: no cover
-    """
-    Process asyncio MSG_PENDING_QUEUE and send validation status.
-
-    :param None
-    :returns None
-    """
-    prefix = 'PROCESS MESSAGE'
+async def save_message_and_ack(consumer):
+    """Save and ack the kafka uploaded message."""
+    prefix = 'SAVING MESSAGE'
     while True:
         consumer_record = await MSG_PENDING_QUEUE.get()
         if consumer_record.topic == QPC_TOPIC:
             try:
                 upload_service_message = unpack_consumer_record(consumer_record)
-                account_number = upload_service_message.get('rh_account')
-                if not account_number:
+                rh_account = upload_service_message.get('rh_account')
+                if not rh_account:
                     raise QPCKafkaMsgException(
                         format_message(
                             prefix,
                             'Message missing rh_account.'))
                 try:
-                    message_hash = upload_service_message['hash']
-                    report_tar_gz = download_report(account_number, upload_service_message)
-                    qpc_insights_report = extract_report_from_tar_gz(account_number, report_tar_gz)
-                    valid_hosts, _ = verify_report_details(
-                        account_number, qpc_insights_report)
-                    report_id = qpc_insights_report.get('report_platform_id')
-                    await send_confirmation(message_hash,
-                                            SUCCESS_CONFIRM_STATUS,
-                                            account_number=account_number,
-                                            report_id=report_id)
-                    upload_to_host_inventory(account_number,
-                                             report_id,
-                                             valid_hosts)
-                except QPCReportException as error:
-                    LOG.error(error)
-                    await send_confirmation(message_hash, FAILURE_CONFIRM_STATUS, account_number=account_number)
+                    new_report = Report(upload_srv_kafka_msg=json.dumps(upload_service_message),
+                                        rh_account=rh_account,
+                                        state=Report.NEW,
+                                        state_info=json.dumps([Report.NEW]),
+                                        last_update_time=datetime.utcnow(),
+                                        candidate_hosts=json.dumps({}),
+                                        failed_hosts=json.dumps({}),
+                                        retry_count=0)
+                    new_report.save()
+                    print('the following report was saved: ')
+                    print(new_report.id)
+                    LOG.info(format_message(prefix, 'Upload service message saved. Ready for processing.'))
+                    consumer.commit()
+                except Exception as error:
+                    LOG.error(format_message(prefix, 'Could not save upload service message: %s', error))
             except QPCKafkaMsgException as message_error:
-                LOG.error(prefix, 'Error processing records.  Message: %s, Error: %s', consumer_record, message_error)
-                await send_confirmation(message_hash, FAILURE_CONFIRM_STATUS)
+                LOG.error(format_message(prefix, 'Error processing records.  Message: %s, Error: %s',
+                                         consumer_record, message_error))
+                consumer.commit()
 
+
+class MessageProcessor():
+    """Class for processing saved upload service messages."""
+
+    def __init__(self):
+        """Create a message processor."""
+        self.report = None
+        self.state = None
+        self.new_state = None
+        self.account_number = None
+        self.upload_message = None
+        self.report_id = None
+        self.report_json = None
+        self.candidate_hosts = None
+        self.failed_hosts = None
+        self.status = None
+        self.prefix = 'PROCESSING REPORT'
+
+    def assign_report(self):
+        """Assign the message processor reports that are saved in the db.
+
+        First priority is the oldest reports that are in the new state.
+        If no reports meet this condition, we look for the oldest report in any state.
+        We then check to see if an appropriate amount of time has passed before we retry this
+        report.
+        """
+        if self.report is None:
+            try:
+                self.report = Report.objects.filter(state=Report.NEW).earliest('last_update_time')
+            except Report.DoesNotExist:
+                try:
+                    oldest_report = Report.objects.earliest('last_update_time')
+                    current_time = datetime.utcnow()
+                    minutes_passed = int((current_time - oldest_report.last_update_time).total_seconds() / 60)
+                    if minutes_passed >= 1:
+                        self.report = oldest_report
+                except Report.DoesNotExist:
+                    self.report = None
+
+    def update_report_state(self, retry=None, report_json=None, report_id=None,
+                            candidate_hosts=None, failed_hosts=None):
+        """
+        Update the message processor state and save.
+
+        :param retry: <bool> boolean on whether or not we should retry
+        :param report_json: <dict> dictionary containing the report json
+        :param report_id: <str> string containing report_platform_id
+        :param candidate_hosts: <dict> dictionary containing hosts that were
+            successfully verified and uploaded
+        :param failed_hosts: <dict> dictionary containing hosts that failed
+            verification or upload
+        """
+        self.report.last_update_time = datetime.utcnow()
+        self.report.state = self.new_state
+        if retry:
+            self.report.retry_count += 1
         else:
-            LOG.debug(format_message(prefix,
-                                     'Message not on %s topic: %s' % (
-                                         QPC_TOPIC, consumer_record)))
+            self.report.retry_count = 0
+        if report_json:
+            self.report.report_json = json.dumps(report_json)
+        if report_id:
+            self.report.report_platform_id = report_id
+        if candidate_hosts:
+            # for success hosts, these can change based on the function
+            # ie. hosts may pass verification but not upload so we
+            # completely override the previous value to get only the
+            # successful hosts at that point.
+            self.report.candidate_hosts = json.dumps(candidate_hosts)
+        if failed_hosts:
+            # for failed hosts we need to figure out how to attempt to
+            # upload them and then remove them from failed dict
+            # right now, we are only compounding failed hosts
+            failed = json.loads(self.report.failed_hosts)
+            if failed:
+                failed = failed.update(failed_hosts)
+            else:
+                failed = failed_hosts
+            self.report.failed_hosts = json.dumps(failed)
+        state_info = json.loads(self.report.state_info)
+        state_info.append(self.new_state)
+        self.report.state_info = json.dumps(state_info)
+        self.report.save()
+
+    def determine_retry(self, fail_state, current_state):
+        """Determine if yupana should archive a report based on retry count."""
+        if self.report.retry_count > RETRIES_ALLOWED:
+            self.status = FAILURE_CONFIRM_STATUS
+            self.new_state = fail_state
+            self.update_report_state()
+        else:
+            self.new_state = current_state
+            self.update_report_state(True)
+            self.reinit_variables()
+
+    def start(self):
+        """Change the state from NEW to STARTED."""
+        LOG.info(format_message(self.prefix, 'starting report processor'))
+        self.new_state = Report.STARTED
+        self.update_report_state()
+
+    def download(self):
+        """Attempt to download the report and extract the json."""
+        LOG.info(format_message(self.prefix, 'attempting to download the report and extract the json'))
+        try:
+            report_tar_gz = download_report(self.account_number, self.upload_message)
+            self.report_json = extract_report_from_tar_gz(self.account_number, report_tar_gz)
+            self.new_state = Report.DOWNLOADED
+            print('WOOT SUCCESSFULLY DOWNLOADED')
+            print(self.report.state_info)
+            self.update_report_state(None, self.report_json)
+        except (QPCReportException, QPCKafkaMsgException) as error:
+            LOG.error(error)
+            self.determine_retry(Report.FAILED_DOWNLOAD, Report.STARTED)
+
+    def verify(self):
+        """Verify that the downloaded report is a valid insights report."""
+        LOG.info(format_message(self.prefix, 'validating the report contents'))
+        try:
+            self.candidate_hosts, self.failed_hosts = verify_report_details(
+                self.account_number, self.report_json)
+            self.report_id = self.report_json.get('report_platform_id')
+            self.status = SUCCESS_CONFIRM_STATUS
+            self.new_state = Report.VALIDATED
+            if not self.candidate_hosts:
+                self.status = FAILURE_CONFIRM_STATUS
+            self.update_report_state(None, None, self.report_id, self.candidate_hosts, self.failed_hosts)
+        except Exception as error:
+            LOG.error(error)
+            self.determine_retry(Report.FAILED_VALIDATION, Report.DOWNLOADED)
+
+    async def send_validation(self):
+        """Upload the validation status of the message."""
+        LOG.info(format_message(self.prefix, 'uploading validation status %s for report %s',
+                                self.status, self.report_id))
+        message_hash = self.upload_message['hash']
+        try:
+            await send_confirmation(message_hash,
+                                    self.status,
+                                    account_number=self.account_number,
+                                    report_id=self.report_id)
+            self.new_state = Report.VALIDATION_REPORTED
+            self.update_report_state()
+            # update_report_state(self.report, Report.VALIDATION_REPORTED)
+        except Exception as error:
+            LOG.error(error)
+            self.determine_retry(Report.FAILED_VALIDATION_REPORTING, Report.VALIDATED)
+
+    def upload(self):
+        """Upload the host candidates to the host_inventory."""
+        LOG.info(format_message(self.prefix, 'Uploading hosts to inventory'))
+        # TODO: actually put host upload function here
+        try:
+            self.candidate_hosts, self.failed_hosts = upload_to_host_inventory(
+                self.account_number,
+                self.report_id,
+                self.candidate_hosts)
+            self.new_state = Report.HOSTS_UPLOADED
+            if self.candidate_hosts:
+                self.update_report_state(None, None, None, self.candidate_hosts, self.failed_hosts)
+            else:
+                self.determine_retry(Report.FAILED_HOSTS_UPLOAD, Report.VALIDATION_REPORTED)
+                # determine what to do if no exception but there were no successful uploads
+            # update_report_state(self.report, Report.HOSTS_UPLOADED)
+        except Exception as error:
+            LOG.error(error)
+            self.determine_retry(Report.FAILED_HOSTS_UPLOAD, Report.VALIDATION_REPORTED)
+
+    def reinit_variables(self):
+        """Reinit the class variables to None."""
+        self.report = None
+        self.state = None
+        self.account_number = None
+        self.upload_message = None
+        self.report_id = None
+        self.report_json = None
+        self.candidate_hosts = None
+        self.failed_hosts = None
+        self.status = None
+
+    def archive_report(self):
+        """Archive the report object."""
+        LOG.info(format_message(self.prefix, 'archiving report'))
+        archived = ReportArchive(
+            rh_account=self.account_number,
+            retry_count=self.report.retry_count,
+            candidate_hosts=self.report.candidate_hosts,
+            failed_hosts=self.report.failed_hosts,
+            state=self.state,
+            state_info=self.report.state_info,
+            last_update_time=self.report.last_update_time,
+            upload_srv_kafka_msg=self.upload_message
+        )
+        if self.report_id:
+            archived.report_platform_id = self.report_id
+        if self.report_json:
+            archived.report_json = self.report_json
+
+        archived.save()
+        print('woooot we were able to archive: ')
+        print(self.report.id)
+        try:
+            Report.objects.get(id=self.report.id).delete()
+        except Report.DoesNotExist:
+            pass
+        self.reinit_variables()
+
+    async def delegate_state(self):
+        """Call the correct function based on report state.
+
+        If the function is async, make sure to await it.
+        """
+        self.state = self.report.state
+        self.account_number = self.report.rh_account
+        self.upload_message = json.loads(self.report.upload_srv_kafka_msg)
+        async_function_call_states = [Report.VALIDATED]
+        state_functions = {Report.NEW: self.start,
+                           Report.STARTED: self.download,
+                           Report.DOWNLOADED: self.verify,
+                           Report.VALIDATED: self.send_validation,
+                           Report.VALIDATION_REPORTED: self.upload,
+                           Report.HOSTS_UPLOADED: self.archive_report,
+                           Report.FAILED_DOWNLOAD: self.archive_report,
+                           Report.FAILED_VALIDATION: self.archive_report,
+                           Report.FAILED_VALIDATION_REPORTING: self.archive_report,
+                           Report.FAILED_HOSTS_UPLOAD: self.archive_report}
+        # if the function is async, we must await it
+        if self.state in async_function_call_states:
+            await state_functions.get(self.state)()
+        else:
+            state_functions.get(self.state)()
+
+    async def run(self):
+        """Run the message processor for a report."""
+        while True:
+            self.assign_report()
+            if self.report:
+                await self.delegate_state()
 
 
 async def listen_for_messages(consumer):  # pragma: no cover
@@ -543,10 +783,11 @@ def asyncio_worker_thread(loop):  # pragma: no cover
         AVAILABLE_TOPIC, QPC_TOPIC,
         loop=EVENT_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS,
         group_id='qpc-group', session_timeout_ms=SESSION_TIMEOUT,
-        request_timeout_ms=REQUEST_TIMEOUT
+        request_timeout_ms=REQUEST_TIMEOUT,
+        enable_auto_commit=True
     )
 
-    loop.create_task(process_messages())
+    loop.create_task(save_message_and_ack(consumer))
 
     try:
         loop.run_until_complete(listen_for_messages(consumer))
@@ -562,5 +803,28 @@ def initialize_kafka_handler():  # pragma: no cover
     :returns None
     """
     event_loop_thread = threading.Thread(target=asyncio_worker_thread, args=(EVENT_LOOP,))
+    event_loop_thread.daemon = True
+    event_loop_thread.start()
+
+
+def asyncio_message_processor_thread(loop):  # pragma: no cover
+    """
+    Worker thread function to run the asyncio event loop.
+
+    :param None
+    :returns None
+    """
+    processor = MessageProcessor()
+    loop.run_until_complete(processor.run())
+
+
+def initialize_message_processor():  # pragma: no cover
+    """
+    Create asyncio tasks and daemon thread to run event loop.
+
+    :param None
+    :returns None
+    """
+    event_loop_thread = threading.Thread(target=asyncio_message_processor_thread, args=(PROCESSING_LOOP,))
     event_loop_thread.daemon = True
     event_loop_thread.start()
