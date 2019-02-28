@@ -561,37 +561,42 @@ class MessageProcessor():
         :param failed_hosts: <dict> dictionary containing hosts that failed
             verification or upload
         """
-        self.report.last_update_time = datetime.utcnow()
-        self.report.state = self.new_state
-        if retry is not None:
-            if retry:
-                self.report.retry_count += 1
-        else:
-            self.report.retry_count = 0
-        if report_json:
-            self.report.report_json = json.dumps(report_json)
-        if report_id:
-            self.report.report_platform_id = report_id
-        if candidate_hosts:
-            # for success hosts, these can change based on the function
-            # ie. hosts may pass verification but not upload so we
-            # completely override the previous value to get only the
-            # successful hosts at that point. Also, we must remove the
-            # hosts that succeeded from the failed hosts in case they were
-            # put there on a retry.
-            self.remove_success_from_failure(candidate_hosts)
-            self.report.candidate_hosts = json.dumps(candidate_hosts)
-        if failed_hosts:
-            # for failed hosts this list can keep growing, so we add the
-            # newly failed hosts to the previous value
-            failed = json.loads(self.report.failed_hosts)
-            for host in failed_hosts:
-                failed.append(host)
-            self.report.failed_hosts = json.dumps(failed)
-        state_info = json.loads(self.report.state_info)
-        state_info.append(self.new_state)
-        self.report.state_info = json.dumps(state_info)
-        self.report.save()
+        try:
+            self.report.last_update_time = datetime.utcnow()
+            self.report.state = self.new_state
+            if retry is not None:
+                if retry:
+                    self.report.retry_count += 1
+            else:
+                self.report.retry_count = 0
+            if report_json:
+                self.report.report_json = json.dumps(report_json)
+            if report_id:
+                self.report.report_platform_id = report_id
+            if candidate_hosts:
+                # for success hosts, these can change based on the function
+                # ie. hosts may pass verification but not upload so we
+                # completely override the previous value to get only the
+                # successful hosts at that point. Also, we must remove the
+                # hosts that succeeded from the failed hosts in case they were
+                # put there on a retry.
+                self.remove_success_from_failure(candidate_hosts)
+                self.report.candidate_hosts = json.dumps(candidate_hosts)
+            if failed_hosts:
+                # for failed hosts this list can keep growing, so we add the
+                # newly failed hosts to the previous value
+                failed = json.loads(self.report.failed_hosts)
+                for host in failed_hosts:
+                    failed.append(host)
+                self.report.failed_hosts = json.dumps(failed)
+            state_info = json.loads(self.report.state_info)
+            state_info.append(self.new_state)
+            self.report.state_info = json.dumps(state_info)
+            self.report.save()
+        except Exception as error:
+            LOG.error(
+                self.prefix,
+                'Could not update report record due to the following error %s.', error)
 
     def determine_retry(self, fail_state, current_state, failed_hosts=None):
         """Determine if yupana should archive a report based on retry count.
@@ -674,8 +679,7 @@ class MessageProcessor():
             self.report_json = extract_report_from_tar_gz(self.account_number, report_tar_gz)
             self.new_state = Report.DOWNLOADED
             self.update_report_state(None, self.report_json)
-        except (QPCReportException, QPCKafkaMsgException) as error:
-            LOG.error(error)
+        except (QPCReportException, QPCKafkaMsgException):
             self.determine_retry(Report.FAILED_DOWNLOAD, Report.STARTED)
 
     def verify(self):
@@ -754,7 +758,7 @@ class MessageProcessor():
             retry_count=self.report.retry_count,
             candidate_hosts=self.report.candidate_hosts,
             failed_hosts=self.report.failed_hosts,
-            state=self.state,
+            state=self.report.state,
             state_info=self.report.state_info,
             last_update_time=self.report.last_update_time,
             upload_srv_kafka_msg=self.upload_message

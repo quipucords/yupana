@@ -18,8 +18,10 @@
 
 import io
 import json
+import random
 import tarfile
 import uuid
+from datetime import datetime
 from unittest.mock import patch
 
 import processor.kafka_msg_handler as msg_handler
@@ -27,6 +29,8 @@ import requests
 import requests_mock
 from django.test import TestCase
 from requests.exceptions import HTTPError
+
+from api.models import Report, ReportArchive
 
 
 def create_tar_buffer(files_data):
@@ -491,3 +495,147 @@ class KafkaMsgHandlerTest(TestCase):
             msg_handler.upload_to_host_inventory(account_number,
                                                  report_platform_id,
                                                  hosts)
+
+
+class MessageProcessorTests(TestCase):
+    """Test Cases for the Message processor."""
+
+    def setUp(self):
+        """Create test setup."""
+        self.payload_url = 'http://insights-upload.com/q/file_to_validate'
+        self.uuid = str(uuid.uuid4())
+        self.uuid2 = str(uuid.uuid4())
+        self.fake_record = KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
+        self.msg = msg_handler.unpack_consumer_record(self.fake_record)
+        self.report_json = {
+            'report_id': 1,
+            'report_type': 'insights',
+            'report_version': '1.0.0.1b025b8',
+            'status': 'completed',
+            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'hosts': {self.uuid: {'bios_uuid': 'value'},
+                      self.uuid2: {'invalid': 'value'}}}
+        self.report_record = Report(upload_srv_kafka_msg=json.dumps(self.msg),
+                                    rh_account='1234',
+                                    state=Report.NEW,
+                                    report_json=json.dumps(self.report_json),
+                                    state_info=json.dumps([Report.NEW]),
+                                    last_update_time=datetime.utcnow(),
+                                    candidate_hosts=json.dumps({}),
+                                    failed_hosts=json.dumps([]),
+                                    retry_count=0)
+        self.report_record.save()
+        self.processor = msg_handler.MessageProcessor()
+        self.processor.report = self.report_record
+
+    def check_variables_are_reinitted(self):
+        """Check that report processor members have been cleared."""
+        self.assertEqual(self.processor.report_id, None)
+        self.assertEqual(self.processor.report, None)
+        self.assertEqual(self.processor.state, None)
+        self.assertEqual(self.processor.account_number, None)
+        self.assertEqual(self.processor.upload_message, None)
+        self.assertEqual(self.processor.report_json, None)
+        self.assertEqual(self.processor.candidate_hosts, None)
+        self.assertEqual(self.processor.failed_hosts, None)
+        self.assertEqual(self.processor.status, None)
+
+    def test_assign_cause_to_failed(self):
+        """Test that we sucessfully record the reason a host fails."""
+        failure_cause = random.choice(['VERIFICATION', 'UPLOAD'])
+        self.processor.failed_hosts = {self.uuid: {'mac_addresses': 'value'},
+                                       self.uuid2: {'bios_uuid': 'value'}}
+        expected = [{self.uuid: {'mac_addresses': 'value'},
+                     'cause': failure_cause},
+                    {self.uuid2: {'bios_uuid': 'value'},
+                     'cause': failure_cause}]
+        failed_hosts_list = self.processor.assign_cause_to_failed(failure_cause)
+        self.assertEqual(failed_hosts_list, expected)
+
+    def test_generate_retry_candidates_with_failed(self):
+        """Test that we generate only the hosts that failed upload to retry."""
+        self.report_record.failed_hosts = json.dumps([
+            {self.uuid: {'mac_addresses': 'value'},
+             'cause': 'UPLOAD'},
+            {self.uuid2: {'bios_uuid': 'value'},
+             'cause': 'VERIFICATION'}])
+        self.report_record.save()
+        retry_candidates = self.processor.generate_retry_candidates()
+        expected = {self.uuid: {'mac_addresses': 'value'}}
+        self.assertEqual(retry_candidates, expected)
+
+    def test_generate_retry_candidates_no_failed(self):
+        """Test that if there are no failed hosts, return the candidate hosts."""
+        self.report_record.failed_hosts = json.dumps([])
+        expected = {self.uuid: {'bios_uuid': 'value'}}
+        self.report_record.candidate_hosts = json.dumps(expected)
+        self.report_record.save()
+        retry_candidates = self.processor.generate_retry_candidates()
+        self.assertEqual(retry_candidates, expected)
+
+    def test_remove_success_from_failure(self):
+        """Test that if a host that previously fails, succeeds, we remove it from fail."""
+        self.report_record.failed_hosts = json.dumps(
+            [{self.uuid: {'mac_addresses': 'value'},
+              'cause': 'UPLOAD'},
+             {self.uuid2: {'bios_uuid': 'value'},
+              'cause': 'VERIFICATION'}])
+        self.report_record.save()
+        self.processor.remove_success_from_failure({self.uuid2: {'bios_uuid': 'value'}})
+        expected = [{self.uuid: {'mac_addresses': 'value'}, 'cause': 'UPLOAD'}]
+        self.assertEqual(expected, json.loads(self.report_record.failed_hosts))
+
+    def test_archiving_report(self):
+        """Test that archiving creates a ReportArchive, deletes the report, and resets the processor."""
+        report_to_archive = Report(upload_srv_kafka_msg=json.dumps(self.msg),
+                                   rh_account='4321',
+                                   report_platform_id=self.uuid2,
+                                   state=Report.NEW,
+                                   report_json=json.dumps(self.report_json),
+                                   state_info=json.dumps([Report.NEW]),
+                                   last_update_time=datetime.utcnow(),
+                                   candidate_hosts=json.dumps({}),
+                                   failed_hosts=json.dumps([]),
+                                   retry_count=0)
+        report_to_archive.save()
+        self.processor = msg_handler.MessageProcessor()
+        self.processor.report = report_to_archive
+        self.processor.account_number = '4321'
+        self.processor.upload_message = self.msg
+
+        self.processor.archive_report()
+        # assert the report doesn't exist
+        with self.assertRaises(Report.DoesNotExist):
+            Report.objects.get(id=report_to_archive.id)
+        # assert the report archive does exist
+        archived = ReportArchive.objects.get(rh_account='4321')
+        self.assertEqual(json.loads(archived.state_info), [Report.NEW])
+
+        # assert the processor was reset
+        self.check_variables_are_reinitted()
+
+    def test_reinit_variables(self):
+        """Test that reinitting the variables clears the values."""
+        # make sure that the variables have values
+        self.processor.report_id = self.uuid
+        self.processor.report = self.report_record
+        self.processor.state = Report.NEW
+        self.processor.account_number = '1234'
+        self.processor.upload_message = self.msg
+        self.processor.report_json = {}
+        self.processor.candidate_hosts = []
+        self.processor.failed_hosts = []
+        self.processor.status = msg_handler.SUCCESS_CONFIRM_STATUS
+        self.assertEqual(self.processor.report, self.report_record)
+        self.assertEqual(self.processor.report_id, self.uuid)
+        self.assertEqual(self.processor.state, Report.NEW)
+        self.assertEqual(self.processor.account_number, '1234')
+        self.assertEqual(self.processor.upload_message, self.msg)
+        self.assertEqual(self.processor.report_json, {})
+        self.assertEqual(self.processor.candidate_hosts, [])
+        self.assertEqual(self.processor.failed_hosts, [])
+        self.assertEqual(self.processor.status, msg_handler.SUCCESS_CONFIRM_STATUS)
+
+        # check all of the variables are None after reinitting
+        self.processor.reinit_variables()
+        self.check_variables_are_reinitted()
