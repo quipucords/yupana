@@ -49,8 +49,8 @@ CANONICAL_FACTS = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addre
 SESSION_TIMEOUT = 300 * 1000
 REQUEST_TIMEOUT = 500 * 1000
 
-RETRY_TIME = 0  # this is the time in minutes that we want to wait to retry a report
-RETRIES_ALLOWED = 1  # this is the number of retries that we want to allow before failing a report
+RETRY_TIME = 1  # this is the time in minutes that we want to wait to retry a report
+RETRIES_ALLOWED = 5  # this is the number of retries that we want to allow before failing a report
 
 
 def format_message(prefix, message, account_number=None, report_id=None):
@@ -396,7 +396,7 @@ def upload_to_host_inventory(account_number, report_id, hosts):
     identity_header = {'x-rh-identity': x_rh_identity_value,
                        'Content-Type': 'application/json'}
     failed_hosts = []
-    successful_hosts = {}  # stroing the hosts that successfully upload here
+    successful_hosts = {}  # storing the hosts that successfully upload here
     failed_upload_hosts = {}  # storing the hosts that failed to upload here
     for host_id, host in hosts.items():
         body = {}
@@ -488,17 +488,15 @@ async def save_message_and_ack(consumer):
                             prefix,
                             'Message missing rh_account.'))
                 try:
-                    new_report = Report(upload_srv_kafka_msg=json.dumps(upload_service_message),
-                                        rh_account=rh_account,
-                                        state=Report.NEW,
-                                        state_info=json.dumps([Report.NEW]),
-                                        last_update_time=datetime.utcnow(),
-                                        candidate_hosts=json.dumps({}),
-                                        failed_hosts=json.dumps({}),
-                                        retry_count=0)
-                    new_report.save()
-                    print('the following report was saved: ')
-                    print(new_report.id)
+                    uploaded_report = Report(upload_srv_kafka_msg=json.dumps(upload_service_message),
+                                             rh_account=rh_account,
+                                             state=Report.NEW,
+                                             state_info=json.dumps([Report.NEW]),
+                                             last_update_time=datetime.utcnow(),
+                                             candidate_hosts=json.dumps({}),
+                                             failed_hosts=json.dumps([]),
+                                             retry_count=0)
+                    uploaded_report.save()
                     LOG.info(format_message(prefix, 'Upload service message saved. Ready for processing.'))
                     consumer.commit()
                 except Exception as error:
@@ -536,23 +534,26 @@ class MessageProcessor():
         """
         if self.report is None:
             try:
+                # look for the oldest report in the new state
                 self.report = Report.objects.filter(state=Report.NEW).earliest('last_update_time')
             except Report.DoesNotExist:
                 try:
+                    # if there are no new reports, look for the oldest report in the db
                     oldest_report = Report.objects.earliest('last_update_time')
                     current_time = datetime.utcnow()
+                    # check that the last updated time on the report is older than the retry time
                     minutes_passed = int((current_time - oldest_report.last_update_time).total_seconds() / 60)
-                    if minutes_passed >= 1:
+                    if minutes_passed >= RETRY_TIME:
                         self.report = oldest_report
                 except Report.DoesNotExist:
-                    self.report = None
+                    pass
 
     def update_report_state(self, retry=None, report_json=None, report_id=None,
                             candidate_hosts=None, failed_hosts=None):
         """
         Update the message processor state and save.
 
-        :param retry: <bool> boolean on whether or not we should retry
+        :param retry: <bool> boolean on whether or not we should increase the retry
         :param report_json: <dict> dictionary containing the report json
         :param report_id: <str> string containing report_platform_id
         :param candidate_hosts: <dict> dictionary containing hosts that were
@@ -562,8 +563,9 @@ class MessageProcessor():
         """
         self.report.last_update_time = datetime.utcnow()
         self.report.state = self.new_state
-        if retry:
-            self.report.retry_count += 1
+        if retry is not None:
+            if retry:
+                self.report.retry_count += 1
         else:
             self.report.retry_count = 0
         if report_json:
@@ -574,49 +576,103 @@ class MessageProcessor():
             # for success hosts, these can change based on the function
             # ie. hosts may pass verification but not upload so we
             # completely override the previous value to get only the
-            # successful hosts at that point.
+            # successful hosts at that point. Also, we must remove the
+            # hosts that succeeded from the failed hosts in case they were
+            # put there on a retry.
+            self.remove_success_from_failure(candidate_hosts)
             self.report.candidate_hosts = json.dumps(candidate_hosts)
         if failed_hosts:
-            # for failed hosts we need to figure out how to attempt to
-            # upload them and then remove them from failed dict
-            # right now, we are only compounding failed hosts
+            # for failed hosts this list can keep growing, so we add the
+            # newly failed hosts to the previous value
             failed = json.loads(self.report.failed_hosts)
-            if failed:
-                failed = failed.update(failed_hosts)
-            else:
-                failed = failed_hosts
+            for host in failed_hosts:
+                failed.append(host)
             self.report.failed_hosts = json.dumps(failed)
         state_info = json.loads(self.report.state_info)
         state_info.append(self.new_state)
         self.report.state_info = json.dumps(state_info)
         self.report.save()
 
-    def determine_retry(self, fail_state, current_state):
-        """Determine if yupana should archive a report based on retry count."""
-        if self.report.retry_count > RETRIES_ALLOWED:
+    def determine_retry(self, fail_state, current_state, failed_hosts=None):
+        """Determine if yupana should archive a report based on retry count.
+
+        :param fail_state: <str> the final state if we have reached max retries
+        :param current_state: <str> the current state we are in that we want to try again
+        :param failed_hosts: <list> for uploading to host inventory, if we fail due to
+            no hosts being successfully uploaded, we want to rerecord the hosts that failed
+            for retrying.
+        """
+        if self.report.retry_count + 1 > RETRIES_ALLOWED:
             self.status = FAILURE_CONFIRM_STATUS
             self.new_state = fail_state
-            self.update_report_state()
+            self.update_report_state(False)
         else:
             self.new_state = current_state
-            self.update_report_state(True)
+            if failed_hosts:
+                self.update_report_state(True, None, None, self.candidate_hosts, failed_hosts)
+            else:
+                self.update_report_state(True)
             self.reinit_variables()
+
+    def assign_cause_to_failed(self, cause):
+        """Assign the reason for failure to the failed_hosts.
+
+        :param cause: <str> should be 'VERIFICATION" or 'UPLOAD'
+        """
+        failed_hosts_list = []
+        for host_id, host in self.failed_hosts.items():
+            failed_hosts_list.append({host_id: host, 'cause': cause})
+        return failed_hosts_list
+
+    def generate_retry_candidates(self):
+        """Generate hosts that only failed upload to retry."""
+        failed_hosts_list = json.loads(self.report.failed_hosts)
+        success_hosts = json.loads(self.report.candidate_hosts)
+        retry_hosts = {}
+        for host in failed_hosts_list:
+            if host.get('cause', '') == 'UPLOAD':
+                host.pop('cause')
+                for key in host.keys():
+                    retry_hosts[key] = host[key]
+        if retry_hosts:
+            return retry_hosts
+        return success_hosts
+
+    def remove_success_from_failure(self, success_hosts):
+        """Remove the hosts that succeeded from the failed hosts if they are there."""
+        failed_hosts = json.loads(self.report.failed_hosts)
+        for host_id, host in success_hosts.items():
+            for failed_host in failed_hosts:
+                if failed_host.get(host_id):
+                    failed_hosts.remove(failed_host)
+        self.report.failed_hosts = json.dumps(failed_hosts)
+        self.report.save()
+
+    def deduplicate_reports(self):
+        """If a report with the same id already exists, archive the new report."""
+        try:
+            existing_reports = Report.objects.filter(report_platform_id=self.report.report_platform_id)
+            if existing_reports.count() > 1:
+                LOG.error(format_message(
+                    self.prefix,
+                    'a report with this report_platform_id already exists. Archiving report'))
+                self.archive_report()
+        except Report.DoesNotExist:
+            pass
 
     def start(self):
         """Change the state from NEW to STARTED."""
-        LOG.info(format_message(self.prefix, 'starting report processor'))
+        LOG.info(format_message(self.prefix, 'Starting report processor'))
         self.new_state = Report.STARTED
         self.update_report_state()
 
     def download(self):
         """Attempt to download the report and extract the json."""
-        LOG.info(format_message(self.prefix, 'attempting to download the report and extract the json'))
+        LOG.info(format_message(self.prefix, 'Attempting to download the report and extract the json'))
         try:
             report_tar_gz = download_report(self.account_number, self.upload_message)
             self.report_json = extract_report_from_tar_gz(self.account_number, report_tar_gz)
             self.new_state = Report.DOWNLOADED
-            print('WOOT SUCCESSFULLY DOWNLOADED')
-            print(self.report.state_info)
             self.update_report_state(None, self.report_json)
         except (QPCReportException, QPCKafkaMsgException) as error:
             LOG.error(error)
@@ -624,23 +680,25 @@ class MessageProcessor():
 
     def verify(self):
         """Verify that the downloaded report is a valid insights report."""
-        LOG.info(format_message(self.prefix, 'validating the report contents'))
+        LOG.info(format_message(self.prefix, 'Validating the report contents'))
         try:
             self.candidate_hosts, self.failed_hosts = verify_report_details(
                 self.account_number, self.report_json)
+            failed_hosts_list = self.assign_cause_to_failed('VERIFICATION')
             self.report_id = self.report_json.get('report_platform_id')
             self.status = SUCCESS_CONFIRM_STATUS
             self.new_state = Report.VALIDATED
             if not self.candidate_hosts:
                 self.status = FAILURE_CONFIRM_STATUS
-            self.update_report_state(None, None, self.report_id, self.candidate_hosts, self.failed_hosts)
+            self.update_report_state(None, None, self.report_id, self.candidate_hosts, failed_hosts_list)
+            self.deduplicate_reports()
         except Exception as error:
             LOG.error(error)
             self.determine_retry(Report.FAILED_VALIDATION, Report.DOWNLOADED)
 
     async def send_validation(self):
         """Upload the validation status of the message."""
-        LOG.info(format_message(self.prefix, 'uploading validation status %s for report %s',
+        LOG.info(format_message(self.prefix, 'Uploading validation status %s for report %s',
                                 self.status, self.report_id))
         message_hash = self.upload_message['hash']
         try:
@@ -658,19 +716,20 @@ class MessageProcessor():
     def upload(self):
         """Upload the host candidates to the host_inventory."""
         LOG.info(format_message(self.prefix, 'Uploading hosts to inventory'))
-        # TODO: actually put host upload function here
         try:
+            hosts_to_try = self.generate_retry_candidates()
             self.candidate_hosts, self.failed_hosts = upload_to_host_inventory(
                 self.account_number,
                 self.report_id,
-                self.candidate_hosts)
+                hosts_to_try)
             self.new_state = Report.HOSTS_UPLOADED
+            failed_hosts_list = self.assign_cause_to_failed('UPLOAD')
             if self.candidate_hosts:
-                self.update_report_state(None, None, None, self.candidate_hosts, self.failed_hosts)
+                self.update_report_state(None, None, None, self.candidate_hosts, failed_hosts_list)
             else:
+                # self.new_state = Report.VALIDATION_REPORTED
                 self.determine_retry(Report.FAILED_HOSTS_UPLOAD, Report.VALIDATION_REPORTED)
-                # determine what to do if no exception but there were no successful uploads
-            # update_report_state(self.report, Report.HOSTS_UPLOADED)
+                # self.update_report_state(True, None, None, self.candidate_hosts, failed_hosts_list)
         except Exception as error:
             LOG.error(error)
             self.determine_retry(Report.FAILED_HOSTS_UPLOAD, Report.VALIDATION_REPORTED)
@@ -689,7 +748,7 @@ class MessageProcessor():
 
     def archive_report(self):
         """Archive the report object."""
-        LOG.info(format_message(self.prefix, 'archiving report'))
+        LOG.info(format_message(self.prefix, 'Archiving report'))
         archived = ReportArchive(
             rh_account=self.account_number,
             retry_count=self.report.retry_count,
@@ -704,10 +763,7 @@ class MessageProcessor():
             archived.report_platform_id = self.report_id
         if self.report_json:
             archived.report_json = self.report_json
-
         archived.save()
-        print('woooot we were able to archive: ')
-        print(self.report.id)
         try:
             Report.objects.get(id=self.report.id).delete()
         except Report.DoesNotExist:
@@ -722,6 +778,14 @@ class MessageProcessor():
         self.state = self.report.state
         self.account_number = self.report.rh_account
         self.upload_message = json.loads(self.report.upload_srv_kafka_msg)
+        if self.report.candidate_hosts:
+            self.candidate_hosts = json.loads(self.report.candidate_hosts)
+        if self.report.failed_hosts:
+            self.failed_hosts = json.loads(self.report.failed_hosts)
+        if self.report.report_json:
+            self.report_json = json.loads(self.report.report_json)
+        if self.report.report_platform_id:
+            self.report_id = self.report.report_platform_id
         async_function_call_states = [Report.VALIDATED]
         state_functions = {Report.NEW: self.start,
                            Report.STARTED: self.download,
