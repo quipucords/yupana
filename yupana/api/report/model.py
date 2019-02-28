@@ -78,13 +78,13 @@ class AbstractReport(models.Model):
                                          self.candidate_hosts) + '}'
 
     class Meta:
-        """Metadata for report model."""
+        """Metadata for abstract report model."""
 
         abstract = True
 
 
 class Report(AbstractReport):
-    """Represents report archives."""
+    """Represents report records."""
 
     pass
 
