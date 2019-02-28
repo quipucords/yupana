@@ -56,6 +56,5 @@ class ReportModelTest(TestCase):
         self.assertEqual(self.report.state, Report.NEW)
         self.assertEqual(self.report.state_info, [Report.NEW])
         self.assertEqual(self.report.last_update_time, self.date)
-        expected = "{report_platform_id:%s, upload_srv_kafka_msg:{'accountid': '13423', 'msg_url': 'foo'}, report_json:{'report_platform_id': '%s', 'report_type': 'insights', 'hosts': {}}, state:new, state_info:['new'], retry_count:None, last_update_time:%s, failed_hosts:[], candidate_hosts:[] }" % (self.uuid, self.uuid, self.date)  # noqa
         expected = "{report_platform_id:%s, rh_account: 13423, upload_srv_kafka_msg:{'accountid': '13423', 'msg_url': 'foo'}, report_json:{'report_platform_id': '%s', 'report_type': 'insights', 'hosts': {}}, state:new, state_info:['new'], retry_count:0, last_update_time:%s, failed_hosts:[], candidate_hosts:[] }" % (self.uuid, self.uuid, self.date)  # noqa
         self.assertEqual(str(self.report), expected)
