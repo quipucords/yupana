@@ -51,6 +51,8 @@ REQUEST_TIMEOUT = 500 * 1000
 
 RETRY_TIME = 1  # this is the time in minutes that we want to wait to retry a report
 RETRIES_ALLOWED = 5  # this is the number of retries that we want to allow before failing a report
+FAILED_VERIFICATION = 'VERIFICATION'
+FAILED_UPLOAD = 'UPLOAD'
 
 
 def format_message(prefix, message, account_number=None, report_id=None):
@@ -640,7 +642,7 @@ class MessageProcessor():
         success_hosts = json.loads(self.report.candidate_hosts)
         retry_hosts = {}
         for host in failed_hosts_list:
-            if host.get('cause', '') == 'UPLOAD':
+            if host.get('cause', '') == FAILED_UPLOAD:
                 host.pop('cause')
                 for key in host.keys():
                     retry_hosts[key] = host[key]
@@ -693,7 +695,7 @@ class MessageProcessor():
         try:
             self.candidate_hosts, self.failed_hosts = verify_report_details(
                 self.account_number, self.report_json)
-            failed_hosts_list = self.assign_cause_to_failed('VERIFICATION')
+            failed_hosts_list = self.assign_cause_to_failed(FAILED_VERIFICATION)
             self.report_id = self.report_json.get('report_platform_id')
             self.status = SUCCESS_CONFIRM_STATUS
             self.next_state = Report.VALIDATED
@@ -733,7 +735,7 @@ class MessageProcessor():
                     self.report_id,
                     hosts_to_try)
                 self.next_state = Report.HOSTS_UPLOADED
-                failed_hosts_list = self.assign_cause_to_failed('UPLOAD')
+                failed_hosts_list = self.assign_cause_to_failed(FAILED_UPLOAD)
                 if self.candidate_hosts:
                     self.update_report_state(None, None, None, self.candidate_hosts, failed_hosts_list)
                 else:

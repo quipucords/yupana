@@ -530,19 +530,22 @@ class MessageProcessorTests(TestCase):
 
     def check_variables_are_reinitted(self):
         """Check that report processor members have been cleared."""
-        self.assertEqual(self.processor.report_id, None)
-        self.assertEqual(self.processor.report, None)
-        self.assertEqual(self.processor.state, None)
-        self.assertEqual(self.processor.account_number, None)
-        self.assertEqual(self.processor.upload_message, None)
-        self.assertEqual(self.processor.report_json, None)
-        self.assertEqual(self.processor.candidate_hosts, None)
-        self.assertEqual(self.processor.failed_hosts, None)
-        self.assertEqual(self.processor.status, None)
+        processor_attributes = [self.processor.report_id,
+                                self.processor.report,
+                                self.processor.state,
+                                self.processor.account_number,
+                                self.processor.upload_message,
+                                self.processor.status,
+                                self.processor.report_json,
+                                self.processor.candidate_hosts,
+                                self.processor.failed_hosts]
+        for attribute in processor_attributes:
+            self.assertEqual(attribute, None)
 
     def test_assign_cause_to_failed(self):
         """Test that we sucessfully record the reason a host fails."""
-        failure_cause = random.choice(['VERIFICATION', 'UPLOAD'])
+        failure_cause = random.choice([msg_handler.FAILED_VERIFICATION,
+                                       msg_handler.FAILED_UPLOAD])
         self.processor.failed_hosts = {self.uuid: {'mac_addresses': 'value'},
                                        self.uuid2: {'bios_uuid': 'value'}}
         expected = [{self.uuid: {'mac_addresses': 'value'},
@@ -556,9 +559,9 @@ class MessageProcessorTests(TestCase):
         """Test that we generate only the hosts that failed upload to retry."""
         self.report_record.failed_hosts = json.dumps([
             {self.uuid: {'mac_addresses': 'value'},
-             'cause': 'UPLOAD'},
+             'cause': msg_handler.FAILED_UPLOAD},
             {self.uuid2: {'bios_uuid': 'value'},
-             'cause': 'VERIFICATION'}])
+             'cause': msg_handler.FAILED_VERIFICATION}])
         self.report_record.save()
         retry_candidates = self.processor.generate_candidates()
         expected = {self.uuid: {'mac_addresses': 'value'}}
@@ -577,12 +580,12 @@ class MessageProcessorTests(TestCase):
         """Test that if a host that previously fails, succeeds, we remove it from fail."""
         self.report_record.failed_hosts = json.dumps(
             [{self.uuid: {'mac_addresses': 'value'},
-              'cause': 'UPLOAD'},
+              'cause': msg_handler.FAILED_UPLOAD},
              {self.uuid2: {'bios_uuid': 'value'},
-              'cause': 'VERIFICATION'}])
+              'cause': msg_handler.FAILED_VERIFICATION}])
         self.report_record.save()
         self.processor.remove_success_from_failure({self.uuid2: {'bios_uuid': 'value'}})
-        expected = [{self.uuid: {'mac_addresses': 'value'}, 'cause': 'UPLOAD'}]
+        expected = [{self.uuid: {'mac_addresses': 'value'}, 'cause': msg_handler.FAILED_UPLOAD}]
         self.assertEqual(expected, json.loads(self.report_record.failed_hosts))
 
     def test_archiving_report(self):
