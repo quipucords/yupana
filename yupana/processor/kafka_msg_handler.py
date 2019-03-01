@@ -514,7 +514,7 @@ class MessageProcessor():
         """Create a message processor."""
         self.report = None
         self.state = None
-        self.new_state = None
+        self.next_state = None
         self.account_number = None
         self.upload_message = None
         self.report_id = None
@@ -609,10 +609,10 @@ class MessageProcessor():
         """
         if self.report.retry_count + 1 > RETRIES_ALLOWED:
             self.status = FAILURE_CONFIRM_STATUS
-            self.new_state = fail_state
+            self.next_state = fail_state
             self.update_report_state(False)
         else:
-            self.new_state = current_state
+            self.next_state = current_state
             if failed_hosts:
                 self.update_report_state(True, None, None, self.candidate_hosts, failed_hosts)
             else:
@@ -668,7 +668,7 @@ class MessageProcessor():
     def start(self):
         """Change the state from NEW to STARTED."""
         LOG.info(format_message(self.prefix, 'Starting report processor'))
-        self.new_state = Report.STARTED
+        self.next_state = Report.STARTED
         self.update_report_state()
 
     def download(self):
@@ -677,7 +677,7 @@ class MessageProcessor():
         try:
             report_tar_gz = download_report(self.account_number, self.upload_message)
             self.report_json = extract_report_from_tar_gz(self.account_number, report_tar_gz)
-            self.new_state = Report.DOWNLOADED
+            self.next_state = Report.DOWNLOADED
             self.update_report_state(None, self.report_json)
         except (QPCReportException, QPCKafkaMsgException):
             self.determine_retry(Report.FAILED_DOWNLOAD, Report.STARTED)
@@ -691,7 +691,7 @@ class MessageProcessor():
             failed_hosts_list = self.assign_cause_to_failed('VERIFICATION')
             self.report_id = self.report_json.get('report_platform_id')
             self.status = SUCCESS_CONFIRM_STATUS
-            self.new_state = Report.VALIDATED
+            self.next_state = Report.VALIDATED
             if not self.candidate_hosts:
                 self.status = FAILURE_CONFIRM_STATUS
             self.update_report_state(None, None, self.report_id, self.candidate_hosts, failed_hosts_list)
@@ -710,7 +710,7 @@ class MessageProcessor():
                                     self.status,
                                     account_number=self.account_number,
                                     report_id=self.report_id)
-            self.new_state = Report.VALIDATION_REPORTED
+            self.next_state = Report.VALIDATION_REPORTED
             self.update_report_state()
             # update_report_state(self.report, Report.VALIDATION_REPORTED)
         except Exception as error:
@@ -722,18 +722,21 @@ class MessageProcessor():
         LOG.info(format_message(self.prefix, 'Uploading hosts to inventory'))
         try:
             hosts_to_try = self.generate_retry_candidates()
-            self.candidate_hosts, self.failed_hosts = upload_to_host_inventory(
-                self.account_number,
-                self.report_id,
-                hosts_to_try)
-            self.new_state = Report.HOSTS_UPLOADED
-            failed_hosts_list = self.assign_cause_to_failed('UPLOAD')
-            if self.candidate_hosts:
-                self.update_report_state(None, None, None, self.candidate_hosts, failed_hosts_list)
+            if hosts_to_try:
+                self.candidate_hosts, self.failed_hosts = upload_to_host_inventory(
+                    self.account_number,
+                    self.report_id,
+                    hosts_to_try)
+                self.next_state = Report.HOSTS_UPLOADED
+                failed_hosts_list = self.assign_cause_to_failed('UPLOAD')
+                if self.candidate_hosts:
+                    self.update_report_state(None, None, None, self.candidate_hosts, failed_hosts_list)
+                else:
+                    self.determine_retry(Report.FAILED_HOSTS_UPLOAD, Report.VALIDATION_REPORTED)
             else:
-                # self.new_state = Report.VALIDATION_REPORTED
-                self.determine_retry(Report.FAILED_HOSTS_UPLOAD, Report.VALIDATION_REPORTED)
-                # self.update_report_state(True, None, None, self.candidate_hosts, failed_hosts_list)
+                # need to not upload, but archive bc no hosts were valid
+                LOG.info(format_message(self.prefix, 'There are no valid hosts to upload'))
+                self.archive_report()
         except Exception as error:
             LOG.error(error)
             self.determine_retry(Report.FAILED_HOSTS_UPLOAD, Report.VALIDATION_REPORTED)
@@ -758,7 +761,7 @@ class MessageProcessor():
             retry_count=self.report.retry_count,
             candidate_hosts=self.report.candidate_hosts,
             failed_hosts=self.report.failed_hosts,
-            state=self.report.state,
+            state=self.state,
             state_info=self.report.state_info,
             last_update_time=self.report.last_update_time,
             upload_srv_kafka_msg=self.upload_message

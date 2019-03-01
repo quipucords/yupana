@@ -598,10 +598,10 @@ class MessageProcessorTests(TestCase):
                                    failed_hosts=json.dumps([]),
                                    retry_count=0)
         report_to_archive.save()
-        self.processor = msg_handler.MessageProcessor()
         self.processor.report = report_to_archive
         self.processor.account_number = '4321'
         self.processor.upload_message = self.msg
+        self.processor.state = report_to_archive.state
 
         self.processor.archive_report()
         # assert the report doesn't exist
