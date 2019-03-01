@@ -622,7 +622,7 @@ class MessageProcessor():
     def assign_cause_to_failed(self, cause):
         """Assign the reason for failure to the failed_hosts.
 
-        :param cause: <str> should be 'VERIFICATION" or 'UPLOAD'
+        :param cause: <str> should be 'VERIFICATION' or 'UPLOAD'
         """
         failed_hosts_list = []
         for host_id, host in self.failed_hosts.items():
@@ -634,7 +634,8 @@ class MessageProcessor():
 
         If a retry has not occurred then we return the candidate_hosts
         but if a retry has occurred and failed at uploading, we want to retry
-        the hosts that failed upload."""
+        the hosts that failed upload.
+        """
         failed_hosts_list = json.loads(self.report.failed_hosts)
         success_hosts = json.loads(self.report.candidate_hosts)
         retry_hosts = {}
