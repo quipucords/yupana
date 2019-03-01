@@ -563,7 +563,7 @@ class MessageProcessor():
         """
         try:
             self.report.last_update_time = datetime.utcnow()
-            self.report.state = self.new_state
+            self.report.state = self.next_state
             if retry is not None:
                 if retry:
                     self.report.retry_count += 1
@@ -590,7 +590,7 @@ class MessageProcessor():
                     failed.append(host)
                 self.report.failed_hosts = json.dumps(failed)
             state_info = json.loads(self.report.state_info)
-            state_info.append(self.new_state)
+            state_info.append(self.next_state)
             self.report.state_info = json.dumps(state_info)
             self.report.save()
         except Exception as error:
@@ -629,8 +629,12 @@ class MessageProcessor():
             failed_hosts_list.append({host_id: host, 'cause': cause})
         return failed_hosts_list
 
-    def generate_retry_candidates(self):
-        """Generate hosts that only failed upload to retry."""
+    def generate_candidates(self):
+        """Generate hosts that need to be uploaded to host inventory.
+
+        If a retry has not occurred then we return the candidate_hosts
+        but if a retry has occurred and failed at uploading, we want to retry
+        the hosts that failed upload."""
         failed_hosts_list = json.loads(self.report.failed_hosts)
         success_hosts = json.loads(self.report.candidate_hosts)
         retry_hosts = {}
@@ -721,7 +725,7 @@ class MessageProcessor():
         """Upload the host candidates to the host_inventory."""
         LOG.info(format_message(self.prefix, 'Uploading hosts to inventory'))
         try:
-            hosts_to_try = self.generate_retry_candidates()
+            hosts_to_try = self.generate_candidates()
             if hosts_to_try:
                 self.candidate_hosts, self.failed_hosts = upload_to_host_inventory(
                     self.account_number,

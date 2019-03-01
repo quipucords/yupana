@@ -552,7 +552,7 @@ class MessageProcessorTests(TestCase):
         failed_hosts_list = self.processor.assign_cause_to_failed(failure_cause)
         self.assertEqual(failed_hosts_list, expected)
 
-    def test_generate_retry_candidates_with_failed(self):
+    def test_generate_candidates_with_failed(self):
         """Test that we generate only the hosts that failed upload to retry."""
         self.report_record.failed_hosts = json.dumps([
             {self.uuid: {'mac_addresses': 'value'},
@@ -560,17 +560,17 @@ class MessageProcessorTests(TestCase):
             {self.uuid2: {'bios_uuid': 'value'},
              'cause': 'VERIFICATION'}])
         self.report_record.save()
-        retry_candidates = self.processor.generate_retry_candidates()
+        retry_candidates = self.processor.generate_candidates()
         expected = {self.uuid: {'mac_addresses': 'value'}}
         self.assertEqual(retry_candidates, expected)
 
-    def test_generate_retry_candidates_no_failed(self):
+    def test_generate_candidates_no_failed(self):
         """Test that if there are no failed hosts, return the candidate hosts."""
         self.report_record.failed_hosts = json.dumps([])
         expected = {self.uuid: {'bios_uuid': 'value'}}
         self.report_record.candidate_hosts = json.dumps(expected)
         self.report_record.save()
-        retry_candidates = self.processor.generate_retry_candidates()
+        retry_candidates = self.processor.generate_candidates()
         self.assertEqual(retry_candidates, expected)
 
     def test_remove_success_from_failure(self):
