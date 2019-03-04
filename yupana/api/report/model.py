@@ -19,7 +19,7 @@ class AbstractReport(models.Model):
 
     report_platform_id = models.CharField(max_length=50, null=True)
     rh_account = models.TextField(null=True)
-
+    upload_ack_status = models.TextField(null=True)
     upload_srv_kafka_msg = models.TextField(null=True)
     report_json = models.TextField(null=True)
 
@@ -59,6 +59,7 @@ class AbstractReport(models.Model):
         """Convert to string."""
         return '{' + 'report_platform_id:{}, '\
             'rh_account: {}, ' \
+            'upload_ack_status: {}, ' \
             'upload_srv_kafka_msg:{}, ' \
             'report_json:{}, '\
             'state:{}, '\
@@ -68,6 +69,7 @@ class AbstractReport(models.Model):
             'failed_hosts:{}, '\
             'candidate_hosts:{} '.format(self.report_platform_id,
                                          self.rh_account,
+                                         self.upload_ack_status,
                                          self.upload_srv_kafka_msg,
                                          self.report_json,
                                          self.state,

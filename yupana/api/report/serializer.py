@@ -26,6 +26,7 @@ class ReportSerializer(ModelSerializer):
 
     report_platform_id = CharField(required=False)
     rh_account = CharField(required=False)
+    upload_ack_status = CharField(required=False)
     upload_srv_kafka_msg = JSONField(read_only=True)
     report_json = JSONField(null=True)
     state = ChoiceField(read_only=True, choices=ReportArchive.STATE_CHOICES)

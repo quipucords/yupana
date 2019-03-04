@@ -81,7 +81,7 @@ class ApiConfig(AppConfig):
 
     def start_message_processor(self):
         """Start the message processor."""
-        from processor.kafka_msg_handler import initialize_message_processor
+        from processor.report_processor import initialize_message_processor
         logger.info('Initializing the messaging processor.')
         initialize_message_processor()
 
