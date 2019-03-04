@@ -8,7 +8,7 @@ name = "pypi"
 [packages]
 
 aiokafka = "==0.5.0"
-djangorestframework = "==3.9.1"
+djangorestframework = "==3.9.2"
 Django = "==2.1.7"
 django-environ = "==0.4.5"
 gunicorn = "==19.9.0"
@@ -27,7 +27,6 @@ codecov = "==2.0.15"
 pylint = "==2.3.0"
 pylint-django = "==2.0.6"
 pylint-plugin-utils = "==0.5"
-
 requests-mock = "==1.5.2"
 sphinx-rtd-theme = "==0.4.3"
 sphinx = "==1.8.4"
