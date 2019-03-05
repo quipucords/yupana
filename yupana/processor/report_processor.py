@@ -36,7 +36,7 @@ from processor.kafka_msg_handler import (KafkaMsgHandlerError,
                                          QPCReportException,
                                          format_message)
 
-from api.models import Report, ReportArchive
+from api.models import Report, ReportArchive, Status
 from config.settings.base import (INSIGHTS_HOST_INVENTORY_URL,
                                   INSIGHTS_KAFKA_ADDRESS)
 
@@ -72,10 +72,15 @@ class MessageProcessor():
         self.failed_hosts = None
         self.status = None
         self.prefix = 'PROCESSING REPORT'
+        self.should_run = True
 
     async def run(self):
-        """Run the message processor for a report."""
-        while True:
+        """Run the report processor in a loop.
+
+        Later, if we find that we want to stop loopng, we can
+        manipulate the self variable should_run.
+        """
+        while self.should_run:
             if not self.report:
                 self.assign_report()
             if self.report:
@@ -113,7 +118,9 @@ class MessageProcessor():
                         self.prefix, report_found_message % self.report.state,
                         account_number=self.account_number, report_id=self.report_id))
                     self.update_report_state()
-            except Report.DoesNotExist:
+                else:
+                    raise QPCReportException()
+            except (Report.DoesNotExist, QPCReportException):
                 try:
                     # otherwise, look for the oldest report in the new state
                     self.report = Report.objects.filter(
@@ -169,6 +176,7 @@ class MessageProcessor():
                 'An error occurred that caused this report to fall into state "%s".' % self.state,
                 account_number=self.account_number,
                 report_id=self.report_id))
+            self.reset_variables()
 
     def transition_to_download(self):
         """Attempt to download the report, extract the json & move to downloaded state."""
@@ -198,11 +206,19 @@ class MessageProcessor():
             self.report_id = self.report_json.get('report_platform_id')
             self.status = SUCCESS_CONFIRM_STATUS
             self.next_state = Report.VALIDATED
-            if not self.candidate_hosts:
-                self.status = FAILURE_CONFIRM_STATUS
             self.update_report_state(report_id=self.report_id, candidate_hosts=self.candidate_hosts,
                                      failed_hosts=failed_hosts_list, status=self.status)
             self.deduplicate_reports()
+        except QPCReportException:
+            # if any QPCReportExceptions occur, we know that the report is not valid but has been
+            # successfully validated
+            self.status = FAILURE_CONFIRM_STATUS
+            self.next_state = Report.VALIDATED
+            LOG.warning(format_message(
+                self.prefix,
+                'The uploaded report was invalid. Status set to "%s".' % self.status,
+                account_number=self.account_number))
+            self.update_report_state(status=self.status)
         except Exception as error:
             LOG.error(format_message(self.prefix, 'The following error occurred: %s.', str(error)))
             self.determine_retry(Report.FAILED_VALIDATION, Report.DOWNLOADED)
@@ -212,13 +228,19 @@ class MessageProcessor():
         self.prefix = 'ATTEMPTING STATUS UPLOAD'
         LOG.info(format_message(
             self.prefix,
-            'Uploading validation status %s for report %s' % (self.status, self.report_id),
+            'Uploading validation status "%s" for report %s' % (self.status, self.report_id),
             account_number=self.account_number, report_id=self.report_id))
         message_hash = self.upload_message['hash']
         try:
             await self._send_confirmation(message_hash)
             self.next_state = Report.VALIDATION_REPORTED
             self.update_report_state()
+            LOG.info(format_message(
+                self.prefix,
+                'Status successfully uploaded.',
+                account_number=self.account_number, report_id=self.report_id))
+            if self.status == FAILURE_CONFIRM_STATUS:
+                self.archive_report()
         except Exception as error:
             LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error),
                                      account_number=self.account_number, report_id=self.report_id))
@@ -231,17 +253,18 @@ class MessageProcessor():
             self.prefix, 'Uploading hosts to inventory. State is "%s"' % self.report.state,
             account_number=self.account_number, report_id=self.report_id))
         try:
-            hosts_to_try = self.generate_candidates()
-            if hosts_to_try:
+            if self.candidate_hosts:
                 self.candidate_hosts, self.failed_hosts = \
-                    self._upload_to_host_inventory(hosts_to_try)
-                self.next_state = Report.HOSTS_UPLOADED
+                    self._upload_to_host_inventory(self.candidate_hosts)
                 failed_hosts_list = self.assign_cause_to_failed(FAILED_UPLOAD)
                 if self.candidate_hosts:
+                    self.determine_retry(Report.FAILED_HOSTS_UPLOAD,
+                                         Report.VALIDATION_REPORTED,
+                                         failed_hosts=failed_hosts_list)
+                else:
+                    self.next_state = Report.HOSTS_UPLOADED
                     self.update_report_state(candidate_hosts=self.candidate_hosts,
                                              failed_hosts=failed_hosts_list)
-                else:
-                    self.determine_retry(Report.FAILED_HOSTS_UPLOAD, Report.VALIDATION_REPORTED)
             else:
                 # need to not upload, but archive bc no hosts were valid
                 LOG.info(format_message(self.prefix, 'There are no valid hosts to upload',
@@ -284,8 +307,8 @@ class MessageProcessor():
                                 account_number=self.account_number, report_id=self.report_id))
         self.reset_variables()
 
-    def update_report_state(self, retry=RETRY.clear, report_json=None, report_id=None,  # noqa: C901 (too-complex)
-                            candidate_hosts=None, failed_hosts=None, status=None):
+    def update_report_state(self, retry=RETRY.clear, retry_type=None, report_json=None,  # noqa: C901 (too-complex)
+                            report_id=None, candidate_hosts=None, failed_hosts=None, status=None):
         """
         Update the message processor state and save.
 
@@ -299,13 +322,16 @@ class MessageProcessor():
         """
         self.prefix = 'UPDATING REPORT STATE'
         try:
+            statusinfo = Status()
             self.report.last_update_time = datetime.utcnow()
             self.report.state = self.next_state
+            self.report.commit_info = statusinfo.commit
             if retry == RETRY.clear:
                 # reset the count to 0 (default behavior)
                 self.report.retry_count = 0
             elif retry == RETRY.increment:
                 self.report.retry_count += 1
+                self.report.retry_type = retry_type
             # the other choice for retry is RETRY.archive in which case we don't
             # want to do anything to the retry count bc we want to preserve as is
             if report_json:
@@ -313,13 +339,9 @@ class MessageProcessor():
             if report_id:
                 self.report.report_platform_id = report_id
             if candidate_hosts:
-                # for success hosts, these can change based on the function
-                # ie. hosts may pass verification but not upload so we
-                # completely override the previous value to get only the
-                # successful hosts at that point. Also, we must remove the
-                # hosts that succeeded from the failed hosts in case they were
-                # put there on a retry.
-                self.remove_success_from_failure(candidate_hosts)
+                # candidate_hosts will get smaller and smaller until it hopefully
+                # is empty because we have taken care of all ofthe candidates so
+                # we rewrite this each time
                 self.report.candidate_hosts = json.dumps(candidate_hosts)
             if failed_hosts:
                 # for failed hosts this list can keep growing, so we add the
@@ -342,7 +364,7 @@ class MessageProcessor():
                 'Could not update report record due to the following error %s.' % str(error),
                 account_number=self.account_number, report_id=self.report_id))
 
-    def determine_retry(self, fail_state, current_state, failed_hosts=None):
+    def determine_retry(self, fail_state, current_state, candidate_hosts=None, failed_hosts=None):
         """Determine if yupana should archive a report based on retry count.
 
         :param fail_state: <str> the final state if we have reached max retries
@@ -351,18 +373,22 @@ class MessageProcessor():
             no hosts being successfully uploaded, we want to rerecord the hosts that failed
             for retrying.
         """
-        if self.report.retry_count + 1 > RETRIES_ALLOWED:
+        if (self.report.retry_count + 1) >= RETRIES_ALLOWED:
             LOG.error(format_message(
                 self.prefix, 'This report has reached the maximum number of retries.',
                 account_number=self.account_number, report_id=self.report_id))
             self.next_state = fail_state
-            self.update_report_state(retry=RETRY.archive)
+            self.update_report_state(retry=RETRY.increment)
         else:
             self.next_state = current_state
             LOG.error(format_message(
                 self.prefix, 'An error occurred. Saving report to retry later.',
                 account_number=self.account_number, report_id=self.report_id))
             if failed_hosts:
+                self.update_report_state(
+                    retry=RETRY.increment, candidate_hosts=self.candidate_hosts,
+                    failed_hosts=failed_hosts)
+            if candidate_hosts:
                 self.update_report_state(
                     retry=RETRY.increment, candidate_hosts=self.candidate_hosts,
                     failed_hosts=failed_hosts)
@@ -399,19 +425,6 @@ class MessageProcessor():
             return retry_hosts
         return success_hosts
 
-    def remove_success_from_failure(self, success_hosts):
-        """Remove the hosts that succeeded from the failed hosts if they are there.
-
-        :param success_hosts: <dict> dictionary of successful hosts at this point.
-        """
-        failed_hosts = json.loads(self.report.failed_hosts)
-        for host_id, host in success_hosts.items():
-            for failed_host in failed_hosts:
-                if failed_host.get(host_id):
-                    failed_hosts.remove(failed_host)
-        self.report.failed_hosts = json.dumps(failed_hosts)
-        self.report.save()
-
     def deduplicate_reports(self):
         """If a report with the same id already exists, archive the new report."""
         try:
@@ -421,7 +434,7 @@ class MessageProcessor():
                 LOG.error(format_message(
                     self.prefix,
                     'a report with the report_platform_id %s already exists.' %
-                    self.report.report_platfrom_id,
+                    self.report.report_platform_id,
                     account_number=self.account_number, report_id=self.report_id))
                 self.archive_report()
         except Report.DoesNotExist:
@@ -687,7 +700,7 @@ class MessageProcessor():
         finally:
             await producer.stop()
 
-    def _upload_to_host_inventory(self, hosts):
+    def _upload_to_host_inventory(self, hosts):  # noqa: C901 (too-complex)
         """
         Verify that the report contents are a valid Insights report.
 
@@ -701,8 +714,8 @@ class MessageProcessor():
         identity_header = {'x-rh-identity': x_rh_identity_value,
                            'Content-Type': 'application/json'}
         failed_hosts = []
-        successful_hosts = {}  # storing the hosts that successfully upload here
         failed_upload_hosts = {}  # storing the hosts that failed to upload here
+        retry_upload_hosts = {}  # storing the hosts to retry here
         for host_id, host in hosts.items():
             body = {
                 'account': self.account_number,
@@ -735,9 +748,10 @@ class MessageProcessor():
                             'display_name': body.get('display_name'),
                             'system_platform_id': host_id,
                             'host': host})
-                    failed_upload_hosts[host_id] = host
-                else:
-                    successful_hosts[host_id] = host
+                    if str(response.status_code).startswith('5'):
+                        retry_upload_hosts[host_id] = host
+                    else:
+                        failed_upload_hosts[host_id] = host
 
             except requests.exceptions.RequestException as err:
                 failed_hosts.append(
@@ -747,7 +761,7 @@ class MessageProcessor():
                         'display_name': body.get('display_name'),
                         'system_platform_id': host_id,
                         'host': host})
-                failed_upload_hosts[host_id] = host
+                retry_upload_hosts[host_id] = host
 
         successful = len(hosts) - len(failed_hosts)
         upload_msg = format_message(
@@ -774,7 +788,7 @@ class MessageProcessor():
                     account_number=self.account_number,
                     report_id=self.report_id
                 ))
-        return successful_hosts, failed_upload_hosts
+        return retry_upload_hosts, failed_upload_hosts
 
 
 def asyncio_message_processor_thread(loop):  # pragma: no cover

@@ -18,7 +18,7 @@ from rest_framework.serializers import (CharField,
                                         JSONField,
                                         ModelSerializer)
 
-from api.models import ReportArchive
+from api.models import AbstractReport
 
 
 class ReportSerializer(ModelSerializer):
@@ -29,7 +29,9 @@ class ReportSerializer(ModelSerializer):
     upload_ack_status = CharField(required=False)
     upload_srv_kafka_msg = JSONField(read_only=True)
     report_json = JSONField(null=True)
-    state = ChoiceField(read_only=True, choices=ReportArchive.STATE_CHOICES)
+    commit_info = CharField(required=False)
+    state = ChoiceField(read_only=True, choices=AbstractReport.STATE_CHOICES)
+    retry_type = ChoiceField(read_only=True, choices=AbstractReport.RETRY_CHOICES)
     state_info = JSONField(null=True)
     retry_count = IntegerField(null=True)
     last_update_time = DateField(null=True)
@@ -39,5 +41,5 @@ class ReportSerializer(ModelSerializer):
     class Meta:
         """Meta class for ReportSerializer."""
 
-        model = ReportArchive
+        model = AbstractReport
         fields = '__all__'

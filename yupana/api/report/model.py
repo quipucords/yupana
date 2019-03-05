@@ -22,6 +22,7 @@ class AbstractReport(models.Model):
     upload_ack_status = models.TextField(null=True)
     upload_srv_kafka_msg = models.TextField(null=True)
     report_json = models.TextField(null=True)
+    commit_info = models.TextField(null=True)
 
     NEW = 'new'
     STARTED = 'started'
@@ -49,6 +50,18 @@ class AbstractReport(models.Model):
         choices=STATE_CHOICES,
         default=NEW
     )
+
+    TIME = 'time'
+    COMMIT = 'commit'
+    RETRY_CHOICES = (('TIME', TIME),
+                     ('COMMIT', COMMIT))
+
+    retry_type = models.CharField(
+        max_length=10,
+        choices=RETRY_CHOICES,
+        default=TIME
+    )
+
     state_info = models.TextField(null=True)
     retry_count = models.PositiveSmallIntegerField(null=True)
     last_update_time = models.DateTimeField(null=True)
@@ -62,9 +75,11 @@ class AbstractReport(models.Model):
             'upload_ack_status: {}, ' \
             'upload_srv_kafka_msg:{}, ' \
             'report_json:{}, '\
+            'commit_info:{}, '\
             'state:{}, '\
             'state_info:{}, '\
             'retry_count:{}, '\
+            'retry_type:{}, '\
             'last_update_time:{}, '\
             'failed_hosts:{}, '\
             'candidate_hosts:{} '.format(self.report_platform_id,
@@ -72,9 +87,11 @@ class AbstractReport(models.Model):
                                          self.upload_ack_status,
                                          self.upload_srv_kafka_msg,
                                          self.report_json,
+                                         self.commit_info,
                                          self.state,
                                          self.state_info,
                                          self.retry_count,
+                                         self.retry_type,
                                          self.last_update_time,
                                          self.failed_hosts,
                                          self.candidate_hosts) + '}'
