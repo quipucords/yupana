@@ -339,6 +339,7 @@ class MessageProcessor():
         archived = ReportArchive(
             rh_account=self.account_number,
             retry_count=self.report.retry_count,
+            retry_type=self.report.retry_type,
             candidate_hosts=self.report.candidate_hosts,
             failed_hosts=self.report.failed_hosts,
             state=self.state,
@@ -378,6 +379,7 @@ class MessageProcessor():
         """
         try:
             status_info = Status()
+            self.state = self.next_state
             self.report.last_update_time = datetime.utcnow()
             self.report.state = self.next_state
             self.report.commit_info = status_info.commit
@@ -444,8 +446,8 @@ class MessageProcessor():
                                      failed_hosts=failed)
         else:
             self.next_state = current_state
-            if retry_type == Report.TIME:
-                log_message = 'Saving report to retry when a new commit is pushed. Retries: %s'
+            if retry_type == Report.COMMIT:
+                log_message = 'Saving the report to retry when a new commit is pushed. Retries: %s'
             else:
                 log_message = 'Saving the report to retry at a later time. Retries: %s'
             LOG.error(format_message(

@@ -106,40 +106,47 @@ def unpack_consumer_record(upload_service_message):
 async def save_message_and_ack(consumer):
     """Save and ack the kafka uploaded message."""
     prefix = 'SAVING MESSAGE'
-    while True:
-        consumer_record = await MSG_PENDING_QUEUE.get()
-        if consumer_record.topic == QPC_TOPIC:
+    consumer_record = await MSG_PENDING_QUEUE.get()
+    if consumer_record.topic == QPC_TOPIC:
+        try:
+            upload_service_message = unpack_consumer_record(consumer_record)
+            rh_account = upload_service_message.get('rh_account')
+            if not rh_account:
+                raise QPCKafkaMsgException(
+                    format_message(
+                        prefix,
+                        'Message missing rh_account.'))
             try:
-                upload_service_message = unpack_consumer_record(consumer_record)
-                rh_account = upload_service_message.get('rh_account')
-                if not rh_account:
-                    raise QPCKafkaMsgException(
-                        format_message(
-                            prefix,
-                            'Message missing rh_account.'))
-                try:
-                    uploaded_report = Report(
-                        upload_srv_kafka_msg=json.dumps(upload_service_message),
-                        rh_account=rh_account,
-                        state=Report.NEW,
-                        state_info=json.dumps([Report.NEW]),
-                        last_update_time=datetime.utcnow(),
-                        candidate_hosts=json.dumps([]),
-                        failed_hosts=json.dumps([]),
-                        retry_count=0)
-                    uploaded_report.save()
-                    LOG.info(format_message(prefix, 'Upload service message saved. Ready for processing.'))
-                    consumer.commit()
-                except Exception as error:
-                    LOG.error(format_message(prefix, 'Could not save upload service message: %s', error))
-            except QPCKafkaMsgException as message_error:
-                LOG.error(format_message(prefix, 'Error processing records.  Message: %s, Error: %s',
-                                         consumer_record, message_error))
-                consumer.commit()
-        else:
-            LOG.debug(format_message(prefix,
-                                     'Message not on %s topic: %s' % (
-                                         QPC_TOPIC, consumer_record)))
+                uploaded_report = Report(
+                    upload_srv_kafka_msg=json.dumps(upload_service_message),
+                    rh_account=rh_account,
+                    state=Report.NEW,
+                    state_info=json.dumps([Report.NEW]),
+                    last_update_time=datetime.utcnow(),
+                    candidate_hosts=json.dumps([]),
+                    failed_hosts=json.dumps([]),
+                    retry_count=0)
+                uploaded_report.save()
+                LOG.info(format_message(
+                    prefix, 'Upload service message saved. Ready for processing.'))
+                await consumer.commit()
+            except Exception as error:
+                LOG.error(format_message(
+                    prefix, 'Could not save upload service message: %s', error))
+        except QPCKafkaMsgException as message_error:
+            LOG.error(format_message(
+                prefix, 'Error processing records.  Message: %s, Error: %s',
+                consumer_record, message_error))
+            await consumer.commit()
+    else:
+        LOG.debug(format_message(
+            prefix, 'Message not on %s topic: %s' % (QPC_TOPIC, consumer_record)))
+
+
+async def loop_save_message_and_ack(consumer):
+    """Loop the save_message_and_ack function."""
+    while True:
+        await save_message_and_ack(consumer)
 
 
 async def listen_for_messages(consumer):  # pragma: no cover
@@ -177,10 +184,10 @@ def asyncio_worker_thread(loop):  # pragma: no cover
     consumer = AIOKafkaConsumer(
         AVAILABLE_TOPIC, QPC_TOPIC,
         loop=EVENT_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS,
-        group_id='qpc-group', enable_auto_commit=True
+        group_id='qpc-group', enable_auto_commit=False
     )
 
-    loop.create_task(save_message_and_ack(consumer))
+    loop.create_task(loop_save_message_and_ack(consumer))
 
     try:
         loop.run_until_complete(listen_for_messages(consumer))

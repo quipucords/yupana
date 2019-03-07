@@ -29,6 +29,7 @@ import processor.kafka_msg_handler as msg_handler
 import processor.report_processor as msg_processor
 import requests
 import requests_mock
+from asynctest import CoroutineMock
 from django.test import TestCase
 from processor.tests_kafka_msg_handler import KafkaMsg, create_tar_buffer
 from requests.exceptions import HTTPError
@@ -206,7 +207,7 @@ class MessageProcessorTests(TestCase):
         # set the values we will update with
         candidates = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'}}]
         failed = [{self.uuid2: {'bios_uuid': 'value', 'name': 'value'},
-                  'cause': msg_processor.FAILED_VALIDATION}]
+                   'cause': msg_processor.FAILED_VALIDATION}]
         expected_failed = failed + [
             {self.uuid3: {'ip_addresses': 'value', 'name': 'value'},
              'cause': msg_processor.FAILED_VALIDATION}]
@@ -456,6 +457,99 @@ class MessageProcessorTests(TestCase):
             self.assertEqual(self.report_record.state, Report.DOWNLOADED)
             self.assertEqual(self.report_record.retry_count, 1)
 
+    async def async_test_transition_to_validation_reported(self):
+        """Set up the test for transitioning to validation reported."""
+        self.report_record.state = Report.VALIDATED
+        self.report_record.report_platform_id = self.uuid
+        self.report_record.upload_ack_status = msg_processor.SUCCESS_CONFIRM_STATUS
+        self.report_record.save()
+        self.processor.report = self.report_record
+        self.processor.status = msg_processor.SUCCESS_CONFIRM_STATUS
+        self.processor.upload_message = {'hash': self.uuid}
+
+        self.processor._send_confirmation = CoroutineMock()
+        await self.processor.transition_to_validation_reported()
+        self.assertEqual(self.processor.report.state, Report.VALIDATION_REPORTED)
+
+    def test_transition_to_validation_reported(self):
+        """Test the async function to transition to validation reported."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.async_test_transition_to_validation_reported)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
+
+    async def async_test_transition_to_validation_reported_exception(self):
+        """Set up the test for transitioning to validation reported."""
+        self.report_record.state = Report.VALIDATED
+        self.report_record.retry_count = 0
+        self.report_record.report_platform_id = self.uuid
+        self.report_record.upload_ack_status = msg_processor.SUCCESS_CONFIRM_STATUS
+        self.report_record.save()
+        self.processor.report = self.report_record
+        self.processor.status = msg_processor.SUCCESS_CONFIRM_STATUS
+        self.processor.upload_message = {'hash': self.uuid}
+
+        def report_side_effect():
+            """Transition the state to validation_reported."""
+            raise Exception('Test')
+
+        self.processor._send_confirmation = CoroutineMock(side_effect=report_side_effect)
+        await self.processor.transition_to_validation_reported()
+        self.assertEqual(self.report_record.state, Report.VALIDATED)
+        self.assertEqual(self.report_record.retry_count, 1)
+        self.check_variables_are_reset()
+
+    def test_transition_to_validation_reported_exception(self):
+        """Test the async function to transition to validation reported."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(
+            self.async_test_transition_to_validation_reported_exception)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
+
+    async def async_transition_to_validation_reported_failure_status(self):
+        """Set up the test for transitioning to validation reported failure status."""
+        report_to_archive = Report(upload_srv_kafka_msg=json.dumps(self.msg),
+                                   rh_account='43214',
+                                   report_platform_id=self.uuid2,
+                                   state=Report.VALIDATED,
+                                   report_json=json.dumps(self.report_json),
+                                   state_info=json.dumps([Report.NEW]),
+                                   last_update_time=datetime.utcnow(),
+                                   candidate_hosts=json.dumps([]),
+                                   failed_hosts=json.dumps([]),
+                                   retry_count=0,
+                                   retry_type=Report.TIME)
+        report_to_archive.upload_ack_status = msg_processor.FAILURE_CONFIRM_STATUS
+        report_to_archive.save()
+        self.processor.report = report_to_archive
+        self.processor.report_id = self.uuid2
+        self.processor.account_number = '43214'
+        self.processor.state = Report.VALIDATED
+        self.processor.status = msg_processor.FAILURE_CONFIRM_STATUS
+        self.processor.upload_message = {'hash': self.uuid}
+        self.processor._send_confirmation = CoroutineMock()
+        await self.processor.transition_to_validation_reported()
+        with self.assertRaises(Report.DoesNotExist):
+            Report.objects.get(id=report_to_archive.id)
+        archived = ReportArchive.objects.get(rh_account='43214')
+        self.assertEqual(archived.state,
+                         Report.VALIDATION_REPORTED)
+        self.assertEqual(archived.upload_ack_status,
+                         msg_processor.FAILURE_CONFIRM_STATUS)
+        # assert the processor was reset
+        self.check_variables_are_reset()
+
+    def test_transition_to_validation_reported_failure(self):
+        """Test the async function for reporting failure status."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.async_transition_to_validation_reported_failure_status)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
+
     def test_transition_to_hosts_uploaded(self):
         """Test the transition to hosts being uploaded."""
         hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'}},
@@ -511,7 +605,7 @@ class MessageProcessorTests(TestCase):
                                state=Report.VALIDATION_REPORTED,
                                report_json=json.dumps(self.report_json),
                                state_info=json.dumps([Report.NEW, Report.STARTED,
-                                                     Report.VALIDATION_REPORTED]),
+                                                      Report.VALIDATION_REPORTED]),
                                last_update_time=datetime.utcnow(),
                                candidate_hosts=json.dumps({}),
                                failed_hosts=json.dumps([]),
@@ -903,6 +997,17 @@ class MessageProcessorTests(TestCase):
         buffer_content = tar_buffer.getvalue()
         with self.assertRaises(msg_processor.FailExtractException):
             self.processor._extract_report_from_tar_gz(buffer_content)
+
+    def test_extract_report_from_tar_gz_general_except(self):
+        """Testing general exception raises retry exception."""
+        def extract_side_effect():
+            """Raise general error."""
+            raise Exception('Test')
+
+        with patch('processor.report_processor.tarfile.open',
+                   side_effect=extract_side_effect):
+            with self.assertRaises(msg_processor.RetryExtractException):
+                self.processor._extract_report_from_tar_gz(None)
 
     def test_no_account_number_inventory_upload(self):
         """Testing no account number present when uploading to inventory."""
