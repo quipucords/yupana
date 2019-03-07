@@ -118,14 +118,15 @@ async def save_message_and_ack(consumer):
                             prefix,
                             'Message missing rh_account.'))
                 try:
-                    uploaded_report = Report(upload_srv_kafka_msg=json.dumps(upload_service_message),
-                                             rh_account=rh_account,
-                                             state=Report.NEW,
-                                             state_info=json.dumps([Report.NEW]),
-                                             last_update_time=datetime.utcnow(),
-                                             candidate_hosts=json.dumps({}),
-                                             failed_hosts=json.dumps([]),
-                                             retry_count=0)
+                    uploaded_report = Report(
+                        upload_srv_kafka_msg=json.dumps(upload_service_message),
+                        rh_account=rh_account,
+                        state=Report.NEW,
+                        state_info=json.dumps([Report.NEW]),
+                        last_update_time=datetime.utcnow(),
+                        candidate_hosts=json.dumps([]),
+                        failed_hosts=json.dumps([]),
+                        retry_count=0)
                     uploaded_report.save()
                     LOG.info(format_message(prefix, 'Upload service message saved. Ready for processing.'))
                     consumer.commit()
