@@ -47,7 +47,7 @@ FAILURE_CONFIRM_STATUS = 'failure'
 CANONICAL_FACTS = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addresses',
                    'vm_uuid', 'etc_machine_id', 'subscription_manager_id']
 
-RETRY_TIME = 1  # this is the time in minutes that we want to wait to retry a report
+RETRY_TIME = 15  # this is the time in minutes that we want to wait to retry a report
 RETRIES_ALLOWED = 5  # this is the number of retries that we want to allow before failing a report
 FAILED_VALIDATION = 'VALIDATION'
 FAILED_UPLOAD = 'UPLOAD'
@@ -126,7 +126,7 @@ class MessageProcessor():
         report.
         """
         self.prefix = 'ASSIGNING REPORT'
-        report_found_message = 'Starting report processor. State is "%s"'
+        report_found_message = 'Starting report processor. State is "%s".'
         if self.report is None:
             try:
                 # look for the oldest report in the db
@@ -218,7 +218,7 @@ class MessageProcessor():
         LOG.info(format_message(
             self.prefix,
             'Attempting to download the report and extract the json. '
-            'State is "%s"' % self.report.state,
+            'State is "%s".' % self.report.state,
             account_number=self.account_number))
         try:
             report_tar_gz = self._download_report()
@@ -243,7 +243,7 @@ class MessageProcessor():
         """Validate that the report contents & move to validated state."""
         self.prefix = 'ATTEMPTING VALIDATE'
         LOG.info(format_message(
-            self.prefix, 'Validating the report contents. State is "%s"' % self.report.state,
+            self.prefix, 'Validating the report contents. State is "%s".' % self.report.state,
             account_number=self.account_number))
         try:
             self.candidate_hosts, self.failed_hosts = self._validate_report_details()
@@ -273,7 +273,8 @@ class MessageProcessor():
         self.prefix = 'ATTEMPTING STATUS UPLOAD'
         LOG.info(format_message(
             self.prefix,
-            'Uploading validation status "%s" for report %s' % (self.status, self.report_id),
+            'Uploading validation status "%s" for report %s. State is "%s".' %
+                (self.status, self.report_id, self.state),
             account_number=self.account_number, report_id=self.report_id))
         message_hash = self.upload_message['hash']
         try:
@@ -295,7 +296,7 @@ class MessageProcessor():
         """Upload the host candidates to inventory & move to hosts_uploaded state."""
         self.prefix = 'ATTEMPTING HOST UPLOAD'
         LOG.info(format_message(
-            self.prefix, 'Uploading hosts to inventory. State is "%s"' % self.report.state,
+            self.prefix, 'Uploading hosts to inventory. State is "%s".' % self.report.state,
             account_number=self.account_number, report_id=self.report_id))
         try:
             if self.candidate_hosts:
