@@ -213,6 +213,8 @@ class MessageProcessor():
     def transition_to_downloaded(self):
         """Attempt to download the report, extract the json & move to downloaded state."""
         self.prefix = 'ATTEMPTING DOWNLOAD'
+        report_download_failed_msg = \
+            'The report could not be downloaded due to the following error: %s.'
         LOG.info(format_message(
             self.prefix,
             'Attempting to download the report and extract the json. '
@@ -223,14 +225,18 @@ class MessageProcessor():
             self.report_json = self._extract_report_from_tar_gz(report_tar_gz)
             self.next_state = Report.DOWNLOADED
             self.update_report_state(report_json=self.report_json)
-        except (FailDownloadException, FailExtractException):
+        except (FailDownloadException, FailExtractException) as err:
             LOG.error(format_message(
                 self.prefix,
-                'The report could not be downloaded.',
+                report_download_failed_msg % err,
                 account_number=self.account_number))
             self.next_state = Report.FAILED_DOWNLOAD
             self.update_report_state()
-        except (RetryDownloadException, RetryExtractException):
+        except (RetryDownloadException, RetryExtractException) as err:
+            LOG.error(format_message(
+                self.prefix,
+                report_download_failed_msg % err,
+                account_number=self.account_number))
             self.determine_retry(Report.FAILED_DOWNLOAD, Report.STARTED)
 
     def transition_to_validated(self):

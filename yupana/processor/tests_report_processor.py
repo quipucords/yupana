@@ -1070,9 +1070,52 @@ class MessageProcessorTests(TestCase):
                  self.uuid5: {'vm_uuid': 'value', 'name': 'foo'},
                  self.uuid6: {'etc_machine_id': 'value'},
                  self.uuid7: {'subscription_manager_id': 'value'}}
-        with patch('processor.report_processor.INSIGHTS_HOST_INVENTORY_URL', value='not none'):
-            with patch('processor.report_processor.requests', status_code=200):
+        with requests_mock.mock() as m:
+            m.post(msg_processor.INSIGHTS_HOST_INVENTORY_URL, status_code=200)
+            retry_time_hosts, retry_commit_hosts = \
                 self.processor._upload_to_host_inventory(hosts)
+            self.assertEqual(retry_time_hosts, [])
+            self.assertEqual(retry_commit_hosts, [])
+
+    def test_host_inventory_upload_500(self):
+        """Testing successful upload to host inventory with 500 errors."""
+        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
+        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+                           'cause': msg_processor.FAILED_UPLOAD,
+                           'status_code': 500},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                           'cause': msg_processor.FAILED_UPLOAD,
+                           'status_code': 500}]
+        with requests_mock.mock() as m:
+            m.post(msg_processor.INSIGHTS_HOST_INVENTORY_URL, status_code=500)
+            retry_time, retry_commit = self.processor._upload_to_host_inventory(hosts)
+            self.assertEqual(retry_commit, [])
+            for host in expected_hosts:
+                self.assertIn(host, retry_time)
+
+    def test_host_inventory_upload_400(self):
+        """Testing successful upload to host inventory with 500 errors."""
+        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                 self.uuid3: {'ip_addresses': 'value', 'name': 'foo'},
+                 self.uuid4: {'mac_addresses': 'value', 'name': 'foo'},
+                 self.uuid5: {'vm_uuid': 'value', 'name': 'foo'},
+                 self.uuid6: {'etc_machine_id': 'value'},
+                 self.uuid7: {'subscription_manager_id': 'value'}}
+        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+                           'cause': msg_processor.FAILED_UPLOAD,
+                           'status_code': 400},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                           'cause': msg_processor.FAILED_UPLOAD,
+                           'status_code': 400}]
+        with requests_mock.mock() as m:
+            m.post(msg_processor.INSIGHTS_HOST_INVENTORY_URL, status_code=400)
+            retry_time_hosts, retry_commit_hosts = \
+                self.processor._upload_to_host_inventory(hosts)
+            self.assertEqual(retry_time_hosts, [])
+            for host in expected_hosts:
+                self.assertIn(host, retry_commit_hosts)
 
     @patch('processor.report_processor.requests.post')
     def test_host_url_exceptions(self, mock_request):
