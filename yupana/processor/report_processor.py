@@ -449,12 +449,17 @@ class MessageProcessor():
         else:
             self.next_state = current_state
             if retry_type == Report.COMMIT:
-                log_message = 'Saving the report to retry when a new commit is pushed. Retries: %s'
+                log_message = \
+                    'Saving the report to retry when a new commit'\
+                    'is pushed. Retries: %s' % str(self.report.retry_count + 1)
             else:
-                log_message = 'Saving the report to retry at a later time. Retries: %s'
+                log_message = \
+                    'Saving the report to retry at in %s minutes. '\
+                    'Retries: %s' % (str(RETRY_TIME),
+                                     str(self.report.retry_count + 1))
             LOG.error(format_message(
                 self.prefix,
-                log_message % str(self.report.retry_count + 1),
+                log_message,
                 account_number=self.account_number, report_id=self.report_id))
 
             self.update_report_state(retry=RETRY.increment,
@@ -820,8 +825,7 @@ class MessageProcessor():
                            'facts': host}]
             }
             try:
-                fake_url = 'http://127.0.0.1:8000/r/insights/platform/inventory/api/v1/hosts'
-                response = requests.post(fake_url,
+                response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
                                          data=json.dumps(body),
                                          headers=identity_header)
 
