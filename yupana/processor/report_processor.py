@@ -820,7 +820,8 @@ class MessageProcessor():
                            'facts': host}]
             }
             try:
-                response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
+                fake_url = 'http://127.0.0.1:8000/r/insights/platform/inventory/api/v1/hosts'
+                response = requests.post(fake_url,
                                          data=json.dumps(body),
                                          headers=identity_header)
 
