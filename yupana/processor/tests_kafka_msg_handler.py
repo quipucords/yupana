@@ -16,13 +16,18 @@
 #
 """Tests kafka message handler."""
 
+import asyncio
 import io
 import json
 import tarfile
-import uuid
+from unittest.mock import patch
 
 import processor.kafka_msg_handler as msg_handler
+from aiokafka import AIOKafkaConsumer
+from asynctest import CoroutineMock
 from django.test import TestCase
+
+from api.models import Report
 
 
 def create_tar_buffer(files_data):
@@ -65,13 +70,6 @@ class KafkaMsgHandlerTest(TestCase):
     def setUp(self):
         """Create test setup."""
         self.payload_url = 'http://insights-upload.com/q/file_to_validate'
-        self.uuid = str(uuid.uuid4())
-        self.uuid2 = str(uuid.uuid4())
-        self.uuid3 = str(uuid.uuid4())
-        self.uuid4 = str(uuid.uuid4())
-        self.uuid5 = str(uuid.uuid4())
-        self.uuid6 = str(uuid.uuid4())
-        self.uuid7 = str(uuid.uuid4())
 
     def tearDown(self):
         """Remove test setup."""
@@ -95,3 +93,54 @@ class KafkaMsgHandlerTest(TestCase):
 
         with self.assertRaises(msg_handler.QPCKafkaMsgException):
             msg_handler.unpack_consumer_record(fake_record)
+
+    async def save_and_ack(self):
+        """Test the save and ack message method."""
+        test_consumer = AIOKafkaConsumer(
+            msg_handler.AVAILABLE_TOPIC, msg_handler.QPC_TOPIC,
+            loop=msg_handler.EVENT_LOOP, bootstrap_servers=msg_handler.INSIGHTS_KAFKA_ADDRESS,
+            group_id='qpc-group', enable_auto_commit=False
+        )
+        test_consumer.commit = CoroutineMock()
+        qpc_msg = KafkaMsg(msg_handler.QPC_TOPIC, self.payload_url)
+        # test happy case
+        with patch('processor.kafka_msg_handler.unpack_consumer_record',
+                   return_value={'rh_account': '8910'}):
+            await msg_handler.save_message_and_ack(test_consumer, qpc_msg)
+            report = Report.objects.get(rh_account='8910')
+            self.assertEqual(json.loads(report.upload_srv_kafka_msg),
+                             {'rh_account': '8910'})
+            self.assertEqual(report.state, Report.NEW)
+
+        # test available topic
+        available_msg = KafkaMsg(msg_handler.AVAILABLE_TOPIC, self.payload_url)
+        await msg_handler.save_message_and_ack(test_consumer, available_msg)
+
+        # test no rh_account
+        with patch('processor.kafka_msg_handler.unpack_consumer_record',
+                   return_value={'foo': 'bar'}):
+            await msg_handler.save_message_and_ack(test_consumer, qpc_msg)
+            with self.assertRaises(Report.DoesNotExist):
+                Report.objects.get(upload_srv_kafka_msg=json.dumps({'foo': 'bar'}))
+
+        # test general exception
+        def raise_error():
+            """Raise a general error."""
+            raise Exception('Test')
+
+        test_consumer.commit = CoroutineMock(side_effect=raise_error)
+        with patch('processor.kafka_msg_handler.unpack_consumer_record',
+                   return_value={'rh_account': '1112'}):
+            await msg_handler.save_message_and_ack(test_consumer, qpc_msg)
+            report = Report.objects.get(rh_account='1112')
+            self.assertEqual(json.loads(report.upload_srv_kafka_msg),
+                             {'rh_account': '1112'})
+            self.assertEqual(report.state, Report.NEW)
+
+    def test_save_and_ack_success(self):
+        """Test the async save and ack function."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.save_and_ack)
+        event_loop.run_until_complete(coro())
+        event_loop.close()

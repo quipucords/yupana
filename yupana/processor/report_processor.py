@@ -158,8 +158,7 @@ class MessageProcessor():
                     LOG.info(format_message(self.prefix, report_found_message % self.report.state,
                                             account_number=self.account_number))
                     # update the report time and state
-                    self.next_state = Report.STARTED
-                    self.update_report_state()
+                    self.transition_to_started()
                 except Report.DoesNotExist:
                     report_not_found_message = \
                         'No reports to be processed at this time. '\

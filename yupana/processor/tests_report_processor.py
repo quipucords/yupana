@@ -266,7 +266,7 @@ class MessageProcessorTests(TestCase):
         self.processor.assign_report()
         self.assertEqual(self.processor.report, self.report_record)
 
-    def test_assign_report_oldest(self):
+    def test_assign_report_oldest_time(self):
         """Test the assign report function with older report."""
         current_time = datetime.utcnow()
         twentyminold_time = current_time - timedelta(minutes=20)
@@ -279,13 +279,41 @@ class MessageProcessorTests(TestCase):
                               last_update_time=twentyminold_time,
                               candidate_hosts=json.dumps({}),
                               failed_hosts=json.dumps([]),
-                              retry_count=0)
+                              retry_count=1)
         older_report.save()
         self.report_record.state = Report.NEW
         self.report_record.save()
         self.processor.report = None
         self.processor.assign_report()
         self.assertEqual(self.processor.report, older_report)
+        # delete the older report object
+        Report.objects.get(id=older_report.id).delete()
+
+    def test_assign_report_oldest_commit(self):
+        """Test the assign report function with retry type as commit."""
+        current_time = datetime.utcnow()
+        twentyminold_time = current_time - timedelta(minutes=20)
+        older_report = Report(upload_srv_kafka_msg=json.dumps(self.msg),
+                              rh_account='4321',
+                              report_platform_id=self.uuid2,
+                              state=Report.DOWNLOADED,
+                              report_json=json.dumps(self.report_json),
+                              state_info=json.dumps([Report.NEW,
+                                                     Report.DOWNLOADED]),
+                              last_update_time=twentyminold_time,
+                              candidate_hosts=json.dumps({}),
+                              failed_hosts=json.dumps([]),
+                              retry_count=1,
+                              retry_type=Report.COMMIT,
+                              commit_info='1234')
+        older_report.save()
+        self.report_record.state = Report.DOWNLOADED
+        self.report_record.save()
+        self.processor.report = None
+        # the commit should always be different from 1234
+        self.processor.assign_report()
+        self.assertEqual(self.processor.report, older_report)
+        self.assertEqual(self.processor.report.state, Report.DOWNLOADED)
         # delete the older report object
         Report.objects.get(id=older_report.id).delete()
 
@@ -315,6 +343,18 @@ class MessageProcessorTests(TestCase):
             self.assertEqual(self.processor.report_id, self.report_record.report_platform_id)
             self.assertEqual(self.processor.report.state, Report.DOWNLOADED)
             self.assertEqual(self.processor.status, self.processor.report.upload_ack_status)
+
+        # test the async function call state
+        self.report_record.state = Report.VALIDATED
+        self.report_record.save()
+
+        def validation_reported_side_effect():
+            """Side effect for async transition method."""
+            self.report_record.state = Report.VALIDATION_REPORTED
+            self.report_record.save()
+        self.processor.transition_to_validation_reported = CoroutineMock(
+            side_effect=validation_reported_side_effect)
+        await self.processor.delegate_state()
 
     def test_run_delegate(self):
         """Test the async function delegate state."""

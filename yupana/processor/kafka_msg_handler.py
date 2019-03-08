@@ -103,10 +103,9 @@ def unpack_consumer_record(upload_service_message):
         raise QPCKafkaMsgException(format_message(prefix, 'Upload service message not JSON.'))
 
 
-async def save_message_and_ack(consumer):
+async def save_message_and_ack(consumer, consumer_record):
     """Save and ack the kafka uploaded message."""
     prefix = 'SAVING MESSAGE'
-    consumer_record = await MSG_PENDING_QUEUE.get()
     if consumer_record.topic == QPC_TOPIC:
         try:
             upload_service_message = unpack_consumer_record(consumer_record)
@@ -132,7 +131,9 @@ async def save_message_and_ack(consumer):
                 await consumer.commit()
             except Exception as error:
                 LOG.error(format_message(
-                    prefix, 'Could not save upload service message: %s', error))
+                    prefix,
+                    'The following error occurred while trying to save and '
+                    'commit the message: %s', error))
         except QPCKafkaMsgException as message_error:
             LOG.error(format_message(
                 prefix, 'Error processing records.  Message: %s, Error: %s',
@@ -146,7 +147,8 @@ async def save_message_and_ack(consumer):
 async def loop_save_message_and_ack(consumer):
     """Loop the save_message_and_ack function."""
     while True:
-        await save_message_and_ack(consumer)
+        consumer_record = await MSG_PENDING_QUEUE.get()
+        await save_message_and_ack(consumer, consumer_record)
 
 
 async def listen_for_messages(consumer):  # pragma: no cover
