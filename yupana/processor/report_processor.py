@@ -202,11 +202,6 @@ class MessageProcessor():
 
     def transition_to_started(self):
         """Attempt to change the state to started."""
-        self.prefix = 'STARTING PROCESSOR'
-        LOG.info(format_message(
-            self.prefix,
-            'Starting the report processor.',
-            account_number=self.account_number))
         self.next_state = Report.STARTED
         self.update_report_state()
 
@@ -273,8 +268,8 @@ class MessageProcessor():
         self.prefix = 'ATTEMPTING STATUS UPLOAD'
         LOG.info(format_message(
             self.prefix,
-            'Uploading validation status "%s" for report %s. State is "%s".' %
-                (self.status, self.report_id, self.state),
+            'Uploading validation status "%s". State is "%s".' %
+                (self.status, self.state),
             account_number=self.account_number, report_id=self.report_id))
         message_hash = self.upload_message['hash']
         try:
@@ -438,7 +433,8 @@ class MessageProcessor():
         """
         if (self.report.retry_count + 1) >= RETRIES_ALLOWED:
             LOG.error(format_message(
-                self.prefix, 'This report has reached the retry limit of %s.' % str(RETRIES_ALLOWED),
+                self.prefix,
+                'This report has reached the retry limit of %s.' % str(RETRIES_ALLOWED),
                 account_number=self.account_number, report_id=self.report_id))
             self.next_state = fail_state
             candidates = None
