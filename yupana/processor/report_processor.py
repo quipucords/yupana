@@ -37,7 +37,9 @@ from processor.kafka_msg_handler import (KafkaMsgHandlerError,
 
 from api.models import Report, ReportArchive, Status
 from config.settings.base import (INSIGHTS_HOST_INVENTORY_URL,
-                                  INSIGHTS_KAFKA_ADDRESS)
+                                  INSIGHTS_KAFKA_ADDRESS,
+                                  RETRIES_ALLOWED,
+                                  RETRY_TIME)
 
 LOG = logging.getLogger(__name__)
 PROCESSING_LOOP = asyncio.new_event_loop()
@@ -47,8 +49,6 @@ FAILURE_CONFIRM_STATUS = 'failure'
 CANONICAL_FACTS = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addresses',
                    'vm_uuid', 'etc_machine_id', 'subscription_manager_id']
 
-RETRY_TIME = 15  # this is the time in minutes that we want to wait to retry a report
-RETRIES_ALLOWED = 5  # this is the number of retries that we want to allow before failing a report
 FAILED_VALIDATION = 'VALIDATION'
 FAILED_UPLOAD = 'UPLOAD'
 EMPTY_QUEUE_SLEEP = 60
