@@ -18,10 +18,9 @@
     "default": {
         "aiokafka": {
             "hashes": [
-                "sha256:d076650bfe0c8de04bec67514d984450ce9b23ca3d5e9f2954bc98cf8e07fa13"
+                "sha256:25b31f9759427fb9334de5a6224df5ac92247d8af9c13eebf8afddd48a5c05b8"
             ],
-            "index": "pypi",
-            "version": "==0.5.0"
+            "version": "==0.5.1"
         },
         "certifi": {
             "hashes": [
