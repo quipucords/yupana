@@ -1,5 +1,5 @@
 #
-# Copyright 2018 Red Hat, Inc.
+# Copyright 2018-2019 Red Hat, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -16,17 +16,18 @@
 #
 """Tests kafka message handler."""
 
+import asyncio
 import io
 import json
 import tarfile
-import uuid
 from unittest.mock import patch
 
 import processor.kafka_msg_handler as msg_handler
-import requests
-import requests_mock
+from aiokafka import AIOKafkaConsumer
+from asynctest import CoroutineMock
 from django.test import TestCase
-from requests.exceptions import HTTPError
+
+from api.models import Report
 
 
 def create_tar_buffer(files_data):
@@ -69,13 +70,6 @@ class KafkaMsgHandlerTest(TestCase):
     def setUp(self):
         """Create test setup."""
         self.payload_url = 'http://insights-upload.com/q/file_to_validate'
-        self.uuid = str(uuid.uuid4())
-        self.uuid2 = str(uuid.uuid4())
-        self.uuid3 = str(uuid.uuid4())
-        self.uuid4 = str(uuid.uuid4())
-        self.uuid5 = str(uuid.uuid4())
-        self.uuid6 = str(uuid.uuid4())
-        self.uuid7 = str(uuid.uuid4())
 
     def tearDown(self):
         """Remove test setup."""
@@ -100,394 +94,53 @@ class KafkaMsgHandlerTest(TestCase):
         with self.assertRaises(msg_handler.QPCKafkaMsgException):
             msg_handler.unpack_consumer_record(fake_record)
 
-    def test_verify_report_success(self):
-        """Test to verify a QPC report with the correct structure passes validation."""
-        report_json = {
-            'report_id': 1,
-            'report_type': 'insights',
-            'report_version': '1.0.0.1b025b8',
-            'status': 'completed',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'bios_uuid': 'value'}}}
+    async def save_and_ack(self):
+        """Test the save and ack message method."""
+        test_consumer = AIOKafkaConsumer(
+            msg_handler.AVAILABLE_TOPIC, msg_handler.QPC_TOPIC,
+            loop=msg_handler.EVENT_LOOP, bootstrap_servers=msg_handler.INSIGHTS_KAFKA_ADDRESS,
+            group_id='qpc-group', enable_auto_commit=False
+        )
+        test_consumer.commit = CoroutineMock()
+        qpc_msg = KafkaMsg(msg_handler.QPC_TOPIC, self.payload_url)
+        # test happy case
+        with patch('processor.kafka_msg_handler.unpack_consumer_record',
+                   return_value={'rh_account': '8910'}):
+            await msg_handler.save_message_and_ack(test_consumer, qpc_msg)
+            report = Report.objects.get(rh_account='8910')
+            self.assertEqual(json.loads(report.upload_srv_kafka_msg),
+                             {'rh_account': '8910'})
+            self.assertEqual(report.state, Report.NEW)
 
-        valid, invalid = msg_handler.verify_report_details('1234', report_json)
-        expect_valid = {self.uuid: {'bios_uuid': 'value'}}
-        expect_invalid = {}
-        self.assertEqual(valid, expect_valid)
-        self.assertEqual(invalid, expect_invalid)
+        # test available topic
+        available_msg = KafkaMsg(msg_handler.AVAILABLE_TOPIC, self.payload_url)
+        await msg_handler.save_message_and_ack(test_consumer, available_msg)
 
-    def test_verify_report_success_mixed_hosts(self):
-        """Test to verify a QPC report with the correct structure passes validation."""
-        report_json = {
-            'report_id': 1,
-            'report_type': 'insights',
-            'report_version': '1.0.0.1b025b8',
-            'status': 'completed',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'bios_uuid': 'value'},
-                      self.uuid2: {'invalid': 'value'}}}
+        # test no rh_account
+        with patch('processor.kafka_msg_handler.unpack_consumer_record',
+                   return_value={'foo': 'bar'}):
+            await msg_handler.save_message_and_ack(test_consumer, qpc_msg)
+            with self.assertRaises(Report.DoesNotExist):
+                Report.objects.get(upload_srv_kafka_msg=json.dumps({'foo': 'bar'}))
 
-        valid, invalid = msg_handler.verify_report_details('12345', report_json)
-        expect_valid = {self.uuid: {'bios_uuid': 'value'}}
-        expect_invalid = {self.uuid2: {'invalid': 'value'}}
-        self.assertEqual(valid, expect_valid)
-        self.assertEqual(invalid, expect_invalid)
+        # test general exception
+        def raise_error():
+            """Raise a general error."""
+            raise Exception('Test')
 
-    def test_verify_report_missing_id(self):
-        """Test to verify a QPC report with a missing id is failed."""
-        report_json = {
-            'report_type': 'insights',
-            'report_version': '1.0.0.1b025b8',
-            'status': 'completed',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'key': 'value'}}}
+        test_consumer.commit = CoroutineMock(side_effect=raise_error)
+        with patch('processor.kafka_msg_handler.unpack_consumer_record',
+                   return_value={'rh_account': '1112'}):
+            await msg_handler.save_message_and_ack(test_consumer, qpc_msg)
+            report = Report.objects.get(rh_account='1112')
+            self.assertEqual(json.loads(report.upload_srv_kafka_msg),
+                             {'rh_account': '1112'})
+            self.assertEqual(report.state, Report.NEW)
 
-        with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = msg_handler.verify_report_details('1234', report_json)
-
-    def test_verify_report_fails_no_canonical_facts(self):
-        """Test to verify a QPC report with the correct structure passes validation."""
-        report_json = {
-            'report_id': 1,
-            'report_type': 'insights',
-            'report_version': '1.0.0.1b025b8',
-            'status': 'completed',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'name': 'value'}}}
-
-        with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = msg_handler.verify_report_details('1234', report_json)
-
-    def test_verify_report_invalid_report_type(self):
-        """Test to verify a QPC report with an invalid report_type is failed."""
-        report_json = {
-            'report_id': 1,
-            'report_type': 'deployments',
-            'report_version': '1.0.0.1b025b8',
-            'status': 'completed',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'key': 'value'}}}
-
-        with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = msg_handler.verify_report_details('1234', report_json)
-
-    def test_verify_report_missing_version(self):
-        """Test to verify a QPC report missing report_version is failed."""
-        report_json = {
-            'report_id': 1,
-            'report_type': 'insights',
-            'status': 'completed',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'key': 'value'}}}
-
-        with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = msg_handler.verify_report_details('1234', report_json)
-
-    def test_verify_report_missing_platform_id(self):
-        """Test to verify a QPC report missing report_platform_id is failed."""
-        report_json = {
-            'report_id': 1,
-            'report_type': 'insights',
-            'report_version': '1.0.0.1b025b8',
-            'status': 'completed',
-            'hosts': {self.uuid: {'key': 'value'}}}
-
-        with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = msg_handler.verify_report_details('1234', report_json)
-
-    def test_verify_report_missing_hosts(self):
-        """Test to verify a QPC report with empty hosts is failed."""
-        report_json = {
-            'report_id': 1,
-            'report_type': 'insights',
-            'report_version': '1.0.0.1b025b8',
-            'status': 'completed',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {}}
-
-        with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = msg_handler.verify_report_details('1234', report_json)
-
-    def test_verify_report_invalid_hosts(self):
-        """Test to verify a QPC report with invalid hosts is failed."""
-        report_json = {
-            'report_id': 1,
-            'report_type': 'insights',
-            'report_version': '1.0.0.1b025b8',
-            'status': 'completed',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': ['foo']}
-
-        with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = msg_handler.verify_report_details('1234', report_json)
-
-    def test_verify_report_invalid_hosts_key(self):
-        """Test to verify a QPC report with invalid hosts key is failed."""
-        report_json = {
-            'report_id': 1,
-            'report_type': 'insights',
-            'report_version': '1.0.0.1b025b8',
-            'status': 'completed',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {1: {'foo': 'bar'}}}
-
-        with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = msg_handler.verify_report_details('1234', report_json)
-
-    def test_verify_report_invalid_hosts_val(self):
-        """Test to verify a QPC report with invalid hosts value is failed."""
-        report_json = {
-            'report_id': 1,
-            'report_type': 'insights',
-            'report_version': '1.0.0.1b025b8',
-            'status': 'completed',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: ['foo']}}
-
-        with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = msg_handler.verify_report_details('1234', report_json)
-
-    def test_verify_report_hosts(self):
-        """Test host verification."""
-        # test all valid hosts
-        uuid8 = str(uuid.uuid4())
-        uuid9 = str(uuid.uuid4())
-
-        valid = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
-                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
-                 self.uuid3: {'ip_addresses': 'value', 'name': 'foo'},
-                 self.uuid4: {'mac_addresses': 'value', 'name': 'foo'},
-                 self.uuid5: {'vm_uuid': 'value', 'name': 'foo'},
-                 self.uuid6: {'etc_machine_id': 'value'},
-                 self.uuid7: {'subscription_manager_id': 'value'}
-                 }
-        invalid = {uuid8: {'not_valid': 'value'}}
-        hosts = dict(valid)
-        hosts.update(invalid)
-        report_json = {
-            'report_id': 1,
-            'report_type': 'insights',
-            'report_version': '1.0.0.1b025b8',
-            'status': 'completed',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': hosts}
-        actual_valid, actual_invalid = msg_handler.verify_report_hosts('1234',
-                                                                       report_json)
-        self.assertEqual(actual_valid, valid)
-        self.assertEqual(actual_invalid, invalid)
-
-        # test that invalid hosts are removed
-        invalid_host = {uuid9: {'no': 'canonical facts', 'metadata': []}}
-        hosts.update(invalid_host)
-        valid_hosts, _ = msg_handler.verify_report_hosts('1234',
-                                                         report_json)
-        self.assertEqual(valid_hosts.get(uuid9), None)
-
-        # test that if there are no valid hosts we return {}
-        report_json['hosts'] = invalid_host
-        valid_hosts, _ = msg_handler.verify_report_hosts('1234',
-                                                         report_json)
-        self.assertEqual({}, valid_hosts)
-
-    def test_extract_report_from_tar_gz_success(self):
-        """Testing the extract method with valid buffer content."""
-        report_json = {
-            'report_id': 1,
-            'report_type': 'insights',
-            'report_version': '1.0.0.1b025b8',
-            'status': 'completed',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'key': 'value'}}}
-        test_dict = dict()
-        test_dict['file.json'] = report_json
-        buffer_content = create_tar_buffer(test_dict)
-        result = msg_handler.extract_report_from_tar_gz('1234', buffer_content)
-        self.assertEqual(result, report_json)
-
-    def test_extract_report_from_tar_gz_failure(self):
-        """Testing the extract method failure too many json files."""
-        report_json = {
-            'report_id': 1,
-            'report_type': 'insights',
-            'report_version': '1.0.0.1b025b8',
-            'status': 'completed',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'key': 'value'}}}
-        test_dict = dict()
-        test_dict['file.json'] = report_json
-        test_dict['file_2.json'] = report_json
-        buffer_content = create_tar_buffer(test_dict)
-        with self.assertRaises(msg_handler.QPCReportException):
-            msg_handler.extract_report_from_tar_gz('1234', buffer_content)
-
-    def test_extract_report_from_tar_gz_failure_no_json(self):
-        """Testing the extract method failure no json file."""
-        report_json = 'No valid report'
-        test_dict = dict()
-        test_dict['file.txt'] = report_json
-        buffer_content = create_tar_buffer(test_dict)
-        with self.assertRaises(msg_handler.QPCReportException):
-            msg_handler.extract_report_from_tar_gz('1234', buffer_content)
-
-    def test_extract_report_from_tar_gz_failure_invalid_json(self):
-        """Testing the extract method failure invalid json."""
-        report_json = None
-        test_dict = dict()
-        test_dict['file.json'] = report_json
-        buffer_content = create_tar_buffer(test_dict)
-        with self.assertRaises(msg_handler.QPCReportException):
-            msg_handler.extract_report_from_tar_gz('1234', buffer_content)
-
-    def test_download_response_content_bad_url(self):
-        """Test to verify extracting payload exceptions are handled."""
-        with requests_mock.mock() as m:
-            m.get(self.payload_url, exc=HTTPError)
-            with self.assertRaises(msg_handler.QPCReportException):
-                msg_handler.download_report('1234', {'url': self.payload_url})
-
-    def test_download_response_content_missing_url(self):
-        """Test case where url is missing."""
-        with requests_mock.mock() as m:
-            m.get(self.payload_url, exc=HTTPError)
-            with self.assertRaises(msg_handler.QPCReportException):
-                msg_handler.download_report('1234', {})
-
-    def test_download_report_success(self):
-        """Test to verify extracting contents is successful."""
-        report_json = {
-            'report_id': 1,
-            'report_type': 'insights',
-            'report_version': '1.0.0.1b025b8',
-            'status': 'completed',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'insights_client_id': 'value'}}}
-        value = {'url': self.payload_url, 'rh_account': '00001'}
-        test_dict = dict()
-        test_dict['file.json'] = report_json
-        buffer_content = create_tar_buffer(test_dict)
-        with requests_mock.mock() as m:
-            m.get(self.payload_url, content=buffer_content)
-            content = msg_handler.download_report('1234', value)
-            self.assertEqual(buffer_content, content)
-
-    def test_download_and_validate_contents_invalid_report(self):
-        """Test to verify extracting contents fails when report is invalid."""
-        report_json = {
-            'report_type': 'insights',
-            'report_version': '1.0.0.1b025b8',
-            'status': 'completed',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'key': 'value'}}}
-
-        with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = msg_handler.verify_report_details('1234', report_json)
-
-    def test_download_and_validate_contents_raises_error(self):
-        """Test to verify extracting contents fails when error is raised."""
-        report_json = {
-            'report_id': 1,
-            'report_type': 'insights',
-            'report_version': '1.0.0.1b025b8',
-            'status': 'completed',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'key': 'value'}}}
-        value = {'url': self.payload_url, 'rh_account': '00001'}
-        test_dict = dict()
-        test_dict['file.json'] = report_json
-        buffer_content = create_tar_buffer(test_dict)
-        with requests_mock.mock() as m:
-            m.get(self.payload_url, content=buffer_content)
-            with patch('requests.get', side_effect=HTTPError):
-                with self.assertRaises(msg_handler.QPCReportException):
-                    content = msg_handler.download_report('1234', value)
-                    self.assertEqual(content, buffer_content)
-
-    def test_download_with_404(self):
-        """Test downloading a URL and getting 404."""
-        report_json = {}
-        test_dict = dict()
-        test_dict['file.json'] = report_json
-        with requests_mock.mock() as m:
-            m.get(self.payload_url, status_code=404)
-            with self.assertRaises(msg_handler.QPCKafkaMsgException):
-                msg_handler.download_report('1234', {'url': self.payload_url})
-
-    def test_value_error_extract_report_from_tar_gz(self):
-        """Testing value error when extracting json from tar.gz."""
-        invalid_json = '["report_id": 1]'
-        tar_buffer = io.BytesIO()
-        with tarfile.open(fileobj=tar_buffer, mode='w:gz') as tar_file:
-            file_name = 'file.json'
-            file_content = invalid_json
-            file_buffer = io.BytesIO(file_content.encode('utf-8'))
-            info = tarfile.TarInfo(name=file_name)
-            info.size = len(file_buffer.getvalue())
-            tar_file.addfile(tarinfo=info, fileobj=file_buffer)
-        tar_buffer.seek(0)
-        buffer_content = tar_buffer.getvalue()
-        with self.assertRaises(msg_handler.QPCReportException):
-            msg_handler.extract_report_from_tar_gz('1234', buffer_content)
-
-    def test_no_json_files_extract_report_from_tar_gz(self):
-        """Testing no json files found in tar.gz."""
-        invalid_json = '["report_id": 1]'
-        tar_buffer = io.BytesIO()
-        with tarfile.open(fileobj=tar_buffer, mode='w:gz') as tar_file:
-            file_name = 'file.csv'
-            file_content = invalid_json
-            file_buffer = io.BytesIO(file_content.encode('utf-8'))
-            info = tarfile.TarInfo(name=file_name)
-            info.size = len(file_buffer.getvalue())
-            tar_file.addfile(tarinfo=info, fileobj=file_buffer)
-        tar_buffer.seek(0)
-        buffer_content = tar_buffer.getvalue()
-        with self.assertRaises(msg_handler.QPCReportException):
-            msg_handler.extract_report_from_tar_gz('1234', buffer_content)
-
-    def test_no_account_number_inventory_upload(self):
-        """Testing no account number present when uploading to inventory."""
-        account_number = None
-        report_platform_id = '0001-kevan'
-        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
-                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
-                 self.uuid3: {'ip_addresses': 'value', 'name': 'foo'},
-                 self.uuid4: {'mac_addresses': 'value', 'name': 'foo'},
-                 self.uuid5: {'vm_uuid': 'value', 'name': 'foo'},
-                 self.uuid6: {'etc_machine_id': 'value'},
-                 self.uuid7: {'subscription_manager_id': 'value'}}
-        msg_handler.upload_to_host_inventory(account_number,
-                                             report_platform_id,
-                                             hosts)
-
-    def test_successful_host_inventory_upload(self):
-        """Testing successful upload to host inventory."""
-        account_number = '00001'
-        report_platform_id = '0001-kevan'
-        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
-                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
-                 self.uuid3: {'ip_addresses': 'value', 'name': 'foo'},
-                 self.uuid4: {'mac_addresses': 'value', 'name': 'foo'},
-                 self.uuid5: {'vm_uuid': 'value', 'name': 'foo'},
-                 self.uuid6: {'etc_machine_id': 'value'},
-                 self.uuid7: {'subscription_manager_id': 'value'}}
-        with patch('processor.kafka_msg_handler.INSIGHTS_HOST_INVENTORY_URL', value='not none'):
-            with patch('processor.kafka_msg_handler.requests', status_code=200):
-                msg_handler.upload_to_host_inventory(account_number,
-                                                     report_platform_id,
-                                                     hosts)
-
-    @patch('processor.kafka_msg_handler.requests.post')
-    def test_host_url_exceptions(self, mock_request):
-        """Testing an exception being raised during host inventory upload."""
-        good_resp = requests.Response()
-        good_resp.status_code = 200
-        bad_resp = requests.exceptions.ConnectionError()
-        mock_request.side_effect = [good_resp, bad_resp]
-        account_number = '00001'
-        report_platform_id = '0001-kevan'
-        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
-                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
-        with patch('processor.kafka_msg_handler.INSIGHTS_HOST_INVENTORY_URL', value='not none'):
-            msg_handler.upload_to_host_inventory(account_number,
-                                                 report_platform_id,
-                                                 hosts)
+    def test_save_and_ack_success(self):
+        """Test the async save and ack function."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.save_and_ack)
+        event_loop.run_until_complete(coro())
+        event_loop.close()

@@ -47,6 +47,11 @@ ALLOWED_HOSTS = ENVIRONMENT.get_value('DJANGO_ALLOWED_HOSTS', default=['*'])
 INSIGHTS_HOST_INVENTORY_URL = ENVIRONMENT.get_value('INSIGHTS_HOST_INVENTORY_URL',
                                                      default='http://127.0.0.1:8000/r/insights/platform/inventory/api/v1/hosts')
 
+# this is the time in minutes that we want to wait to retry a report
+# default is 8 hours
+RETRY_TIME = ENVIRONMENT.get_value('RETRY_TIME', default=480)
+# this is the number of retries that we want to allow before failing a report
+RETRIES_ALLOWED = ENVIRONMENT.get_value('RETRIES_ALLOWED', default=5)
 # Logging
 # https://docs.djangoproject.com/en/dev/topics/logging/
 # https://docs.python.org/3.6/library/logging.html

@@ -11,19 +11,18 @@
 
 """Model for report progress."""
 
-import uuid
-
 from django.db import models
 
 
-class Report(models.Model):
-    """Represents report progress."""
+class AbstractReport(models.Model):
+    """Represents report information."""
 
-    report_platform_id = models.UUIDField(
-        default=uuid.uuid4, editable=False)
-
+    report_platform_id = models.CharField(max_length=50, null=True)
+    rh_account = models.TextField(null=True)
+    upload_ack_status = models.TextField(null=True)
     upload_srv_kafka_msg = models.TextField(null=True)
     report_json = models.TextField(null=True)
+    git_commit = models.TextField(null=True)
 
     NEW = 'new'
     STARTED = 'started'
@@ -51,28 +50,65 @@ class Report(models.Model):
         choices=STATE_CHOICES,
         default=NEW
     )
-    state_info = models.TextField(null=False)
+
+    TIME = 'time'
+    GIT_COMMIT = 'git commit'
+    RETRY_CHOICES = (('TIME', TIME),
+                     ('GIT_COMMIT', GIT_COMMIT))
+
+    retry_type = models.CharField(
+        max_length=10,
+        choices=RETRY_CHOICES,
+        default=TIME
+    )
+
+    state_info = models.TextField(null=True)
     retry_count = models.PositiveSmallIntegerField(null=True)
     last_update_time = models.DateTimeField(null=True)
-    failed_hosts = models.TextField(null=False)
-    candidate_hosts = models.TextField(null=False)
+    failed_hosts = models.TextField(null=True)
+    candidate_hosts = models.TextField(null=True)
 
     def __str__(self):
         """Convert to string."""
         return '{' + 'report_platform_id:{}, '\
+            'rh_account: {}, ' \
+            'upload_ack_status: {}, ' \
             'upload_srv_kafka_msg:{}, ' \
             'report_json:{}, '\
+            'git_commit:{}, '\
             'state:{}, '\
             'state_info:{}, '\
             'retry_count:{}, '\
+            'retry_type:{}, '\
             'last_update_time:{}, '\
             'failed_hosts:{}, '\
             'candidate_hosts:{} '.format(self.report_platform_id,
+                                         self.rh_account,
+                                         self.upload_ack_status,
                                          self.upload_srv_kafka_msg,
                                          self.report_json,
+                                         self.git_commit,
                                          self.state,
                                          self.state_info,
                                          self.retry_count,
+                                         self.retry_type,
                                          self.last_update_time,
                                          self.failed_hosts,
                                          self.candidate_hosts) + '}'
+
+    class Meta:
+        """Metadata for abstract report model."""
+
+        abstract = True
+
+
+class Report(AbstractReport):
+    """Represents report records."""
+
+    pass
+
+
+class ReportArchive(AbstractReport):
+    """Represents report archives."""
+
+    pass

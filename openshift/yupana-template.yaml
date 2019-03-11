@@ -91,6 +91,8 @@ objects:
     insights-kafka-server-host: ${KAFKA_HOST}.${KAFKA_NAMESPACE}.svc
     insights-kafka-server-port: ${KAFKA_PORT}
     insights-host-inventory-url: ${INSIGHTS_HOST_INVENTORY_URL}
+    retries-allowed: ${RETRIES_ALLOWED}
+    retry-time: ${RETRY_TIME}
     log-level: INFO
 - apiVersion: v1
   kind: Service
@@ -298,6 +300,18 @@ objects:
                   name: yupana-env
                   key: insights-host-inventory-url
                   optional: false
+            - name: RETRIES_ALLOWED
+              valueFrom:
+                configMapKeyRef:
+                  name: yupana-env
+                  key: retries_allowed
+                  optional: true
+            - name: RETRY_TIME
+              valueFrom:
+                configMapKeyRef:
+                  name: yupana-env
+                  key: retry_time
+                  optional: true
           livenessProbe:
             failureThreshold: 3
             httpGet:
@@ -599,3 +613,13 @@ parameters:
   name: INSIGHTS_HOST_INVENTORY_URL
   required: true
   value: http://127.0.0.1:8000/r/insights/platform/inventory/api/v1/hosts
+- description: Retry time in minutes
+  displayName: Retry time
+  name: RETRY_TIME
+  required: true
+  value: 480
+- description: Number of retries allowed
+  displayName: Retries allowed
+  name: RETRIES_ALLOWED
+  required: true
+  value: 5
