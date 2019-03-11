@@ -1,6 +1,6 @@
 -i https://pypi.python.org/simple
 aiokafka==0.5.1
-certifi==2018.11.29
+certifi==2019.3.9
 chardet==3.0.4
 django-environ==0.4.5
 django==2.1.7
