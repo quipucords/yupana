@@ -27,6 +27,7 @@ from enum import Enum
 from http import HTTPStatus
 from io import BytesIO
 
+import pytz
 import requests
 from aiokafka import AIOKafkaProducer
 from django.db import transaction
@@ -132,7 +133,7 @@ class ReportProcessor():
                 # look for the oldest report in the db
                 assign = False
                 oldest_report = Report.objects.earliest('last_update_time')
-                current_time = datetime.utcnow()
+                current_time = datetime.now(pytz.utc)
                 status_info = Status()
                 same_commit = oldest_report.git_commit == status_info.git_commit
                 minutes_passed = int(
@@ -394,7 +395,7 @@ class ReportProcessor():
         try:
             status_info = Status()
             self.state = self.next_state
-            self.report.last_update_time = datetime.utcnow()
+            self.report.last_update_time = datetime.now(pytz.utc)
             self.report.state = self.next_state
             self.report.git_commit = status_info.git_commit
             if retry == RETRY.clear:
@@ -497,11 +498,11 @@ class ReportProcessor():
         """
         candidate_hosts = json.loads(self.report.candidate_hosts)
         candidates = {}
-        for host in candidate_hosts:
-            host.pop('cause', '')
-            host.pop('status_code', '')
-            for key in host.keys():
-                candidates[key] = host[key]
+        # we want to generate a dictionary of just the id mapped to the data
+        # so we iterate the list creating a dictionary of the key: value if
+        # the key is not 'cause' or 'status_code'
+        candidates = {key: host[key] for host in candidate_hosts
+                      for key in host.keys() if key not in ['cause', 'status_code']}
         return candidates
 
     def deduplicate_reports(self):

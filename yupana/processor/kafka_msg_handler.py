@@ -22,6 +22,7 @@ import logging
 import threading
 from datetime import datetime
 
+import pytz
 from aiokafka import AIOKafkaConsumer
 from kafka.errors import ConnectionError as KafkaConnectionError
 
@@ -121,7 +122,7 @@ async def save_message_and_ack(consumer, consumer_record):
                     rh_account=rh_account,
                     state=Report.NEW,
                     state_info=json.dumps([Report.NEW]),
-                    last_update_time=datetime.utcnow(),
+                    last_update_time=datetime.now(pytz.utc),
                     candidate_hosts=json.dumps([]),
                     failed_hosts=json.dumps([]),
                     retry_count=0)

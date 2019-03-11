@@ -27,6 +27,7 @@ from unittest.mock import patch
 
 import processor.kafka_msg_handler as msg_handler
 import processor.report_processor as report_processor
+import pytz
 import requests
 import requests_mock
 from asynctest import CoroutineMock
@@ -65,7 +66,7 @@ class ReportProcessorTests(TestCase):
                                     state=Report.NEW,
                                     report_json=json.dumps(self.report_json),
                                     state_info=json.dumps([Report.NEW]),
-                                    last_update_time=datetime.utcnow(),
+                                    last_update_time=datetime.now(pytz.utc),
                                     candidate_hosts=json.dumps({}),
                                     failed_hosts=json.dumps([]),
                                     retry_count=0)
@@ -108,7 +109,7 @@ class ReportProcessorTests(TestCase):
                                    state=Report.NEW,
                                    report_json=json.dumps(self.report_json),
                                    state_info=json.dumps([Report.NEW]),
-                                   last_update_time=datetime.utcnow(),
+                                   last_update_time=datetime.now(pytz.utc),
                                    candidate_hosts=json.dumps({}),
                                    failed_hosts=json.dumps([]),
                                    retry_count=0)
@@ -141,7 +142,7 @@ class ReportProcessorTests(TestCase):
                                  state=Report.NEW,
                                  report_json=json.dumps(self.report_json),
                                  state_info=json.dumps([Report.NEW]),
-                                 last_update_time=datetime.utcnow(),
+                                 last_update_time=datetime.now(pytz.utc),
                                  candidate_hosts=json.dumps({}),
                                  failed_hosts=json.dumps([]),
                                  retry_count=0)
@@ -268,15 +269,15 @@ class ReportProcessorTests(TestCase):
 
     def test_assign_report_oldest_time(self):
         """Test the assign report function with older report."""
-        current_time = datetime.utcnow()
-        twentyminold_time = current_time - timedelta(minutes=20)
+        current_time = datetime.now(pytz.utc)
+        hours_old_time = current_time - timedelta(hours=9)
         older_report = Report(upload_srv_kafka_msg=json.dumps(self.msg),
                               rh_account='4321',
                               report_platform_id=self.uuid2,
                               state=Report.NEW,
                               report_json=json.dumps(self.report_json),
                               state_info=json.dumps([Report.NEW]),
-                              last_update_time=twentyminold_time,
+                              last_update_time=hours_old_time,
                               candidate_hosts=json.dumps({}),
                               failed_hosts=json.dumps([]),
                               retry_count=1)
@@ -289,9 +290,32 @@ class ReportProcessorTests(TestCase):
         # delete the older report object
         Report.objects.get(id=older_report.id).delete()
 
+    def test_assign_report_not_old_enough(self):
+        """Test the assign report function with young report."""
+        # delete the report record
+        Report.objects.get(id=self.report_record.id).delete()
+        self.processor.report = None
+        current_time = datetime.now(pytz.utc)
+        min_old_time = current_time - timedelta(minutes=1)
+        older_report = Report(upload_srv_kafka_msg=json.dumps(self.msg),
+                              rh_account='4321',
+                              report_platform_id=self.uuid2,
+                              state=Report.STARTED,
+                              report_json=json.dumps(self.report_json),
+                              state_info=json.dumps([Report.NEW]),
+                              last_update_time=min_old_time,
+                              candidate_hosts=json.dumps({}),
+                              failed_hosts=json.dumps([]),
+                              retry_count=1)
+        older_report.save()
+        self.processor.assign_report()
+        self.assertEqual(self.processor.report, None)
+        # delete the older report object
+        Report.objects.get(id=older_report.id).delete()
+
     def test_assign_report_oldest_commit(self):
         """Test the assign report function with retry type as commit."""
-        current_time = datetime.utcnow()
+        current_time = datetime.now(pytz.utc)
         twentyminold_time = current_time - timedelta(minutes=20)
         older_report = Report(upload_srv_kafka_msg=json.dumps(self.msg),
                               rh_account='4321',
@@ -557,7 +581,7 @@ class ReportProcessorTests(TestCase):
                                    state=Report.VALIDATED,
                                    report_json=json.dumps(self.report_json),
                                    state_info=json.dumps([Report.NEW]),
-                                   last_update_time=datetime.utcnow(),
+                                   last_update_time=datetime.now(pytz.utc),
                                    candidate_hosts=json.dumps([]),
                                    failed_hosts=json.dumps([]),
                                    retry_count=0,
@@ -646,7 +670,7 @@ class ReportProcessorTests(TestCase):
                                report_json=json.dumps(self.report_json),
                                state_info=json.dumps([Report.NEW, Report.STARTED,
                                                       Report.VALIDATION_REPORTED]),
-                               last_update_time=datetime.utcnow(),
+                               last_update_time=datetime.now(pytz.utc),
                                candidate_hosts=json.dumps({}),
                                failed_hosts=json.dumps([]),
                                retry_count=0)
