@@ -26,7 +26,7 @@ from datetime import datetime, timedelta
 from unittest.mock import patch
 
 import processor.kafka_msg_handler as msg_handler
-import processor.report_processor as msg_processor
+import processor.report_processor as report_processor
 import requests
 import requests_mock
 from asynctest import CoroutineMock
@@ -37,7 +37,7 @@ from requests.exceptions import HTTPError
 from api.models import Report, ReportArchive
 
 
-class MessageProcessorTests(TestCase):
+class ReportProcessorTests(TestCase):
     """Test Cases for the Message processor."""
 
     def setUp(self):
@@ -70,7 +70,7 @@ class MessageProcessorTests(TestCase):
                                     failed_hosts=json.dumps([]),
                                     retry_count=0)
         self.report_record.save()
-        self.processor = msg_processor.MessageProcessor()
+        self.processor = report_processor.ReportProcessor()
         self.processor.report = self.report_record
 
     def check_variables_are_reset(self):
@@ -89,8 +89,8 @@ class MessageProcessorTests(TestCase):
 
     def test_assign_cause_to_failed(self):
         """Test that we sucessfully record the reason a host fails."""
-        failure_cause = random.choice([msg_processor.FAILED_VALIDATION,
-                                       msg_processor.FAILED_UPLOAD])
+        failure_cause = random.choice([report_processor.FAILED_VALIDATION,
+                                       report_processor.FAILED_UPLOAD])
         self.processor.failed_hosts = {self.uuid: {'mac_addresses': 'value'},
                                        self.uuid2: {'bios_uuid': 'value'}}
         expected = [{self.uuid: {'mac_addresses': 'value'},
@@ -118,7 +118,7 @@ class MessageProcessorTests(TestCase):
         self.processor.upload_message = self.msg
         self.processor.state = report_to_archive.state
         self.processor.report_id = self.uuid
-        self.processor.status = msg_processor.SUCCESS_CONFIRM_STATUS
+        self.processor.status = report_processor.SUCCESS_CONFIRM_STATUS
         self.processor.report_json = self.report_json
 
         self.processor.archive_report()
@@ -151,7 +151,7 @@ class MessageProcessorTests(TestCase):
         self.processor.upload_message = self.msg
         self.processor.state = report_to_dedup.state
         self.processor.report_id = self.uuid
-        self.processor.status = msg_processor.SUCCESS_CONFIRM_STATUS
+        self.processor.status = report_processor.SUCCESS_CONFIRM_STATUS
         self.processor.report_json = self.report_json
 
         self.processor.deduplicate_reports()
@@ -170,7 +170,7 @@ class MessageProcessorTests(TestCase):
         self.processor.candidate_hosts = candidates
         self.processor.failed_hosts = [
             {self.uuid2: {'bios_uuid': 'value', 'name': 'value'},
-             'cause': msg_processor.FAILED_VALIDATION}]
+             'cause': report_processor.FAILED_VALIDATION}]
         self.processor.move_candidates_to_failed()
         self.assertEqual(self.processor.candidate_hosts, [])
         for host in candidates:
@@ -179,7 +179,7 @@ class MessageProcessorTests(TestCase):
     def test_determine_retry_limit(self):
         """Test the determine retry method when the retry is at the limit."""
         candidates = [{self.uuid3: {'ip_addresses': 'value', 'name': 'value'},
-                       'cause': msg_processor.FAILED_UPLOAD}]
+                       'cause': report_processor.FAILED_UPLOAD}]
         self.report_record.state = Report.STARTED
         self.report_record.retry_count = 4
         self.report_record.candidate_hosts = json.dumps(candidates)
@@ -202,23 +202,23 @@ class MessageProcessorTests(TestCase):
             {self.uuid4: {'ip_addresses': 'value', 'name': 'value'}}])
         self.report_record.failed_hosts = json.dumps([
             {self.uuid3: {'ip_addresses': 'value', 'name': 'value'},
-             'cause': msg_processor.FAILED_VALIDATION}])
+             'cause': report_processor.FAILED_VALIDATION}])
         self.report_record.save()
         # set the values we will update with
         candidates = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'}}]
         failed = [{self.uuid2: {'bios_uuid': 'value', 'name': 'value'},
-                   'cause': msg_processor.FAILED_VALIDATION}]
+                   'cause': report_processor.FAILED_VALIDATION}]
         expected_failed = failed + [
             {self.uuid3: {'ip_addresses': 'value', 'name': 'value'},
-             'cause': msg_processor.FAILED_VALIDATION}]
+             'cause': report_processor.FAILED_VALIDATION}]
         self.processor.report = self.report_record
-        self.processor.update_report_state(retry=msg_processor.RETRY.increment,
-                                           retry_type=Report.COMMIT,
+        self.processor.update_report_state(retry=report_processor.RETRY.increment,
+                                           retry_type=Report.GIT_COMMIT,
                                            report_id=self.uuid3,
                                            candidate_hosts=candidates,
                                            failed_hosts=failed)
         self.assertEqual(self.report_record.retry_count, 1)
-        self.assertEqual(self.report_record.retry_type, Report.COMMIT)
+        self.assertEqual(self.report_record.retry_type, Report.GIT_COMMIT)
         self.assertEqual(self.report_record.report_platform_id, self.uuid3)
         self.assertEqual(json.loads(self.report_record.candidate_hosts), candidates)
         for host in expected_failed:
@@ -227,7 +227,7 @@ class MessageProcessorTests(TestCase):
     def test_generate_upload_candidates(self):
         """Test the generate upload candidates method."""
         candidate_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
-                            'cause': msg_processor.FAILED_UPLOAD,
+                            'cause': report_processor.FAILED_UPLOAD,
                             'status_code': '500'},
                            {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}]
         expected = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
@@ -245,7 +245,7 @@ class MessageProcessorTests(TestCase):
         def delegate_side_effect():
             self.processor.should_run = False
 
-        with patch('processor.report_processor.MessageProcessor.delegate_state',
+        with patch('processor.report_processor.ReportProcessor.delegate_state',
                    side_effect=delegate_side_effect):
             await self.processor.run()
             self.assertEqual(self.processor.report, self.report_record)
@@ -304,8 +304,8 @@ class MessageProcessorTests(TestCase):
                               candidate_hosts=json.dumps({}),
                               failed_hosts=json.dumps([]),
                               retry_count=1,
-                              retry_type=Report.COMMIT,
-                              commit_info='1234')
+                              retry_type=Report.GIT_COMMIT,
+                              git_commit='1234')
         older_report.save()
         self.report_record.state = Report.DOWNLOADED
         self.report_record.save()
@@ -329,7 +329,7 @@ class MessageProcessorTests(TestCase):
         """Set up the test for delegate state."""
         self.report_record.state = Report.STARTED
         self.report_record.report_platform_id = self.uuid
-        self.report_record.upload_ack_status = msg_processor.SUCCESS_CONFIRM_STATUS
+        self.report_record.upload_ack_status = report_processor.SUCCESS_CONFIRM_STATUS
         self.report_record.save()
         self.processor.report = self.report_record
 
@@ -337,7 +337,7 @@ class MessageProcessorTests(TestCase):
             """Transition the state to downloaded."""
             self.report_record.state = Report.DOWNLOADED
             self.report_record.save()
-        with patch('processor.report_processor.MessageProcessor.transition_to_downloaded',
+        with patch('processor.report_processor.ReportProcessor.transition_to_downloaded',
                    side_effect=download_side_effect):
             await self.processor.delegate_state()
             self.assertEqual(self.processor.report_id, self.report_record.report_platform_id)
@@ -375,7 +375,7 @@ class MessageProcessorTests(TestCase):
         self.processor.report_json = {}
         self.processor.candidate_hosts = []
         self.processor.failed_hosts = []
-        self.processor.status = msg_processor.SUCCESS_CONFIRM_STATUS
+        self.processor.status = report_processor.SUCCESS_CONFIRM_STATUS
         self.assertEqual(self.processor.report, self.report_record)
         self.assertEqual(self.processor.report_id, self.uuid)
         self.assertEqual(self.processor.state, Report.NEW)
@@ -384,7 +384,7 @@ class MessageProcessorTests(TestCase):
         self.assertEqual(self.processor.report_json, {})
         self.assertEqual(self.processor.candidate_hosts, [])
         self.assertEqual(self.processor.failed_hosts, [])
-        self.assertEqual(self.processor.status, msg_processor.SUCCESS_CONFIRM_STATUS)
+        self.assertEqual(self.processor.status, report_processor.SUCCESS_CONFIRM_STATUS)
 
         # check all of the variables are None after reinitting
         self.processor.reset_variables()
@@ -437,9 +437,9 @@ class MessageProcessorTests(TestCase):
 
         def download_side_effect():
             """Raise a FailDownloadException."""
-            raise msg_processor.FailDownloadException()
+            raise report_processor.FailDownloadException()
 
-        with patch('processor.report_processor.MessageProcessor._download_report',
+        with patch('processor.report_processor.ReportProcessor._download_report',
                    side_effect=download_side_effect):
             self.processor.transition_to_downloaded()
             self.assertEqual(self.report_record.state, Report.FAILED_DOWNLOAD)
@@ -471,7 +471,7 @@ class MessageProcessorTests(TestCase):
         self.processor.transition_to_validated()
         self.assertEqual(self.report_record.state, Report.VALIDATED)
         self.assertEqual(self.report_record.upload_ack_status,
-                         msg_processor.FAILURE_CONFIRM_STATUS)
+                         report_processor.FAILURE_CONFIRM_STATUS)
         self.assertEqual(self.report_record.retry_count, 0)
 
     def test_transition_to_validated_general_exception(self):
@@ -491,7 +491,7 @@ class MessageProcessorTests(TestCase):
             """Transition the state to downloaded."""
             raise Exception('Test')
 
-        with patch('processor.report_processor.MessageProcessor._validate_report_details',
+        with patch('processor.report_processor.ReportProcessor._validate_report_details',
                    side_effect=validate_side_effect):
             self.processor.transition_to_validated()
             self.assertEqual(self.report_record.state, Report.DOWNLOADED)
@@ -501,10 +501,10 @@ class MessageProcessorTests(TestCase):
         """Set up the test for transitioning to validation reported."""
         self.report_record.state = Report.VALIDATED
         self.report_record.report_platform_id = self.uuid
-        self.report_record.upload_ack_status = msg_processor.SUCCESS_CONFIRM_STATUS
+        self.report_record.upload_ack_status = report_processor.SUCCESS_CONFIRM_STATUS
         self.report_record.save()
         self.processor.report = self.report_record
-        self.processor.status = msg_processor.SUCCESS_CONFIRM_STATUS
+        self.processor.status = report_processor.SUCCESS_CONFIRM_STATUS
         self.processor.upload_message = {'hash': self.uuid}
 
         self.processor._send_confirmation = CoroutineMock()
@@ -524,10 +524,10 @@ class MessageProcessorTests(TestCase):
         self.report_record.state = Report.VALIDATED
         self.report_record.retry_count = 0
         self.report_record.report_platform_id = self.uuid
-        self.report_record.upload_ack_status = msg_processor.SUCCESS_CONFIRM_STATUS
+        self.report_record.upload_ack_status = report_processor.SUCCESS_CONFIRM_STATUS
         self.report_record.save()
         self.processor.report = self.report_record
-        self.processor.status = msg_processor.SUCCESS_CONFIRM_STATUS
+        self.processor.status = report_processor.SUCCESS_CONFIRM_STATUS
         self.processor.upload_message = {'hash': self.uuid}
 
         def report_side_effect():
@@ -562,13 +562,13 @@ class MessageProcessorTests(TestCase):
                                    failed_hosts=json.dumps([]),
                                    retry_count=0,
                                    retry_type=Report.TIME)
-        report_to_archive.upload_ack_status = msg_processor.FAILURE_CONFIRM_STATUS
+        report_to_archive.upload_ack_status = report_processor.FAILURE_CONFIRM_STATUS
         report_to_archive.save()
         self.processor.report = report_to_archive
         self.processor.report_id = self.uuid2
         self.processor.account_number = '43214'
         self.processor.state = Report.VALIDATED
-        self.processor.status = msg_processor.FAILURE_CONFIRM_STATUS
+        self.processor.status = report_processor.FAILURE_CONFIRM_STATUS
         self.processor.upload_message = {'hash': self.uuid}
         self.processor._send_confirmation = CoroutineMock()
         await self.processor.transition_to_validation_reported()
@@ -578,7 +578,7 @@ class MessageProcessorTests(TestCase):
         self.assertEqual(archived.state,
                          Report.VALIDATION_REPORTED)
         self.assertEqual(archived.upload_ack_status,
-                         msg_processor.FAILURE_CONFIRM_STATUS)
+                         report_processor.FAILURE_CONFIRM_STATUS)
         # assert the processor was reset
         self.check_variables_are_reset()
 
@@ -604,7 +604,7 @@ class MessageProcessorTests(TestCase):
         self.report_record.save()
         self.processor.report = self.report_record
         self.processor.candidate_hosts = hosts
-        with patch('processor.report_processor.MessageProcessor._upload_to_host_inventory',
+        with patch('processor.report_processor.ReportProcessor._upload_to_host_inventory',
                    return_value=([], [])):
             self.processor.transition_to_hosts_uploaded()
             self.assertEqual(json.loads(self.report_record.candidate_hosts), [])
@@ -613,7 +613,7 @@ class MessageProcessorTests(TestCase):
     def test_transition_to_hosts_uploaded_unsuccessful(self):
         """Test the transition to hosts being uploaded."""
         hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
-                  'cause': msg_processor.FAILED_UPLOAD,
+                  'cause': report_processor.FAILED_UPLOAD,
                   'status_code': '500'},
                  {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}},
                  {self.uuid3: {'ip_addresses': 'value', 'name': 'foo'}},
@@ -621,14 +621,14 @@ class MessageProcessorTests(TestCase):
                  {self.uuid5: {'vm_uuid': 'value', 'name': 'foo'}},
                  {self.uuid6: {'etc_machine_id': 'value'}}]
         retry_commit_hosts = [{self.uuid7: {'subscription_manager_id': 'value'},
-                               'cause': msg_processor.FAILED_UPLOAD,
+                               'cause': report_processor.FAILED_UPLOAD,
                                'status_code': '400'}]
         self.report_record.failed_hosts = []
         self.report_record.candidate_hosts = json.dumps(hosts)
         self.report_record.save()
         self.processor.report = self.report_record
         self.processor.candidate_hosts = hosts
-        with patch('processor.report_processor.MessageProcessor._upload_to_host_inventory',
+        with patch('processor.report_processor.ReportProcessor._upload_to_host_inventory',
                    return_value=(hosts, retry_commit_hosts)):
             self.processor.transition_to_hosts_uploaded()
             total_hosts = hosts + retry_commit_hosts
@@ -656,7 +656,7 @@ class MessageProcessorTests(TestCase):
         self.processor.upload_message = self.msg
         self.processor.state = faulty_report.state
         self.processor.report_id = self.uuid2
-        self.processor.status = msg_processor.SUCCESS_CONFIRM_STATUS
+        self.processor.status = report_processor.SUCCESS_CONFIRM_STATUS
         self.processor.report_json = self.report_json
         self.processor.candidate_hosts = {}
         self.processor.transition_to_hosts_uploaded()
@@ -682,7 +682,7 @@ class MessageProcessorTests(TestCase):
         def hosts_upload_side_effect():
             raise Exception('Test')
 
-        with patch('processor.report_processor.MessageProcessor._upload_to_host_inventory',
+        with patch('processor.report_processor.ReportProcessor._upload_to_host_inventory',
                    side_effect=hosts_upload_side_effect):
             self.processor.transition_to_hosts_uploaded()
             self.assertEqual(self.report_record.state, Report.VALIDATION_REPORTED)
@@ -718,7 +718,7 @@ class MessageProcessorTests(TestCase):
         valid, invalid = self.processor._validate_report_details()
         expect_valid = [{self.uuid: {'bios_uuid': 'value'}}]
         expect_invalid = [{self.uuid2: {'invalid': 'value'},
-                           'cause': msg_processor.FAILED_VALIDATION}]
+                           'cause': report_processor.FAILED_VALIDATION}]
         self.assertEqual(valid, expect_valid)
         self.assertEqual(invalid, expect_invalid)
 
@@ -859,7 +859,7 @@ class MessageProcessorTests(TestCase):
                           {self.uuid6: {'etc_machine_id': 'value'}},
                           {self.uuid7: {'subscription_manager_id': 'value'}}]
         expected_invalid = [{uuid8: {'not_valid': 'value'},
-                             'cause': msg_processor.FAILED_VALIDATION}]
+                             'cause': report_processor.FAILED_VALIDATION}]
         self.processor.report_json = {
             'report_id': 1,
             'report_type': 'insights',
@@ -910,7 +910,7 @@ class MessageProcessorTests(TestCase):
         test_dict['file.json'] = report_json
         test_dict['file_2.json'] = report_json
         buffer_content = create_tar_buffer(test_dict)
-        with self.assertRaises(msg_processor.FailExtractException):
+        with self.assertRaises(report_processor.FailExtractException):
             self.processor._extract_report_from_tar_gz(buffer_content)
 
     def test_extract_report_from_tar_gz_failure_no_json(self):
@@ -919,7 +919,7 @@ class MessageProcessorTests(TestCase):
         test_dict = dict()
         test_dict['file.txt'] = report_json
         buffer_content = create_tar_buffer(test_dict)
-        with self.assertRaises(msg_processor.FailExtractException):
+        with self.assertRaises(report_processor.FailExtractException):
             self.processor._extract_report_from_tar_gz(buffer_content)
 
     def test_extract_report_from_tar_gz_failure_invalid_json(self):
@@ -928,20 +928,20 @@ class MessageProcessorTests(TestCase):
         test_dict = dict()
         test_dict['file.json'] = report_json
         buffer_content = create_tar_buffer(test_dict)
-        with self.assertRaises(msg_processor.FailExtractException):
+        with self.assertRaises(report_processor.FailExtractException):
             self.processor._extract_report_from_tar_gz(buffer_content)
 
     def test_download_response_content_bad_url(self):
         """Test to verify download exceptions are handled."""
         with requests_mock.mock() as m:
             m.get(self.payload_url, exc=HTTPError)
-            with self.assertRaises(msg_processor.RetryDownloadException):
+            with self.assertRaises(report_processor.RetryDownloadException):
                 self.processor.upload_message = {'url': self.payload_url}
                 self.processor._download_report()
 
     def test_download_response_content_missing_url(self):
         """Test case where url is missing."""
-        with self.assertRaises(msg_processor.FailDownloadException):
+        with self.assertRaises(report_processor.FailDownloadException):
             self.processor.upload_message = {}
             self.processor._download_report()
 
@@ -991,7 +991,7 @@ class MessageProcessorTests(TestCase):
         with requests_mock.mock() as m:
             m.get(self.payload_url, content=buffer_content)
             with patch('requests.get', side_effect=HTTPError):
-                with self.assertRaises(msg_processor.RetryDownloadException):
+                with self.assertRaises(report_processor.RetryDownloadException):
                     content = self.processor._download_report()
                     self.assertEqual(content, buffer_content)
 
@@ -1002,7 +1002,7 @@ class MessageProcessorTests(TestCase):
         test_dict['file.json'] = report_json
         with requests_mock.mock() as m:
             m.get(self.payload_url, status_code=404)
-            with self.assertRaises(msg_processor.RetryDownloadException):
+            with self.assertRaises(report_processor.RetryDownloadException):
                 self.processor.upload_message = {'url': self.payload_url}
                 self.processor._download_report()
 
@@ -1019,7 +1019,7 @@ class MessageProcessorTests(TestCase):
             tar_file.addfile(tarinfo=info, fileobj=file_buffer)
         tar_buffer.seek(0)
         buffer_content = tar_buffer.getvalue()
-        with self.assertRaises(msg_processor.FailExtractException):
+        with self.assertRaises(report_processor.FailExtractException):
             self.processor._extract_report_from_tar_gz(buffer_content)
 
     def test_no_json_files_extract_report_from_tar_gz(self):
@@ -1035,7 +1035,7 @@ class MessageProcessorTests(TestCase):
             tar_file.addfile(tarinfo=info, fileobj=file_buffer)
         tar_buffer.seek(0)
         buffer_content = tar_buffer.getvalue()
-        with self.assertRaises(msg_processor.FailExtractException):
+        with self.assertRaises(report_processor.FailExtractException):
             self.processor._extract_report_from_tar_gz(buffer_content)
 
     def test_extract_report_from_tar_gz_general_except(self):
@@ -1046,7 +1046,7 @@ class MessageProcessorTests(TestCase):
 
         with patch('processor.report_processor.tarfile.open',
                    side_effect=extract_side_effect):
-            with self.assertRaises(msg_processor.RetryExtractException):
+            with self.assertRaises(report_processor.RetryExtractException):
                 self.processor._extract_report_from_tar_gz(None)
 
     def test_no_account_number_inventory_upload(self):
@@ -1071,7 +1071,7 @@ class MessageProcessorTests(TestCase):
                  self.uuid6: {'etc_machine_id': 'value'},
                  self.uuid7: {'subscription_manager_id': 'value'}}
         with requests_mock.mock() as m:
-            m.post(msg_processor.INSIGHTS_HOST_INVENTORY_URL, status_code=200)
+            m.post(report_processor.INSIGHTS_HOST_INVENTORY_URL, status_code=200)
             retry_time_hosts, retry_commit_hosts = \
                 self.processor._upload_to_host_inventory(hosts)
             self.assertEqual(retry_time_hosts, [])
@@ -1082,13 +1082,13 @@ class MessageProcessorTests(TestCase):
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
         expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
-                           'cause': msg_processor.FAILED_UPLOAD,
+                           'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 500},
                           {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
-                           'cause': msg_processor.FAILED_UPLOAD,
+                           'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 500}]
         with requests_mock.mock() as m:
-            m.post(msg_processor.INSIGHTS_HOST_INVENTORY_URL, status_code=500)
+            m.post(report_processor.INSIGHTS_HOST_INVENTORY_URL, status_code=500)
             retry_time, retry_commit = self.processor._upload_to_host_inventory(hosts)
             self.assertEqual(retry_commit, [])
             for host in expected_hosts:
@@ -1104,13 +1104,13 @@ class MessageProcessorTests(TestCase):
                  self.uuid6: {'etc_machine_id': 'value'},
                  self.uuid7: {'subscription_manager_id': 'value'}}
         expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
-                           'cause': msg_processor.FAILED_UPLOAD,
+                           'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 400},
                           {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
-                           'cause': msg_processor.FAILED_UPLOAD,
+                           'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 400}]
         with requests_mock.mock() as m:
-            m.post(msg_processor.INSIGHTS_HOST_INVENTORY_URL, status_code=400)
+            m.post(report_processor.INSIGHTS_HOST_INVENTORY_URL, status_code=400)
             retry_time_hosts, retry_commit_hosts = \
                 self.processor._upload_to_host_inventory(hosts)
             self.assertEqual(retry_time_hosts, [])

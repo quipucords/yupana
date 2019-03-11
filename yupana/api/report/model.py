@@ -22,7 +22,7 @@ class AbstractReport(models.Model):
     upload_ack_status = models.TextField(null=True)
     upload_srv_kafka_msg = models.TextField(null=True)
     report_json = models.TextField(null=True)
-    commit_info = models.TextField(null=True)
+    git_commit = models.TextField(null=True)
 
     NEW = 'new'
     STARTED = 'started'
@@ -52,9 +52,9 @@ class AbstractReport(models.Model):
     )
 
     TIME = 'time'
-    COMMIT = 'commit'
+    GIT_COMMIT = 'git commit'
     RETRY_CHOICES = (('TIME', TIME),
-                     ('COMMIT', COMMIT))
+                     ('GIT_COMMIT', GIT_COMMIT))
 
     retry_type = models.CharField(
         max_length=10,
@@ -75,7 +75,7 @@ class AbstractReport(models.Model):
             'upload_ack_status: {}, ' \
             'upload_srv_kafka_msg:{}, ' \
             'report_json:{}, '\
-            'commit_info:{}, '\
+            'git_commit:{}, '\
             'state:{}, '\
             'state_info:{}, '\
             'retry_count:{}, '\
@@ -87,7 +87,7 @@ class AbstractReport(models.Model):
                                          self.upload_ack_status,
                                          self.upload_srv_kafka_msg,
                                          self.report_json,
-                                         self.commit_info,
+                                         self.git_commit,
                                          self.state,
                                          self.state_info,
                                          self.retry_count,

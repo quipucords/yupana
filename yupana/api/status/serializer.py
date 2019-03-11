@@ -26,7 +26,7 @@ class StatusSerializer(serializers.Serializer):
     """Serializer for the Status model."""
 
     api_version = serializers.IntegerField()
-    commit = serializers.CharField()
+    git_commit = serializers.CharField()
     modules = serializers.DictField()
     platform_info = serializers.DictField()
     python_version = serializers.CharField()

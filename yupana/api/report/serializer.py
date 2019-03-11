@@ -29,7 +29,7 @@ class ReportSerializer(ModelSerializer):
     upload_ack_status = CharField(required=False)
     upload_srv_kafka_msg = JSONField(read_only=True)
     report_json = JSONField(null=True)
-    commit_info = CharField(required=False)
+    git_commit = CharField(required=False)
     state = ChoiceField(read_only=True, choices=AbstractReport.STATE_CHOICES)
     retry_type = ChoiceField(read_only=True, choices=AbstractReport.RETRY_CHOICES)
     state_info = JSONField(null=True)

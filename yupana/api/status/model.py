@@ -32,20 +32,20 @@ class Status:
     """A server's status."""
 
     @property
-    def commit(self):  # pylint: disable=R0201
+    def git_commit(self):  # pylint: disable=R0201
         """Collect the build number for the server.
 
         :returns: A build number
         """
-        commit_info = os.environ.get('OPENSHIFT_BUILD_COMMIT', None)
-        if commit_info is None:
-            commit_info = subprocess.run(['git',
-                                          'describe',
-                                          '--always'],
-                                         stdout=subprocess.PIPE)
-            if commit_info.stdout:
-                commit_info = commit_info.stdout.decode('utf-8').strip()
-        return commit_info
+        git_commit = os.environ.get('OPENSHIFT_BUILD_COMMIT', None)
+        if git_commit is None:
+            git_commit = subprocess.run(['git',
+                                         'describe',
+                                         '--always'],
+                                        stdout=subprocess.PIPE)
+            if git_commit.stdout:
+                git_commit = git_commit.stdout.decode('utf-8').strip()
+        return git_commit
 
     @property
     def platform_info(self):  # pylint: disable=R0201
@@ -98,7 +98,7 @@ class Status:
 
         logger.info('Python: %s', self.python_version)
 
-        logger.info('Commit: %s', self.commit)
+        logger.info('Commit: %s', self.git_commit)
         logger.info('API Version: %s', self.api_version)
 
         prefix = '-' * 18

@@ -52,7 +52,7 @@ CANONICAL_FACTS = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addre
 FAILED_VALIDATION = 'VALIDATION'
 FAILED_UPLOAD = 'UPLOAD'
 EMPTY_QUEUE_SLEEP = 60
-RETRY = Enum('RETRY', 'clear increment archive')
+RETRY = Enum('RETRY', 'clear increment keep_same')
 
 
 class FailDownloadException(Exception):
@@ -79,11 +79,11 @@ class RetryExtractException(Exception):
     pass
 
 
-class MessageProcessor():
-    """Class for processing saved upload service messages."""
+class ReportProcessor():
+    """Class for processing saved reports that have been uploaded."""
 
     def __init__(self):
-        """Create a message processor."""
+        """Create a report processor."""
         self.report = None
         self.state = None
         self.next_state = None
@@ -101,7 +101,7 @@ class MessageProcessor():
         """Run the report processor in a loop.
 
         Later, if we find that we want to stop loopng, we can
-        manipulate the self variable should_run.
+        manipulate the class variable should_run.
         """
         while self.should_run:
             if not self.report:
@@ -118,7 +118,7 @@ class MessageProcessor():
 
     @transaction.atomic
     def assign_report(self):
-        """Assign the message processor reports that are saved in the db.
+        """Assign the report processor reports that are saved in the db.
 
         First priority is the oldest reports that are in the new state.
         If no reports meet this condition, we look for the oldest report in any state.
@@ -134,12 +134,16 @@ class MessageProcessor():
                 oldest_report = Report.objects.earliest('last_update_time')
                 current_time = datetime.utcnow()
                 status_info = Status()
-                same_commit = oldest_report.commit_info == status_info.commit
+                same_commit = oldest_report.git_commit == status_info.git_commit
                 minutes_passed = int(
                     (current_time - oldest_report.last_update_time).total_seconds() / 60)
+                # if the oldest report is a retry based on time and the retry time has
+                # passed, then we want to assign the current report
                 if oldest_report.retry_type == Report.TIME and minutes_passed >= RETRY_TIME:
                     assign = True
-                elif oldest_report.retry_type == Report.COMMIT and not same_commit:
+                # or if the oldest report is a retry based on code change and the code
+                # has changed, then we want to assign the current report
+                elif oldest_report.retry_type == Report.GIT_COMMIT and not same_commit:
                     assign = True
                 if assign:
                     self.report = oldest_report
@@ -147,12 +151,14 @@ class MessageProcessor():
                     LOG.info(format_message(
                         self.prefix, report_found_message % self.report.state,
                         account_number=self.account_number, report_id=self.report_id))
-                    self.update_report_state(retry=RETRY.archive)
+                    self.update_report_state(retry=RETRY.keep_same)
                 else:
+                    # else we want to raise an exception to look for reports in the
+                    # new state
                     raise QPCReportException()
             except (Report.DoesNotExist, QPCReportException):
                 try:
-                    # otherwise, look for the oldest report in the new state
+                    # look for the oldest report in the new state
                     self.report = Report.objects.filter(
                         state=Report.NEW).earliest('last_update_time')
                     LOG.info(format_message(self.prefix, report_found_message % self.report.state,
@@ -261,7 +267,8 @@ class MessageProcessor():
             self.update_report_state(status=self.status)
         except Exception as error:
             LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error)))
-            self.determine_retry(Report.FAILED_VALIDATION, Report.DOWNLOADED, retry_type=Report.COMMIT)
+            self.determine_retry(Report.FAILED_VALIDATION, Report.DOWNLOADED,
+                                 retry_type=Report.GIT_COMMIT)
 
     async def transition_to_validation_reported(self):
         """Upload the validation status & move to validation reported state."""
@@ -306,9 +313,13 @@ class MessageProcessor():
                     self.update_report_state(candidate_hosts=[])
                 else:
                     candidates = []
+                    # if both retry_commit_candidates and retry_time_candidates are returned
+                    # (ie. we got both 400 & 500 status codes were returned), we give the
+                    # retry_time precedence because we want to retry those with the hope that
+                    # they will succeed and leave behind the retry_commit hosts
                     if retry_commit_candidates:
                         candidates += retry_commit_candidates
-                        retry_type = Report.COMMIT
+                        retry_type = Report.GIT_COMMIT
                     if retry_time_candidates:
                         candidates += retry_time_candidates
                         retry_type = Report.TIME
@@ -329,7 +340,7 @@ class MessageProcessor():
             LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error),
                                      account_number=self.account_number, report_id=self.report_id))
             self.determine_retry(Report.FAILED_HOSTS_UPLOAD, Report.VALIDATION_REPORTED,
-                                 retry_type=Report.COMMIT)
+                                 retry_type=Report.GIT_COMMIT)
 
     @transaction.atomic
     def archive_report(self):
@@ -367,23 +378,25 @@ class MessageProcessor():
                             report_json=None, report_id=None, candidate_hosts=None,
                             failed_hosts=None, status=None):
         """
-        Update the message processor state and save.
+        Update the report processor state and save.
 
         :param retry: <enum> Retry.clear=clear count, RETRY.increment=increase count
-        :param retry_type: <str> either time=retry after time, commit=retry after new commit
+        :param retry_type: <str> either time=retry after time,
+            git_commit=retry after new commit
         :param report_json: <dict> dictionary containing the report json
         :param report_id: <str> string containing report_platform_id
         :param candidate_hosts: <dict> dictionary containing hosts that were
             successfully verified and uploaded
         :param failed_hosts: <dict> dictionary containing hosts that failed
             verification or upload
+        :param status: <str> either success or failure based on the report
         """
         try:
             status_info = Status()
             self.state = self.next_state
             self.report.last_update_time = datetime.utcnow()
             self.report.state = self.next_state
-            self.report.commit_info = status_info.commit
+            self.report.git_commit = status_info.git_commit
             if retry == RETRY.clear:
                 # reset the count to 0 (default behavior)
                 self.report.retry_count = 0
@@ -391,7 +404,7 @@ class MessageProcessor():
             elif retry == RETRY.increment:
                 self.report.retry_count += 1
                 self.report.retry_type = retry_type
-            # the other choice for retry is RETRY.archive in which case we don't
+            # the other choice for retry is RETRY.keep_same in which case we don't
             # want to do anything to the retry count bc we want to preserve as is
             if report_json:
                 self.report.report_json = json.dumps(report_json)
@@ -415,8 +428,6 @@ class MessageProcessor():
             state_info.append(self.next_state)
             self.report.state_info = json.dumps(state_info)
             self.report.save()
-            # LOG.info(format_message(self.prefix, 'Report successfully updated.',
-            #                         account_number=self.account_number, report_id=self.report_id))
         except Exception as error:
             LOG.error(format_message(
                 self.prefix,
@@ -448,7 +459,7 @@ class MessageProcessor():
                                      failed_hosts=failed)
         else:
             self.next_state = current_state
-            if retry_type == Report.COMMIT:
+            if retry_type == Report.GIT_COMMIT:
                 log_message = \
                     'Saving the report to retry when a new commit'\
                     'is pushed. Retries: %s' % str(self.report.retry_count + 1)
@@ -842,11 +853,16 @@ class MessageProcessor():
                             'display_name': body.get('display_name'),
                             'system_platform_id': host_id,
                             'host': host})
+                    # if the response code is a 500, then something on
+                    # host inventory side blew up and we want to retry
+                    # after a certain amount of time
                     if str(response.status_code).startswith('5'):
                         retry_time_hosts.append({host_id: host,
                                                  'cause': cause,
                                                  'status_code': response.status_code})
                     else:
+                        # else, if we recieved a 400 status code, the problem is
+                        # likely on our side so we should retry after a code change
                         retry_commit_hosts.append({host_id: host,
                                                    'cause': cause,
                                                    'status_code': response.status_code})
@@ -890,25 +906,29 @@ class MessageProcessor():
         return retry_time_hosts, retry_commit_hosts
 
 
-def asyncio_message_processor_thread(loop):  # pragma: no cover
+def asyncio_report_processor_thread(loop):  # pragma: no cover
     """
     Worker thread function to run the asyncio event loop.
 
-    :param None
+    Creates a report processor and calls the run method.
+
+    :param loop: event loop
     :returns None
     """
-    processor = MessageProcessor()
+    processor = ReportProcessor()
     loop.run_until_complete(processor.run())
 
 
-def initialize_message_processor():  # pragma: no cover
+def initialize_report_processor():  # pragma: no cover
     """
     Create asyncio tasks and daemon thread to run event loop.
+
+    Calls the report processor thread.
 
     :param None
     :returns None
     """
-    event_loop_thread = threading.Thread(target=asyncio_message_processor_thread,
+    event_loop_thread = threading.Thread(target=asyncio_report_processor_thread,
                                          args=(PROCESSING_LOOP,))
     event_loop_thread.daemon = True
     event_loop_thread.start()
