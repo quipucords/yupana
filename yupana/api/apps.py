@@ -80,7 +80,7 @@ class ApiConfig(AppConfig):
         initialize_kafka_handler()
 
     def start_report_processor(self):
-        """Start the message processor."""
+        """Start the report processor."""
         from processor.report_processor import initialize_report_processor
         logger.info('Initializing the report processor.')
         initialize_report_processor()
