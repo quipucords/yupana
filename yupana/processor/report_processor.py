@@ -462,7 +462,7 @@ class ReportProcessor():
             self.next_state = current_state
             if retry_type == Report.GIT_COMMIT:
                 log_message = \
-                    'Saving the report to retry when a new commit'\
+                    'Saving the report to retry when a new commit '\
                     'is pushed. Retries: %s' % str(self.report.retry_count + 1)
             else:
                 log_message = \
@@ -819,9 +819,10 @@ class ReportProcessor():
         x_rh_identity_value = base64.b64encode(bytes_string).decode()
         identity_header = {'x-rh-identity': x_rh_identity_value,
                            'Content-Type': 'application/json'}
+        list_of_hosts_to_upload = []
         failed_hosts = []
         retry_time_hosts = []  # storing hosts to retry after time
-        retry_commit_hosts = []  # storing hsots to retry after commit change
+        retry_commit_hosts = []  # storing hosts to retry after commit change
         for host_id, host in hosts.items():
             body = {
                 'account': self.account_number,
@@ -836,48 +837,56 @@ class ReportProcessor():
                 'facts': [{'namespace': 'qpc',
                            'facts': host}]
             }
-            try:
-                response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
-                                         data=json.dumps(body),
-                                         headers=identity_header)
+            list_of_hosts_to_upload.append(body)
+        try:
+            response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
+                                     data=json.dumps(list_of_hosts_to_upload),
+                                     headers=identity_header)
 
-                if response.status_code not in [HTTPStatus.OK, HTTPStatus.CREATED]:
-                    try:
-                        json_body = response.json()
-                    except ValueError:
-                        json_body = 'No JSON response'
+            if response.status_code in [HTTPStatus.MULTI_STATUS]:
+                try:
+                    json_body = response.json()
+                except ValueError:
+                    json_body = {}
+                print('This is the json body: ')
+                print(json_body)
+                errors = json_body.get('errors')
+                if errors != 0:
+                    for host_data in json_body.get('data', {}):
+                        host_id = 'unknown'
+                        host_status = host_data.get('status')
+                        host = host_data.get('host')
+                        if host_status not in [HTTPStatus.OK, HTTPStatus.CREATED]:
+                            failed_hosts.append({
+                                'status_code': host_status,
+                                # 'error': json_body,
+                                'display_name': body.get('display_name'),
+                                # 'system_platform_id': host_id,
+                                'host': host})
 
-                    failed_hosts.append(
-                        {
-                            'status_code': response.status_code,
-                            'error': json_body,
-                            'display_name': body.get('display_name'),
-                            'system_platform_id': host_id,
-                            'host': host})
-                    # if the response code is a 500, then something on
-                    # host inventory side blew up and we want to retry
-                    # after a certain amount of time
-                    if str(response.status_code).startswith('5'):
-                        retry_time_hosts.append({host_id: host,
-                                                 'cause': cause,
-                                                 'status_code': response.status_code})
-                    else:
-                        # else, if we recieved a 400 status code, the problem is
-                        # likely on our side so we should retry after a code change
-                        retry_commit_hosts.append({host_id: host,
-                                                   'cause': cause,
-                                                   'status_code': response.status_code})
+                            # if the response code is a 500, then something on
+                            # host inventory side blew up and we want to retry
+                            # after a certain amount of time
+                            if str(host_status).startswith('5'):
+                                host_facts = host.get('facts')
+                                for namespace_facts in host_facts:
+                                    if namespace_facts.get('namespace') == 'qpc':
+                                        host_id = namespace_facts.get('system_platform_id')
+                                        original_host = hosts.get(host_id)
+                                retry_time_hosts.append({host_id: original_host,
+                                                         'cause': cause,
+                                                         'status_code': host_status})
+                            else:
+                                # else, if we recieved a 400 status code, the problem is
+                                # likely on our side so we should retry after a code change
+                                retry_commit_hosts.append({host_id: original_host,
+                                                           'cause': cause,
+                                                           'status_code': host_status})
+                else:
+                    LOG.error('Unknown response code %s' % str(response.status_code))
 
-            except requests.exceptions.RequestException as err:
-                failed_hosts.append(
-                    {
-                        'status_code': 'None',
-                        'error': str(err),
-                        'display_name': body.get('display_name'),
-                        'system_platform_id': host_id,
-                        'host': host})
-                retry_time_hosts.append({host_id: host,
-                                         'cause': cause})
+        except requests.exceptions.RequestException as err:
+            LOG.error('An error occurred: %s' % str(err))
 
         successful = len(hosts) - len(failed_hosts)
         upload_msg = format_message(
