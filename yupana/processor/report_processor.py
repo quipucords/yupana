@@ -864,15 +864,17 @@ class ReportProcessor():
                                 # 'system_platform_id': host_id,
                                 'host': host})
 
+                            host_facts = host.get('facts')
+                            for namespace_facts in host_facts:
+                                if namespace_facts.get('namespace') == 'qpc':
+                                    actual_facts = namespace_facts.get('facts')
+                                    host_id = actual_facts.get('system_platform_id')
+                                    original_host = hosts.get(host_id)
+
                             # if the response code is a 500, then something on
                             # host inventory side blew up and we want to retry
                             # after a certain amount of time
                             if str(host_status).startswith('5'):
-                                host_facts = host.get('facts')
-                                for namespace_facts in host_facts:
-                                    if namespace_facts.get('namespace') == 'qpc':
-                                        host_id = namespace_facts.get('system_platform_id')
-                                        original_host = hosts.get(host_id)
                                 retry_time_hosts.append({host_id: original_host,
                                                          'cause': cause,
                                                          'status_code': host_status})
