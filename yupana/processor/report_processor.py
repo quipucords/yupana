@@ -884,8 +884,8 @@ class ReportProcessor():
                                 retry_commit_hosts.append({host_id: original_host,
                                                            'cause': cause,
                                                            'status_code': host_status})
-                else:
-                    LOG.error('Unknown response code %s' % str(response.status_code))
+            else:
+                LOG.error('Unknown response code %s' % str(response.status_code))
 
         except requests.exceptions.RequestException as err:
             LOG.error('An error occurred: %s' % str(err))
