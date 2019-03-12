@@ -24,10 +24,6 @@ from django.urls import reverse
 class StatusViewTest(TestCase):
     """Tests the status view."""
 
-    def setUp(self):  # pylint: disable=useless-super-delegation
-        """Create test case setup."""
-        super().setUp()
-
     def test_status_endpoint(self):
         """Test the status endpoint."""
         url = reverse('server-status')

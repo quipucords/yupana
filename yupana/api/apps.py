@@ -27,18 +27,6 @@ from config.settings.env import ENVIRONMENT
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
-def start_kafka_consumer():
-    """Start the kafka consumer."""
-    from processor.kafka_msg_handler import initialize_kafka_handler
-    logger.info('Initializing the kafka messaging handler.')
-    initialize_kafka_handler()
-
-def start_report_processor():
-    """Start the report processor."""
-    from processor.report_processor import initialize_report_processor
-    logger.info('Initializing the report processor.')
-    initialize_report_processor()
-
 
 class ApiConfig(AppConfig):
     """API application configuration."""
@@ -53,8 +41,8 @@ class ApiConfig(AppConfig):
         try:
             self.startup_status()
             self.check_and_create_service_admin()
-            start_kafka_consumer()
-            start_report_processor()
+            self.start_kafka_consumer()
+            self.start_report_processor()
         except (OperationalError, ProgrammingError) as op_error:
             if 'no such table' in str(op_error) or \
                     'does not exist' in str(op_error):
@@ -69,6 +57,20 @@ class ApiConfig(AppConfig):
         status_info = Status()
 
         status_info.startup()
+
+    @staticmethod
+    def start_kafka_consumer():
+        """Start the kafka consumer."""
+        from processor.kafka_msg_handler import initialize_kafka_handler
+        logger.info('Initializing the kafka messaging handler.')
+        initialize_kafka_handler()
+
+    @staticmethod
+    def start_report_processor():
+        """Start the report processor."""
+        from processor.report_processor import initialize_report_processor
+        logger.info('Initializing the report processor.')
+        initialize_report_processor()
 
     def create_service_admin(self, service_email):  # pylint: disable=R0201
         """Create the Service Admin."""
