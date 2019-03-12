@@ -850,8 +850,6 @@ class ReportProcessor():
                     json_body = response.json()
                 except ValueError:
                     json_body = {}
-                print('This is the json body: ')
-                print(json_body)
                 errors = json_body.get('errors')
                 if errors != 0:
                     for host_data in json_body.get('data', {}):
