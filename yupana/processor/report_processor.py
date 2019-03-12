@@ -54,6 +54,8 @@ FAILED_VALIDATION = 'VALIDATION'
 FAILED_UPLOAD = 'UPLOAD'
 EMPTY_QUEUE_SLEEP = 60
 RETRY = Enum('RETRY', 'clear increment keep_same')
+RETRIES_ALLOWED = int(RETRIES_ALLOWED)
+RETRY_TIME = int(RETRY_TIME)
 
 
 class FailDownloadException(Exception):
