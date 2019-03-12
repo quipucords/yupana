@@ -24,7 +24,7 @@ from django.urls import reverse
 class StatusViewTest(TestCase):
     """Tests the status view."""
 
-    def setUp(self):
+    def setUp(self):  # pylint: disable=useless-super-delegation
         """Create test case setup."""
         super().setUp()
 

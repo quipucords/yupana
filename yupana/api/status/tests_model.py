@@ -41,7 +41,7 @@ class StatusModelTest(TestCase):
         # restore filters on logging
         logging.disable(logging.CRITICAL)
 
-    def setUp(self):
+    def setUp(self):  # pylint: disable=useless-super-delegation
         """Create test case setup."""
         super().setUp()
 

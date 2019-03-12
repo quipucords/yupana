@@ -54,6 +54,8 @@ FAILED_VALIDATION = 'VALIDATION'
 FAILED_UPLOAD = 'UPLOAD'
 EMPTY_QUEUE_SLEEP = 60
 RETRY = Enum('RETRY', 'clear increment keep_same')
+RETRIES_ALLOWED = int(RETRIES_ALLOWED)
+RETRY_TIME = int(RETRY_TIME)
 
 
 class FailDownloadException(Exception):
@@ -80,7 +82,8 @@ class RetryExtractException(Exception):
     pass
 
 
-class ReportProcessor():
+# pylint: disable=broad-except
+class ReportProcessor():  # pylint: disable=too-many-instance-attributes
     """Class for processing saved reports that have been uploaded."""
 
     def __init__(self):
@@ -277,7 +280,7 @@ class ReportProcessor():
         LOG.info(format_message(
             self.prefix,
             'Uploading validation status "%s". State is "%s".' %
-                (self.status, self.state),
+            (self.status, self.state),
             account_number=self.account_number, report_id=self.report_id))
         message_hash = self.upload_message['hash']
         try:
@@ -375,8 +378,10 @@ class ReportProcessor():
                                 account_number=self.account_number, report_id=self.report_id))
         self.reset_variables()
 
-    def update_report_state(self, retry=RETRY.clear, retry_type=Report.TIME,  # noqa: C901 (too-complex)
-                            report_json=None, report_id=None, candidate_hosts=None,
+    # pylint: disable=too-many-arguments
+    def update_report_state(self, retry=RETRY.clear,   # noqa: C901 (too-complex)
+                            retry_type=Report.TIME, report_json=None,
+                            report_id=None, candidate_hosts=None,
                             failed_hosts=None, status=None):
         """
         Update the report processor state and save.
@@ -435,7 +440,8 @@ class ReportProcessor():
                 'Could not update report record due to the following error %s.' % str(error),
                 account_number=self.account_number, report_id=self.report_id))
 
-    def determine_retry(self, fail_state, current_state, candidate_hosts=None, retry_type=Report.TIME):
+    def determine_retry(self, fail_state, current_state,
+                        candidate_hosts=None, retry_type=Report.TIME):
         """Determine if yupana should archive a report based on retry count.
 
         :param fail_state: <str> the final state if we have reached max retries
@@ -646,7 +652,7 @@ class ReportProcessor():
                                'Unexpected error reading tar.gz: %s' % str(err),
                                account_number=self.account_number))
 
-    def _validate_report_details(self):
+    def _validate_report_details(self):  # pylint: disable=too-many-locals
         """
         Verify that the report contents are a valid Insights report.
 
@@ -725,8 +731,7 @@ class ReportProcessor():
                     'report does not contain any valid hosts.',
                     account_number=self.account_number,
                     report_id=report_id))
-        else:
-            return candidate_hosts, failed_hosts
+        return candidate_hosts, failed_hosts
 
     def _validate_report_hosts(self):
         """Verify that report hosts contain canonical facts.
@@ -805,7 +810,7 @@ class ReportProcessor():
         finally:
             await producer.stop()
 
-    def _upload_to_host_inventory(self, hosts):  # noqa: C901 (too-complex)
+    def _upload_to_host_inventory(self, hosts):  # noqa: C901 (too-complex) pylint: disable=too-many-locals
         """
         Verify that the report contents are a valid Insights report.
 

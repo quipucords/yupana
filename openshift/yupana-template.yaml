@@ -617,9 +617,9 @@ parameters:
   displayName: Retry time
   name: RETRY_TIME
   required: true
-  value: 480
+  value: "480"
 - description: Number of retries allowed
   displayName: Retries allowed
   name: RETRIES_ALLOWED
   required: true
-  value: 5
+  value: "5"

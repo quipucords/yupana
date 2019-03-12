@@ -16,6 +16,7 @@
 #
 
 """Settings file meant for local development."""
+# pylint: disable=wildcard-import, unused-wildcard-import
 from .base import *  # noqa: F401,F403
 from .env import ENVIRONMENT
 

@@ -27,6 +27,18 @@ from config.settings.env import ENVIRONMENT
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
+def start_kafka_consumer():
+    """Start the kafka consumer."""
+    from processor.kafka_msg_handler import initialize_kafka_handler
+    logger.info('Initializing the kafka messaging handler.')
+    initialize_kafka_handler()
+
+def start_report_processor():
+    """Start the report processor."""
+    from processor.report_processor import initialize_report_processor
+    logger.info('Initializing the report processor.')
+    initialize_report_processor()
+
 
 class ApiConfig(AppConfig):
     """API application configuration."""
@@ -41,15 +53,14 @@ class ApiConfig(AppConfig):
         try:
             self.startup_status()
             self.check_and_create_service_admin()
-            self.start_kafka_consumer()
-            self.start_report_processor()
+            start_kafka_consumer()
+            start_report_processor()
         except (OperationalError, ProgrammingError) as op_error:
             if 'no such table' in str(op_error) or \
                     'does not exist' in str(op_error):
                 # skip this if we haven't created tables yet.
                 return
-            else:
-                logger.error('Error: %s.', op_error)
+            logger.error('Error: %s.', op_error)
 
     def startup_status(self):  # pylint: disable=R0201
         """Log the status of the server at startup."""
@@ -72,18 +83,6 @@ class ApiConfig(AppConfig):
                                       service_email,
                                       service_pass)
         logger.info('Created Service Admin: %s.', service_email)
-
-    def start_kafka_consumer(self):
-        """Start the kafka consumer."""
-        from processor.kafka_msg_handler import initialize_kafka_handler
-        logger.info('Initializing the kafka messaging handler.')
-        initialize_kafka_handler()
-
-    def start_report_processor(self):
-        """Start the report processor."""
-        from processor.report_processor import initialize_report_processor
-        logger.info('Initializing the report processor.')
-        initialize_report_processor()
 
     def check_and_create_service_admin(self):  # pylint: disable=R0201
         """Check for the service admin and create it if necessary."""
