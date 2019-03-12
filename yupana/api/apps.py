@@ -58,20 +58,6 @@ class ApiConfig(AppConfig):
 
         status_info.startup()
 
-    @staticmethod
-    def start_kafka_consumer():
-        """Start the kafka consumer."""
-        from processor.kafka_msg_handler import initialize_kafka_handler
-        logger.info('Initializing the kafka messaging handler.')
-        initialize_kafka_handler()
-
-    @staticmethod
-    def start_report_processor():
-        """Start the report processor."""
-        from processor.report_processor import initialize_report_processor
-        logger.info('Initializing the report processor.')
-        initialize_report_processor()
-
     def create_service_admin(self, service_email):  # pylint: disable=R0201
         """Create the Service Admin."""
         # noqa: E402 pylint: disable=C0413
@@ -85,6 +71,20 @@ class ApiConfig(AppConfig):
                                       service_email,
                                       service_pass)
         logger.info('Created Service Admin: %s.', service_email)
+
+    @staticmethod
+    def start_kafka_consumer():
+        """Start the kafka consumer."""
+        from processor.kafka_msg_handler import initialize_kafka_handler
+        logger.info('Initializing the kafka messaging handler.')
+        initialize_kafka_handler()
+
+    @staticmethod
+    def start_report_processor():
+        """Start the report processor."""
+        from processor.report_processor import initialize_report_processor
+        logger.info('Initializing the report processor.')
+        initialize_report_processor()
 
     def check_and_create_service_admin(self):  # pylint: disable=R0201
         """Check for the service admin and create it if necessary."""
