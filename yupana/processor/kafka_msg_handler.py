@@ -130,7 +130,7 @@ async def save_message_and_ack(consumer, consumer_record):
                 LOG.info(format_message(
                     prefix, 'Upload service message saved. Ready for processing.'))
                 await consumer.commit()
-            except Exception as error:
+            except Exception as error:  # pylint: disable=broad-except
                 LOG.error(format_message(
                     prefix,
                     'The following error occurred while trying to save and '

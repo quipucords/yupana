@@ -25,19 +25,20 @@ import uuid
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
-import processor.kafka_msg_handler as msg_handler
-import processor.report_processor as report_processor
 import pytz
 import requests
 import requests_mock
 from asynctest import CoroutineMock
 from django.test import TestCase
-from processor.tests_kafka_msg_handler import KafkaMsg, create_tar_buffer
-from requests.exceptions import HTTPError
+from processor import (kafka_msg_handler as msg_handler,
+                       report_processor,
+                       tests_kafka_msg_handler as test_handler)
 
 from api.models import Report, ReportArchive
 
 
+# pylint: disable=too-many-public-methods
+# pylint: disable=protected-access,too-many-lines,too-many-instance-attributes
 class ReportProcessorTests(TestCase):
     """Test Cases for the Message processor."""
 
@@ -51,7 +52,7 @@ class ReportProcessorTests(TestCase):
         self.uuid5 = str(uuid.uuid4())
         self.uuid6 = str(uuid.uuid4())
         self.uuid7 = str(uuid.uuid4())
-        self.fake_record = KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
+        self.fake_record = test_handler.KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
         self.msg = msg_handler.unpack_consumer_record(self.fake_record)
         self.report_json = {
             'report_id': 1,
@@ -434,9 +435,9 @@ class ReportProcessorTests(TestCase):
         self.processor.upload_message = {'url': self.payload_url, 'rh_account': '00001'}
         test_dict = dict()
         test_dict['file.json'] = report_json
-        buffer_content = create_tar_buffer(test_dict)
-        with requests_mock.mock() as m:
-            m.get(self.payload_url, content=buffer_content)
+        buffer_content = test_handler.create_tar_buffer(test_dict)
+        with requests_mock.mock() as mock_req:
+            mock_req.get(self.payload_url, content=buffer_content)
             self.processor.transition_to_downloaded()
             self.assertEqual(self.report_record.state, Report.DOWNLOADED)
 
@@ -446,8 +447,8 @@ class ReportProcessorTests(TestCase):
         self.report_record.state = Report.STARTED
         self.report_record.save()
         self.processor.report = self.report_record
-        with requests_mock.mock() as m:
-            m.get(self.payload_url, exc=HTTPError)
+        with requests_mock.mock() as mock_req:
+            mock_req.get(self.payload_url, exc=requests.exceptions.HTTPError)
             self.processor.transition_to_downloaded()
             self.assertEqual(self.report_record.state, Report.STARTED)
             self.assertEqual(self.report_record.retry_count, 1)
@@ -917,7 +918,7 @@ class ReportProcessorTests(TestCase):
             'hosts': {self.uuid: {'key': 'value'}}}
         test_dict = dict()
         test_dict['file.json'] = report_json
-        buffer_content = create_tar_buffer(test_dict)
+        buffer_content = test_handler.create_tar_buffer(test_dict)
         result = self.processor._extract_report_from_tar_gz(buffer_content)
         self.assertEqual(result, report_json)
 
@@ -933,7 +934,7 @@ class ReportProcessorTests(TestCase):
         test_dict = dict()
         test_dict['file.json'] = report_json
         test_dict['file_2.json'] = report_json
-        buffer_content = create_tar_buffer(test_dict)
+        buffer_content = test_handler.create_tar_buffer(test_dict)
         with self.assertRaises(report_processor.FailExtractException):
             self.processor._extract_report_from_tar_gz(buffer_content)
 
@@ -942,7 +943,7 @@ class ReportProcessorTests(TestCase):
         report_json = 'No valid report'
         test_dict = dict()
         test_dict['file.txt'] = report_json
-        buffer_content = create_tar_buffer(test_dict)
+        buffer_content = test_handler.create_tar_buffer(test_dict)
         with self.assertRaises(report_processor.FailExtractException):
             self.processor._extract_report_from_tar_gz(buffer_content)
 
@@ -951,14 +952,14 @@ class ReportProcessorTests(TestCase):
         report_json = None
         test_dict = dict()
         test_dict['file.json'] = report_json
-        buffer_content = create_tar_buffer(test_dict)
+        buffer_content = test_handler.create_tar_buffer(test_dict)
         with self.assertRaises(report_processor.FailExtractException):
             self.processor._extract_report_from_tar_gz(buffer_content)
 
     def test_download_response_content_bad_url(self):
         """Test to verify download exceptions are handled."""
-        with requests_mock.mock() as m:
-            m.get(self.payload_url, exc=HTTPError)
+        with requests_mock.mock() as mock_req:
+            mock_req.get(self.payload_url, exc=requests.exceptions.HTTPError)
             with self.assertRaises(report_processor.RetryDownloadException):
                 self.processor.upload_message = {'url': self.payload_url}
                 self.processor._download_report()
@@ -981,9 +982,9 @@ class ReportProcessorTests(TestCase):
         self.processor.upload_message = {'url': self.payload_url, 'rh_account': '00001'}
         test_dict = dict()
         test_dict['file.json'] = report_json
-        buffer_content = create_tar_buffer(test_dict)
-        with requests_mock.mock() as m:
-            m.get(self.payload_url, content=buffer_content)
+        buffer_content = test_handler.create_tar_buffer(test_dict)
+        with requests_mock.mock() as mock_req:
+            mock_req.get(self.payload_url, content=buffer_content)
             content = self.processor._download_report()
             self.assertEqual(buffer_content, content)
 
@@ -1011,10 +1012,10 @@ class ReportProcessorTests(TestCase):
         self.processor.upload_message = {'url': self.payload_url, 'rh_account': '00001'}
         test_dict = dict()
         test_dict['file.json'] = report_json
-        buffer_content = create_tar_buffer(test_dict)
-        with requests_mock.mock() as m:
-            m.get(self.payload_url, content=buffer_content)
-            with patch('requests.get', side_effect=HTTPError):
+        buffer_content = test_handler.create_tar_buffer(test_dict)
+        with requests_mock.mock() as mock_req:
+            mock_req.get(self.payload_url, content=buffer_content)
+            with patch('requests.get', side_effect=requests.exceptions.HTTPError):
                 with self.assertRaises(report_processor.RetryDownloadException):
                     content = self.processor._download_report()
                     self.assertEqual(content, buffer_content)
@@ -1024,8 +1025,8 @@ class ReportProcessorTests(TestCase):
         report_json = {}
         test_dict = dict()
         test_dict['file.json'] = report_json
-        with requests_mock.mock() as m:
-            m.get(self.payload_url, status_code=404)
+        with requests_mock.mock() as mock_req:
+            mock_req.get(self.payload_url, status_code=404)
             with self.assertRaises(report_processor.RetryDownloadException):
                 self.processor.upload_message = {'url': self.payload_url}
                 self.processor._download_report()
@@ -1094,8 +1095,8 @@ class ReportProcessorTests(TestCase):
                  self.uuid5: {'vm_uuid': 'value', 'name': 'foo'},
                  self.uuid6: {'etc_machine_id': 'value'},
                  self.uuid7: {'subscription_manager_id': 'value'}}
-        with requests_mock.mock() as m:
-            m.post(report_processor.INSIGHTS_HOST_INVENTORY_URL, status_code=200)
+        with requests_mock.mock() as mock_req:
+            mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL, status_code=200)
             retry_time_hosts, retry_commit_hosts = \
                 self.processor._upload_to_host_inventory(hosts)
             self.assertEqual(retry_time_hosts, [])
@@ -1121,9 +1122,9 @@ class ReportProcessorTests(TestCase):
                 {'status': 500,
                  'host': {'facts': [{'namespace': 'qpc', 'facts':
                                      {'system_platform_id': self.uuid2}}]}}]}
-        with requests_mock.mock() as m:
-            m.post(report_processor.INSIGHTS_HOST_INVENTORY_URL,
-                   status_code=207, json=bulk_response)
+        with requests_mock.mock() as mock_req:
+            mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL,
+                          status_code=207, json=bulk_response)
             retry_time, retry_commit = self.processor._upload_to_host_inventory(hosts)
             self.assertEqual(retry_commit, [])
             for host in expected_hosts:
@@ -1154,9 +1155,9 @@ class ReportProcessorTests(TestCase):
                 {'status': 400,
                  'host': {'facts': [{'namespace': 'qpc', 'facts':
                                      {'system_platform_id': self.uuid2}}]}}]}
-        with requests_mock.mock() as m:
-            m.post(report_processor.INSIGHTS_HOST_INVENTORY_URL,
-                   status_code=207, json=bulk_response)
+        with requests_mock.mock() as mock_req:
+            mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL,
+                          status_code=207, json=bulk_response)
             retry_time_hosts, retry_commit_hosts = \
                 self.processor._upload_to_host_inventory(hosts)
             self.assertEqual(retry_time_hosts, [])

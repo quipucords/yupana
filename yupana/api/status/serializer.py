@@ -22,7 +22,7 @@ from rest_framework import serializers
 from .model import Status
 
 
-class StatusSerializer(serializers.Serializer):
+class StatusSerializer(serializers.Serializer):  # pylint:disable=abstract-method
     """Serializer for the Status model."""
 
     api_version = serializers.IntegerField()

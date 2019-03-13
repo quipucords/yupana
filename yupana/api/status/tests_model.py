@@ -41,10 +41,6 @@ class StatusModelTest(TestCase):
         # restore filters on logging
         logging.disable(logging.CRITICAL)
 
-    def setUp(self):
-        """Create test case setup."""
-        super().setUp()
-
     @patch('os.environ')
     def test_commit_with_env(self, mock_os):
         """Test the commit method via environment."""
