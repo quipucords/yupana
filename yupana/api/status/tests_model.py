@@ -41,16 +41,12 @@ class StatusModelTest(TestCase):
         # restore filters on logging
         logging.disable(logging.CRITICAL)
 
-    def setUp(self):
-        """Create test case setup."""
-        super().setUp()
-
     @patch('os.environ')
     def test_commit_with_env(self, mock_os):
         """Test the commit method via environment."""
         expected = 'buildnum'
         mock_os.get.return_value = expected
-        result = self.status_info.commit
+        result = self.status_info.git_commit
         self.assertEqual(result, expected)
 
     @patch('os.environ')
@@ -77,7 +73,7 @@ class StatusModelTest(TestCase):
         run.stdout = b'buildnum'
         mock_subprocess.return_value = run
         mock_os.get.return_value = None
-        result = self.status_info.commit
+        result = self.status_info.git_commit
         self.assertEqual(result, expected)
 
     @patch('platform.uname')

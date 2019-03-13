@@ -1,5 +1,5 @@
 #
-# Copyright 2018 Red Hat, Inc.
+# Copyright 2018-2019 Red Hat, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -19,4 +19,4 @@
 # flake8: noqa
 # pylint: disable=unused-import
 from api.status.model import Status
-from api.report.model import Report
+from api.report.model import AbstractReport, Report, ReportArchive

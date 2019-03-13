@@ -44,9 +44,15 @@ SECRET_KEY = ENVIRONMENT.get_value('DJANGO_SECRET_KEY',
                                    default='base')
 DEBUG = ENVIRONMENT.bool('DJANGO_DEBUG', default=False)
 ALLOWED_HOSTS = ENVIRONMENT.get_value('DJANGO_ALLOWED_HOSTS', default=['*'])
-INSIGHTS_HOST_INVENTORY_URL = ENVIRONMENT.get_value('INSIGHTS_HOST_INVENTORY_URL',
-                                                     default='http://127.0.0.1:8000/r/insights/platform/inventory/api/v1/hosts')
+INSIGHTS_HOST_INVENTORY_URL = ENVIRONMENT.get_value(
+    'INSIGHTS_HOST_INVENTORY_URL',
+    default='http://127.0.0.1:8000/r/insights/platform/inventory/api/v1/hosts')
 
+# this is the time in minutes that we want to wait to retry a report
+# default is 8 hours
+RETRY_TIME = ENVIRONMENT.get_value('RETRY_TIME', default=480)
+# this is the number of retries that we want to allow before failing a report
+RETRIES_ALLOWED = ENVIRONMENT.get_value('RETRIES_ALLOWED', default=5)
 # Logging
 # https://docs.djangoproject.com/en/dev/topics/logging/
 # https://docs.python.org/3.6/library/logging.html
@@ -134,33 +140,33 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
-engines = {
+ENGINES = {
     'sqlite': 'django.db.backends.sqlite3',
     'postgresql': 'django.db.backends.postgresql',
     'mysql': 'django.db.backends.mysql',
 }
 
-service_name = ENVIRONMENT.get_value('DATABASE_SERVICE_NAME',
-                                         default='').upper().replace('-', '_')
-if service_name:
-    engine = engines.get(ENVIRONMENT.get_value('DATABASE_ENGINE'),
-                         engines['postgresql'])
+SERVICE_NAME = ENVIRONMENT.get_value('DATABASE_SERVICE_NAME',
+                                     default='').upper().replace('-', '_')
+if SERVICE_NAME:
+    ENGINE = ENGINES.get(ENVIRONMENT.get_value('DATABASE_ENGINE'),
+                         ENGINES['postgresql'])
 else:
-    engine = engines['sqlite']
+    ENGINE = ENGINES['sqlite']
 
-name = ENVIRONMENT.get_value('DATABASE_NAME', default=None)
+NAME = ENVIRONMENT.get_value('DATABASE_NAME', default=None)
 
-if not name and engine == engines['sqlite']:
-    name = os.path.join(APPS_DIR, 'db.sqlite3')
+if not NAME and ENGINE == ENGINES['sqlite']:
+    NAME = os.path.join(APPS_DIR, 'db.sqlite3')
 
 DATABASES = {
-    'ENGINE': engine,
-    'NAME': name,
+    'ENGINE': ENGINE,
+    'NAME': NAME,
     'USER': ENVIRONMENT.get_value('DATABASE_USER', default=None),
     'PASSWORD': ENVIRONMENT.get_value('DATABASE_PASSWORD', default=None),
-    'HOST': ENVIRONMENT.get_value('{}_SERVICE_HOST'.format(service_name),
+    'HOST': ENVIRONMENT.get_value('{}_SERVICE_HOST'.format(SERVICE_NAME),
                                   default=None),
-    'PORT': ENVIRONMENT.get_value('{}_SERVICE_PORT'.format(service_name),
+    'PORT': ENVIRONMENT.get_value('{}_SERVICE_PORT'.format(SERVICE_NAME),
                                   default=None),
 }
 
@@ -217,6 +223,7 @@ REST_FRAMEWORK = {
 }
 
 # Override the initial ingest requirement to allow INITIAL_INGEST_NUM_MONTHS
+# pylint: disable=simplifiable-if-expression
 INGEST_OVERRIDE = False if os.getenv('INITIAL_INGEST_OVERRIDE', 'False') == 'False' else True
 
 # Insights Kafka messaging address

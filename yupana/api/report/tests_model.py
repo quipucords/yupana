@@ -38,10 +38,11 @@ class ReportModelTest(TestCase):
         self.date = datetime.now()
         self.report = Report(report_platform_id=self.uuid,
                              upload_srv_kafka_msg=self.upload_srv_msg,
+                             rh_account='13423',
                              report_json=self.report_json,
                              state=Report.NEW,
                              state_info=[Report.NEW],
-                             retry_count=None,
+                             retry_count=0,
                              last_update_time=self.date,
                              failed_hosts=[],
                              candidate_hosts=[])
@@ -55,5 +56,6 @@ class ReportModelTest(TestCase):
         self.assertEqual(self.report.state, Report.NEW)
         self.assertEqual(self.report.state_info, [Report.NEW])
         self.assertEqual(self.report.last_update_time, self.date)
-        expected = "{report_platform_id:%s, upload_srv_kafka_msg:{'accountid': '13423', 'msg_url': 'foo'}, report_json:{'report_platform_id': '%s', 'report_type': 'insights', 'hosts': {}}, state:new, state_info:['new'], retry_count:None, last_update_time:%s, failed_hosts:[], candidate_hosts:[] }" % (self.uuid, self.uuid, self.date)  # noqa
+        # pylint: disable=line-too-long
+        expected = "{report_platform_id:%s, rh_account: 13423, upload_ack_status: None, upload_srv_kafka_msg:{'accountid': '13423', 'msg_url': 'foo'}, report_json:{'report_platform_id': '%s', 'report_type': 'insights', 'hosts': {}}, git_commit:None, state:new, state_info:['new'], retry_count:0, retry_type:time, last_update_time:%s, failed_hosts:[], candidate_hosts:[] }" % (self.uuid, self.uuid, self.date)  # noqa
         self.assertEqual(str(self.report), expected)
