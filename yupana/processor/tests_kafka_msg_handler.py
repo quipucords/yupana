@@ -53,7 +53,7 @@ def create_tar_buffer(files_data):
     return tar_buffer.getvalue()
 
 
-class KafkaMsg:
+class KafkaMsg:  # pylint:disable=too-few-public-methods
     """Create a kafka msg."""
 
     def __init__(self, topic, url):
@@ -78,13 +78,13 @@ class KafkaMsgHandlerTest(TestCase):
     def test_format_message_no_account_report(self):
         """Test format message without account or report id."""
         msg = msg_handler.format_message('p', 'm')
-        self.assertEquals(msg, 'Report p - m')
+        self.assertEqual(msg, 'Report p - m')
 
     def test_unpack_consumer_record(self):
         """Test format message without account or report id."""
         fake_record = KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
         msg = msg_handler.unpack_consumer_record(fake_record)
-        self.assertEquals(msg, {'url': 'http://internet.com', 'rh_account': '1234'})
+        self.assertEqual(msg, {'url': 'http://internet.com', 'rh_account': '1234'})
 
     def test_unpack_consumer_record_not_json(self):
         """Test format message without account or report id."""

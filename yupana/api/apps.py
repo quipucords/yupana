@@ -48,8 +48,7 @@ class ApiConfig(AppConfig):
                     'does not exist' in str(op_error):
                 # skip this if we haven't created tables yet.
                 return
-            else:
-                logger.error('Error: %s.', op_error)
+            logger.error('Error: %s.', op_error)
 
     def startup_status(self):  # pylint: disable=R0201
         """Log the status of the server at startup."""
@@ -73,13 +72,15 @@ class ApiConfig(AppConfig):
                                       service_pass)
         logger.info('Created Service Admin: %s.', service_email)
 
-    def start_kafka_consumer(self):
+    @staticmethod
+    def start_kafka_consumer():
         """Start the kafka consumer."""
         from processor.kafka_msg_handler import initialize_kafka_handler
         logger.info('Initializing the kafka messaging handler.')
         initialize_kafka_handler()
 
-    def start_report_processor(self):
+    @staticmethod
+    def start_report_processor():
         """Start the report processor."""
         from processor.report_processor import initialize_report_processor
         logger.info('Initializing the report processor.')
