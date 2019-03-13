@@ -1095,8 +1095,13 @@ class ReportProcessorTests(TestCase):
                  self.uuid5: {'vm_uuid': 'value', 'name': 'foo'},
                  self.uuid6: {'etc_machine_id': 'value'},
                  self.uuid7: {'subscription_manager_id': 'value'}}
+        bulk_response = {
+            'errors': 0,
+            'total': 7,
+            'data': []}
         with requests_mock.mock() as mock_req:
-            mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL, status_code=200)
+            mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL,
+                          status_code=207, json=bulk_response)
             retry_time_hosts, retry_commit_hosts = \
                 self.processor._upload_to_host_inventory(hosts)
             self.assertEqual(retry_time_hosts, [])

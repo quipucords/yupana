@@ -810,6 +810,30 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         finally:
             await producer.stop()
 
+    def generate_bulk_upload_list(self, hosts):
+        """Generate a list of hosts to upload.
+
+        :param hosts: <dict> dictionary containing hosts to upload.
+        """
+        bulk_upload_list = []
+        for _, host in hosts.items():
+            body = {
+                'account': self.account_number,
+                'bios_uuid': host.get('bios_uuid'),
+                'display_name': host.get('name'),
+                'ip_addresses': host.get('ip_addresses'),
+                'mac_addresses': host.get('mac_addresses'),
+                'insights_id': host.get('insights_client_id'),
+                'rhel_machine_id': host.get('etc_machine_id'),
+                'subscription_manage_id': host.get('subscription_manager_id'),
+                'fqdn': host.get('name'),
+                'facts': [{'namespace': 'qpc',
+                           'facts': host}]
+            }
+            bulk_upload_list.append(body)
+        return bulk_upload_list
+
+# pylint: disable=too-many-branches
     def _upload_to_host_inventory(self, hosts):  # noqa: C901 (too-complex) pylint: disable=too-many-locals
         """
         Verify that the report contents are a valid Insights report.
@@ -824,28 +848,13 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         x_rh_identity_value = base64.b64encode(bytes_string).decode()
         identity_header = {'x-rh-identity': x_rh_identity_value,
                            'Content-Type': 'application/json'}
-        list_of_hosts_to_upload = []
-        failed_hosts = []
+        bulk_upload_list = self.generate_bulk_upload_list(hosts)
+        failed_hosts = []  # this is purely for counts and logging
         retry_time_hosts = []  # storing hosts to retry after time
         retry_commit_hosts = []  # storing hosts to retry after commit change
-        for host_id, host in hosts.items():
-            body = {
-                'account': self.account_number,
-                'bios_uuid': host.get('bios_uuid'),
-                'display_name': host.get('name'),
-                'ip_addresses': host.get('ip_addresses'),
-                'mac_addresses': host.get('mac_addresses'),
-                'insights_id': host.get('insights_client_id'),
-                'rhel_machine_id': host.get('etc_machine_id'),
-                'subscription_manage_id': host.get('subscription_manager_id'),
-                'fqdn': host.get('name'),
-                'facts': [{'namespace': 'qpc',
-                           'facts': host}]
-            }
-            list_of_hosts_to_upload.append(body)
-        try:
+        try:  # pylint: disable=too-many-nested-blocks
             response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
-                                     data=json.dumps(list_of_hosts_to_upload),
+                                     data=json.dumps(bulk_upload_list),
                                      headers=identity_header)
 
             if response.status_code in [HTTPStatus.MULTI_STATUS]:
@@ -855,24 +864,21 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                     json_body = {}
                 errors = json_body.get('errors')
                 if errors != 0:
-                    for host_data in json_body.get('data', {}):
-                        host_id = 'unknown'
+                    for host_data in json_body.get('data', []):
                         host_status = host_data.get('status')
-                        host = host_data.get('host')
                         if host_status not in [HTTPStatus.OK, HTTPStatus.CREATED]:
-                            failed_hosts.append({
-                                'status_code': host_status,
-                                # 'error': json_body,
-                                'display_name': body.get('display_name'),
-                                # 'system_platform_id': host_id,
-                                'host': host})
-
+                            host = host_data.get('host')
                             host_facts = host.get('facts')
                             for namespace_facts in host_facts:
                                 if namespace_facts.get('namespace') == 'qpc':
-                                    actual_facts = namespace_facts.get('facts')
-                                    host_id = actual_facts.get('system_platform_id')
+                                    qpc_facts = namespace_facts.get('facts')
+                                    host_id = qpc_facts.get('system_platform_id')
                                     original_host = hosts.get(host_id)
+                            failed_hosts.append({
+                                'status_code': host_status,
+                                'display_name': host.get('name'),
+                                'system_platform_id': host_id,
+                                'host': host})
 
                             # if the response code is a 500, then something on
                             # host inventory side blew up and we want to retry
@@ -888,10 +894,24 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                                                            'cause': cause,
                                                            'status_code': host_status})
             else:
-                LOG.error('Unknown response code %s' % str(response.status_code))
+                # something went wrong so we should log it and then generate a retry list
+                # of all of the hosts
+                LOG.error(format_message(self.prefix,
+                                         'Unexpected response code %s' % str(response.status_code),
+                                         account_number=self.account_number,
+                                         report_id=self.report_id))
+                for host_id, host_data in hosts.items():
+                    retry_time_hosts.append({host_id: host_data,
+                                             'cause': cause,
+                                             'status_code': response.status_code})
 
         except requests.exceptions.RequestException as err:
-            LOG.error('An error occurred: %s' % str(err))
+            LOG.error(format_message(self.prefix, 'An error occurred: %s' % str(err),
+                                     account_number=self.account_number,
+                                     report_id=self.report_id))
+            for host_id, host_data in hosts.items():
+                retry_time_hosts.append({host_id: host_data,
+                                         'cause': cause})
 
         successful = len(hosts) - len(failed_hosts)
         upload_msg = format_message(
@@ -908,11 +928,10 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             for failed_info in failed_hosts:
                 LOG.error(format_message(
                     self.prefix,
-                    'Host inventory returned %s for %s.  Error: %s.  '
+                    'Host inventory returned %s for %s. '
                     'system_platform_id: %s. host: %s' % (
                         failed_info.get('status_code'),
                         failed_info.get('display_name'),
-                        failed_info.get('error'),
                         failed_info.get('system_platform_id'),
                         failed_info.get('host')),
                     account_number=self.account_number,
