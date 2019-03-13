@@ -1107,6 +1107,24 @@ class ReportProcessorTests(TestCase):
             self.assertEqual(retry_time_hosts, [])
             self.assertEqual(retry_commit_hosts, [])
 
+    def test_no_json_resp_host_inventory_upload(self):
+        """Testing unsuccessful upload to host inventory."""
+        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
+
+        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+                           'cause': report_processor.FAILED_UPLOAD},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                           'cause': report_processor.FAILED_UPLOAD}]
+        with requests_mock.mock() as mock_req:
+            mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL,
+                          status_code=207, json=None)
+            retry_time_hosts, retry_commit_hosts = \
+                self.processor._upload_to_host_inventory(hosts)
+            for host in expected_hosts:
+                self.assertIn(host, retry_time_hosts)
+            self.assertEqual(retry_commit_hosts, [])
+
     def test_host_inventory_upload_500(self):
         """Testing successful upload to host inventory with 500 errors."""
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},

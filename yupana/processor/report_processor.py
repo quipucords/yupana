@@ -82,6 +82,12 @@ class RetryExtractException(Exception):
     pass
 
 
+class RetryUploadException(Exception):
+    """Use to report upload errors that should be retried."""
+
+    pass
+
+
 # pylint: disable=broad-except
 class ReportProcessor():  # pylint: disable=too-many-instance-attributes
     """Class for processing saved reports that have been uploaded."""
@@ -833,7 +839,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             bulk_upload_list.append(body)
         return bulk_upload_list
 
-# pylint: disable=too-many-branches
+# pylint: disable=too-many-branches, too-many-statements
     def _upload_to_host_inventory(self, hosts):  # noqa: C901 (too-complex) pylint: disable=too-many-locals
         """
         Verify that the report contents are a valid Insights report.
@@ -861,7 +867,10 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                 try:
                     json_body = response.json()
                 except ValueError:
-                    json_body = {}
+                    # something went wrong
+                    raise RetryUploadException(format_message(
+                        self.prefix, 'Missing json response',
+                        account_number=self.account_number, report_id=self.report_id))
                 errors = json_body.get('errors')
                 if errors != 0:
                     for host_data in json_body.get('data', []):
@@ -896,14 +905,22 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             else:
                 # something went wrong so we should log it and then generate a retry list
                 # of all of the hosts
-                LOG.error(format_message(self.prefix,
-                                         'Unexpected response code %s' % str(response.status_code),
-                                         account_number=self.account_number,
-                                         report_id=self.report_id))
-                for host_id, host_data in hosts.items():
-                    retry_time_hosts.append({host_id: host_data,
-                                             'cause': cause,
-                                             'status_code': response.status_code})
+                raise RetryUploadException(format_message(
+                    self.prefix,
+                    'Unexpected response code %s' % str(response.status_code),
+                    account_number=self.account_number,
+                    report_id=self.report_id))
+
+        except RetryUploadException:
+            for host_id, host_data in hosts.items():
+                retry_time_hosts.append({host_id: host_data,
+                                         'cause': cause})
+
+                failed_hosts.append({
+                    'status_code': 'unknown',
+                    'display_name': host_data.get('name'),
+                    'system_platform_id': host_id,
+                    'host': host_data})
 
         except requests.exceptions.RequestException as err:
             LOG.error(format_message(self.prefix, 'An error occurred: %s' % str(err),
@@ -912,6 +929,11 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             for host_id, host_data in hosts.items():
                 retry_time_hosts.append({host_id: host_data,
                                          'cause': cause})
+                failed_hosts.append({
+                    'status_code': 'unknown',
+                    'display_name': host_data.get('name'),
+                    'system_platform_id': host_id,
+                    'host': host_data})
 
         successful = len(hosts) - len(failed_hosts)
         upload_msg = format_message(
