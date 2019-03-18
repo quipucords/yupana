@@ -1074,6 +1074,40 @@ class ReportProcessorTests(TestCase):
             with self.assertRaises(report_processor.RetryExtractException):
                 self.processor._extract_report_from_tar_gz(None)
 
+    def test_generate_bulk_upload_list(self):
+        """Test generating a list of all hosts for upload."""
+        self.processor.account_number = self.uuid
+        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
+        expected = [{'account': self.uuid, 'display_name': 'value',
+                     'fqdn': 'value', 'bios_uuid': 'value',
+                     'facts': [{
+                         'namespace': 'qpc',
+                         'facts': {'bios_uuid': 'value', 'name': 'value'}}]},
+                    {'account': self.uuid, 'insights_client_id': 'value',
+                     'display_name': 'foo',
+                     'fqdn': 'foo', 'facts': [{
+                         'namespace': 'qpc',
+                         'facts': {'insights_client_id': 'value', 'name': 'foo'}}]}]
+        list_of_hosts = self.processor.generate_bulk_upload_list(hosts)
+        self.assertEqual(list_of_hosts, expected)
+
+    def test_split_host_list(self):
+        """Test splitting the host list into."""
+        self.processor.account_number = self.uuid
+        all_hosts = [{'account': self.uuid, 'display_name': 'value',
+                      'fqdn': 'value', 'bios_uuid': 'value',
+                      'facts': [{
+                          'namespace': 'qpc',
+                          'facts': {'bios_uuid': 'value', 'name': 'value'}}]},
+                     {'account': self.uuid, 'insights_client_id': 'value',
+                      'display_name': 'foo',
+                      'fqdn': 'foo', 'facts': [{
+                          'namespace': 'qpc',
+                          'facts': {'insights_client_id': 'value', 'name': 'foo'}}]}]
+        split_hosts = self.processor.split_hosts(all_hosts)
+        self.assertEqual(split_hosts, [all_hosts])
+
     def test_no_account_number_inventory_upload(self):
         """Testing no account number present when uploading to inventory."""
         self.processor.account_number = None
@@ -1088,6 +1122,7 @@ class ReportProcessorTests(TestCase):
 
     def test_successful_host_inventory_upload(self):
         """Testing successful upload to host inventory."""
+        self.processor.account_number = self.uuid
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
                  self.uuid3: {'ip_addresses': 'value', 'name': 'foo'},
@@ -1109,6 +1144,7 @@ class ReportProcessorTests(TestCase):
 
     def test_no_json_resp_host_inventory_upload(self):
         """Testing unsuccessful upload to host inventory."""
+        self.processor.account_number = self.uuid
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
 
@@ -1127,12 +1163,17 @@ class ReportProcessorTests(TestCase):
 
     def test_host_inventory_upload_500(self):
         """Testing successful upload to host inventory with 500 errors."""
-        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
-                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
-        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+        self.processor.account_number = self.uuid
+        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value',
+                             'system_platform_id': self.uuid},
+                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
+                              'system_platform_id': self.uuid2}}
+        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
+                                       'system_platform_id': self.uuid},
                            'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 500},
-                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
+                                        'system_platform_id': self.uuid2},
                            'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 500}]
         bulk_response = {
@@ -1155,17 +1196,22 @@ class ReportProcessorTests(TestCase):
 
     def test_host_inventory_upload_400(self):
         """Testing successful upload to host inventory with 500 errors."""
-        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
-                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+        self.processor.account_number = self.uuid
+        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value',
+                             'system_platform_id': self.uuid},
+                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
+                              'system_platform_id': self.uuid2},
                  self.uuid3: {'ip_addresses': 'value', 'name': 'foo'},
                  self.uuid4: {'mac_addresses': 'value', 'name': 'foo'},
                  self.uuid5: {'vm_uuid': 'value', 'name': 'foo'},
                  self.uuid6: {'etc_machine_id': 'value'},
                  self.uuid7: {'subscription_manager_id': 'value'}}
-        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
+                                       'system_platform_id': self.uuid},
                            'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 400},
-                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
+                                        'system_platform_id': self.uuid2},
                            'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 400}]
         bulk_response = {

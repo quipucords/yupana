@@ -82,13 +82,19 @@ class RetryExtractException(Exception):
     pass
 
 
-class RetryUploadException(Exception):
-    """Use to report upload errors that should be retried."""
+class RetryUploadTimeException(Exception):
+    """Use to report upload errors that should be retried on time."""
 
     pass
 
 
-# pylint: disable=broad-except
+class RetryUploadCommitException(Exception):
+    """Use to report upload errors that should be retried on commit."""
+
+    pass
+
+
+# pylint: disable=broad-except, too-many-lines
 class ReportProcessor():  # pylint: disable=too-many-instance-attributes
     """Class for processing saved reports that have been uploaded."""
 
@@ -823,23 +829,38 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         """
         bulk_upload_list = []
         for _, host in hosts.items():
-            body = {
-                'account': self.account_number,
+            non_null_facts = {
                 'bios_uuid': host.get('bios_uuid'),
-                'display_name': host.get('name'),
                 'ip_addresses': host.get('ip_addresses'),
                 'mac_addresses': host.get('mac_addresses'),
-                'insights_id': host.get('insights_client_id'),
+                'insights_client_id': host.get('insights_client_id'),
                 'rhel_machine_id': host.get('etc_machine_id'),
-                'subscription_manage_id': host.get('subscription_manager_id'),
+                'subscription_manager_id': host.get('subscription_manager_id')
+            }
+            body = {
+                'account': self.account_number,
+                'display_name': host.get('name'),
                 'fqdn': host.get('name'),
                 'facts': [{'namespace': 'qpc',
                            'facts': host}]
             }
+            for fact_name, fact_value in non_null_facts.items():
+                if fact_value:
+                    body[fact_name] = fact_value
+
             bulk_upload_list.append(body)
         return bulk_upload_list
 
-# pylint: disable=too-many-branches, too-many-statements
+    @staticmethod
+    def split_hosts(list_of_all_hosts):
+        """Split up the hosts into lists of 1000 or less."""
+        hosts_per_request = 1000
+        hosts_lists_to_upload = \
+            [list_of_all_hosts[i:i + hosts_per_request]
+             for i in range(0, len(list_of_all_hosts), hosts_per_request)]
+        return hosts_lists_to_upload
+
+    # pylint: disable=too-many-branches, too-many-statements
     def _upload_to_host_inventory(self, hosts):  # noqa: C901 (too-complex) pylint: disable=too-many-locals
         """
         Verify that the report contents are a valid Insights report.
@@ -854,86 +875,99 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         x_rh_identity_value = base64.b64encode(bytes_string).decode()
         identity_header = {'x-rh-identity': x_rh_identity_value,
                            'Content-Type': 'application/json'}
-        bulk_upload_list = self.generate_bulk_upload_list(hosts)
+        list_of_all_hosts = self.generate_bulk_upload_list(hosts)
+        hosts_lists_to_upload = self.split_hosts(list_of_all_hosts)
         failed_hosts = []  # this is purely for counts and logging
         retry_time_hosts = []  # storing hosts to retry after time
         retry_commit_hosts = []  # storing hosts to retry after commit change
-        try:  # pylint: disable=too-many-nested-blocks
-            response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
-                                     data=json.dumps(bulk_upload_list),
-                                     headers=identity_header)
+        for hosts_list in hosts_lists_to_upload:  # pylint: disable=too-many-nested-blocks
+            try:  # pylint: disable=too-many-nested-blocks
+                response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
+                                         data=json.dumps(hosts_list),
+                                         headers=identity_header)
 
-            if response.status_code in [HTTPStatus.MULTI_STATUS]:
-                try:
-                    json_body = response.json()
-                except ValueError:
-                    # something went wrong
-                    raise RetryUploadException(format_message(
-                        self.prefix, 'Missing json response',
-                        account_number=self.account_number, report_id=self.report_id))
-                errors = json_body.get('errors')
-                if errors != 0:
-                    for host_data in json_body.get('data', []):
-                        host_status = host_data.get('status')
-                        if host_status not in [HTTPStatus.OK, HTTPStatus.CREATED]:
-                            host = host_data.get('host')
-                            host_facts = host.get('facts')
-                            for namespace_facts in host_facts:
-                                if namespace_facts.get('namespace') == 'qpc':
-                                    qpc_facts = namespace_facts.get('facts')
-                                    host_id = qpc_facts.get('system_platform_id')
-                                    original_host = hosts.get(host_id)
-                            failed_hosts.append({
-                                'status_code': host_status,
-                                'display_name': host.get('name'),
-                                'system_platform_id': host_id,
-                                'host': host})
+                if response.status_code in [HTTPStatus.MULTI_STATUS]:
+                    try:
+                        json_body = response.json()
+                    except ValueError:
+                        # something went wrong
+                        raise RetryUploadTimeException(format_message(
+                            self.prefix, 'Missing json response',
+                            account_number=self.account_number, report_id=self.report_id))
+                    errors = json_body.get('errors')
+                    if errors != 0:
+                        all_data = json_body.get('data', [])
+                        for host_data in all_data:
+                            host_status = host_data.get('status')
+                            if host_status not in [HTTPStatus.OK, HTTPStatus.CREATED]:
+                                host_index = all_data.index(host_data)
+                                upload_host = hosts_list[host_index]
+                                host_facts = upload_host.get('facts')
+                                for namespace_facts in host_facts:
+                                    if namespace_facts.get('namespace') == 'qpc':
+                                        qpc_facts = namespace_facts.get('facts')
+                                        host_id = qpc_facts.get('system_platform_id')
+                                        original_host = hosts.get(host_id, {})
+                                failed_hosts.append({
+                                    'status_code': host_status,
+                                    'display_name': original_host.get('name'),
+                                    'system_platform_id': host_id,
+                                    'host': original_host})
 
-                            # if the response code is a 500, then something on
-                            # host inventory side blew up and we want to retry
-                            # after a certain amount of time
-                            if str(host_status).startswith('5'):
-                                retry_time_hosts.append({host_id: original_host,
-                                                         'cause': cause,
-                                                         'status_code': host_status})
-                            else:
-                                # else, if we recieved a 400 status code, the problem is
-                                # likely on our side so we should retry after a code change
-                                retry_commit_hosts.append({host_id: original_host,
-                                                           'cause': cause,
-                                                           'status_code': host_status})
-            else:
-                # something went wrong so we should log it and then generate a retry list
-                # of all of the hosts
-                raise RetryUploadException(format_message(
-                    self.prefix,
-                    'Unexpected response code %s' % str(response.status_code),
-                    account_number=self.account_number,
-                    report_id=self.report_id))
+                                # if the response code is a 500, then something on
+                                # host inventory side blew up and we want to retry
+                                # after a certain amount of time
+                                if str(host_status).startswith('5'):
+                                    retry_time_hosts.append({host_id: original_host,
+                                                             'cause': cause,
+                                                             'status_code': host_status})
+                                else:
+                                    # else, if we recieved a 400 status code, the problem is
+                                    # likely on our side so we should retry after a code change
+                                    retry_commit_hosts.append({host_id: original_host,
+                                                               'cause': cause,
+                                                               'status_code': host_status})
 
-        except RetryUploadException:
-            for host_id, host_data in hosts.items():
-                retry_time_hosts.append({host_id: host_data,
-                                         'cause': cause})
+                else:
+                    # something went wrong so we should log it and then generate a retry list
+                    # of all of the hosts
+                    raise RetryUploadCommitException(format_message(
+                        self.prefix,
+                        'Unexpected response code %s' % str(response.status_code),
+                        account_number=self.account_number,
+                        report_id=self.report_id))
 
-                failed_hosts.append({
-                    'status_code': 'unknown',
-                    'display_name': host_data.get('name'),
-                    'system_platform_id': host_id,
-                    'host': host_data})
+            except RetryUploadCommitException:
+                for host_id, host_data in hosts.items():
+                    retry_commit_hosts.append({host_id: host_data,
+                                               'cause': cause})
+                    failed_hosts.append({
+                        'status_code': 'unknown',
+                        'display_name': host_data.get('name'),
+                        'system_platform_id': host_id,
+                        'host': host_data})
+            except RetryUploadTimeException:
+                for host_id, host_data in hosts.items():
+                    retry_time_hosts.append({host_id: host_data,
+                                             'cause': cause})
+                    failed_hosts.append({
+                        'status_code': 'unknown',
+                        'display_name': host_data.get('name'),
+                        'system_platform_id': host_id,
+                        'host': host_data})
 
-        except requests.exceptions.RequestException as err:
-            LOG.error(format_message(self.prefix, 'An error occurred: %s' % str(err),
-                                     account_number=self.account_number,
-                                     report_id=self.report_id))
-            for host_id, host_data in hosts.items():
-                retry_time_hosts.append({host_id: host_data,
-                                         'cause': cause})
-                failed_hosts.append({
-                    'status_code': 'unknown',
-                    'display_name': host_data.get('name'),
-                    'system_platform_id': host_id,
-                    'host': host_data})
+            except requests.exceptions.RequestException as err:
+                LOG.error(format_message(self.prefix, 'An error occurred: %s' % str(err),
+                                         account_number=self.account_number,
+                                         report_id=self.report_id))
+                for host_id, host_data in hosts.items():
+                    retry_time_hosts.append({host_id: host_data,
+                                             'cause': cause})
+                    failed_hosts.append({
+                        'status_code': 'unknown',
+                        'display_name': host_data.get('name'),
+                        'system_platform_id': host_id,
+                        'host': host_data})
 
         successful = len(hosts) - len(failed_hosts)
         upload_msg = format_message(
