@@ -19,7 +19,6 @@
 import asyncio
 import io
 import json
-import random
 import tarfile
 import uuid
 from datetime import datetime, timedelta
@@ -88,19 +87,6 @@ class ReportProcessorTests(TestCase):
                                 self.processor.failed_hosts]
         for attribute in processor_attributes:
             self.assertEqual(attribute, None)
-
-    def test_assign_cause_to_failed(self):
-        """Test that we sucessfully record the reason a host fails."""
-        failure_cause = random.choice([report_processor.FAILED_VALIDATION,
-                                       report_processor.FAILED_UPLOAD])
-        self.processor.failed_hosts = {self.uuid: {'mac_addresses': 'value'},
-                                       self.uuid2: {'bios_uuid': 'value'}}
-        expected = [{self.uuid: {'mac_addresses': 'value'},
-                     'cause': failure_cause},
-                    {self.uuid2: {'bios_uuid': 'value'},
-                     'cause': failure_cause}]
-        failed_hosts_list = self.processor.assign_cause_to_failed(failure_cause)
-        self.assertEqual(failed_hosts_list, expected)
 
     def test_archiving_report(self):
         """Test that archiving creates a ReportArchive, deletes report, and resets the processor."""

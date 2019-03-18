@@ -264,7 +264,6 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             account_number=self.account_number))
         try:
             self.candidate_hosts, self.failed_hosts = self._validate_report_details()
-            # failed_hosts_list = self.assign_cause_to_failed(FAILED_VALIDATION)
             self.report_id = self.report_json.get('report_platform_id')
             self.status = SUCCESS_CONFIRM_STATUS
             self.next_state = Report.VALIDATED
@@ -496,16 +495,6 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                                      retry_type=retry_type,
                                      candidate_hosts=candidate_hosts)
             self.reset_variables()
-
-    def assign_cause_to_failed(self, cause):
-        """Assign the reason for failure to the failed_hosts.
-
-        :param cause: <str> should be 'VALIDATION' or 'UPLOAD'
-        """
-        failed_hosts_list = []
-        for host_id, host in self.failed_hosts.items():
-            failed_hosts_list.append({host_id: host, 'cause': cause})
-        return failed_hosts_list
 
     def generate_upload_candidates(self):
         """Generate dictionary of hosts that need to be uploaded to host inventory.
@@ -750,7 +739,6 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
 
         :returns: tuple containing valid & invalid hosts
         """
-        cause = FAILED_VALIDATION
         hosts = self.report_json['hosts']
         report_id = self.report_json['report_platform_id']
 
@@ -769,7 +757,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             else:
                 host.pop('metadata', None)
                 failed_hosts.append({host_id: host,
-                                     'cause': cause})
+                                     'cause': FAILED_VALIDATION})
                 invalid_hosts[host_id] = host
         if invalid_hosts:
             LOG.warning(
@@ -868,7 +856,6 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         :param hosts: a list of dictionaries that have been validated.
         :returns None
         """
-        cause = FAILED_UPLOAD
         self.prefix = 'UPLOAD TO HOST INVENTORY'
         identity_string = '{"identity": {"account_number": "%s"}}' % str(self.account_number)
         bytes_string = identity_string.encode()
@@ -919,13 +906,13 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                                 # after a certain amount of time
                                 if str(host_status).startswith('5'):
                                     retry_time_hosts.append({host_id: original_host,
-                                                             'cause': cause,
+                                                             'cause': FAILED_UPLOAD,
                                                              'status_code': host_status})
                                 else:
                                     # else, if we recieved a 400 status code, the problem is
                                     # likely on our side so we should retry after a code change
                                     retry_commit_hosts.append({host_id: original_host,
-                                                               'cause': cause,
+                                                               'cause': FAILED_UPLOAD,
                                                                'status_code': host_status})
 
                 else:
@@ -940,7 +927,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             except RetryUploadCommitException:
                 for host_id, host_data in hosts.items():
                     retry_commit_hosts.append({host_id: host_data,
-                                               'cause': cause})
+                                               'cause': FAILED_UPLOAD})
                     failed_hosts.append({
                         'status_code': 'unknown',
                         'display_name': host_data.get('name'),
@@ -949,7 +936,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             except RetryUploadTimeException:
                 for host_id, host_data in hosts.items():
                     retry_time_hosts.append({host_id: host_data,
-                                             'cause': cause})
+                                             'cause': FAILED_UPLOAD})
                     failed_hosts.append({
                         'status_code': 'unknown',
                         'display_name': host_data.get('name'),
@@ -962,7 +949,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                                          report_id=self.report_id))
                 for host_id, host_data in hosts.items():
                     retry_time_hosts.append({host_id: host_data,
-                                             'cause': cause})
+                                             'cause': FAILED_UPLOAD})
                     failed_hosts.append({
                         'status_code': 'unknown',
                         'display_name': host_data.get('name'),
