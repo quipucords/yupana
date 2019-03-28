@@ -816,11 +816,11 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         :param hosts: <dict> dictionary containing hosts to upload.
         """
         bulk_upload_list = []
+        non_null_facts = \
+            ['bios_uuid', 'ip_addresses',
+             'mac_addresses', 'insights_client_id',
+             'rhel_machine_id', 'subscription_manager_id']
         for _, host in hosts.items():
-            non_null_facts = \
-                ['bios_uuid', 'ip_addresses',
-                 'mac_addresses', 'insights_client_id',
-                 'rhel_machine_id', 'subscription_manager_id']
             body = {
                 'account': self.account_number,
                 'display_name': host.get('name'),
