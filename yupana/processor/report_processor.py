@@ -817,14 +817,10 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         """
         bulk_upload_list = []
         for _, host in hosts.items():
-            non_null_facts = {
-                'bios_uuid': host.get('bios_uuid'),
-                'ip_addresses': host.get('ip_addresses'),
-                'mac_addresses': host.get('mac_addresses'),
-                'insights_client_id': host.get('insights_client_id'),
-                'rhel_machine_id': host.get('etc_machine_id'),
-                'subscription_manager_id': host.get('subscription_manager_id')
-            }
+            non_null_facts = \
+                ['bios_uuid', 'ip_addresses',
+                 'mac_addresses', 'insights_client_id',
+                 'rhel_machine_id', 'subscription_manager_id']
             body = {
                 'account': self.account_number,
                 'display_name': host.get('name'),
@@ -832,7 +828,8 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                 'facts': [{'namespace': 'qpc',
                            'facts': host}]
             }
-            for fact_name, fact_value in non_null_facts.items():
+            for fact_name in non_null_facts:
+                fact_value = host.get(fact_name)
                 if fact_value:
                     body[fact_name] = fact_value
 
@@ -915,9 +912,16 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                                                                'cause': FAILED_UPLOAD,
                                                                'status_code': host_status})
 
+                elif str(response.status_code).startswith('5'):
+                    # something went wrong on host inventory side and we should regenerate after
+                    # some time has passed
+                    raise RetryUploadTimeException(format_message(
+                        self.prefix,
+                        'Unexpected response code %s' % str(response.status_code),
+                        account_number=self.account_number, report_id=self.report_id))
                 else:
-                    # something went wrong so we should log it and then generate a retry list
-                    # of all of the hosts
+                    # something went wrong possibly on our side (if its a 400)
+                    # and we should regenerate the hosts dictionary and re-upload after a commit
                     raise RetryUploadCommitException(format_message(
                         self.prefix,
                         'Unexpected response code %s' % str(response.status_code),
