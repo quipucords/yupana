@@ -881,10 +881,10 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                     errors = json_body.get('errors')
                     if errors != 0:
                         all_data = json_body.get('data', [])
+                        host_index = 0
                         for host_data in all_data:
                             host_status = host_data.get('status')
                             if host_status not in [HTTPStatus.OK, HTTPStatus.CREATED]:
-                                host_index = all_data.index(host_data)
                                 upload_host = hosts_list[host_index]
                                 host_facts = upload_host.get('facts')
                                 for namespace_facts in host_facts:
@@ -911,6 +911,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                                     retry_commit_hosts.append({host_id: original_host,
                                                                'cause': FAILED_UPLOAD,
                                                                'status_code': host_status})
+                            host_index += 1
 
                 elif str(response.status_code).startswith('5'):
                     # something went wrong on host inventory side and we should regenerate after
