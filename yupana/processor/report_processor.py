@@ -865,8 +865,6 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         retry_time_hosts = []  # storing hosts to retry after time
         retry_commit_hosts = []  # storing hosts to retry after commit change
         for hosts_list in hosts_lists_to_upload:  # pylint: disable=too-many-nested-blocks
-            LOG.info(format_message(self.prefix, 'Hosts list to upload: %s' % str(hosts_list),
-                     account_number=self.account_number, report_id=self.report_id))
             try:  # pylint: disable=too-many-nested-blocks
                 response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
                                          data=json.dumps(hosts_list),
