@@ -830,7 +830,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             }
             for fact_name in non_null_facts:
                 fact_value = host.get(fact_name)
-                if fact_value not in [None, [], '']:
+                if fact_value:
                     body[fact_name] = fact_value
 
             bulk_upload_list.append(body)
