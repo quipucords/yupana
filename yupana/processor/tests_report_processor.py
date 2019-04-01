@@ -19,7 +19,6 @@
 import asyncio
 import io
 import json
-import random
 import tarfile
 import uuid
 from datetime import datetime, timedelta
@@ -88,19 +87,6 @@ class ReportProcessorTests(TestCase):
                                 self.processor.failed_hosts]
         for attribute in processor_attributes:
             self.assertEqual(attribute, None)
-
-    def test_assign_cause_to_failed(self):
-        """Test that we sucessfully record the reason a host fails."""
-        failure_cause = random.choice([report_processor.FAILED_VALIDATION,
-                                       report_processor.FAILED_UPLOAD])
-        self.processor.failed_hosts = {self.uuid: {'mac_addresses': 'value'},
-                                       self.uuid2: {'bios_uuid': 'value'}}
-        expected = [{self.uuid: {'mac_addresses': 'value'},
-                     'cause': failure_cause},
-                    {self.uuid2: {'bios_uuid': 'value'},
-                     'cause': failure_cause}]
-        failed_hosts_list = self.processor.assign_cause_to_failed(failure_cause)
-        self.assertEqual(failed_hosts_list, expected)
 
     def test_archiving_report(self):
         """Test that archiving creates a ReportArchive, deletes report, and resets the processor."""
@@ -1074,6 +1060,40 @@ class ReportProcessorTests(TestCase):
             with self.assertRaises(report_processor.RetryExtractException):
                 self.processor._extract_report_from_tar_gz(None)
 
+    def test_generate_bulk_upload_list(self):
+        """Test generating a list of all hosts for upload."""
+        self.processor.account_number = self.uuid
+        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
+        expected = [{'account': self.uuid, 'display_name': 'value',
+                     'fqdn': 'value', 'bios_uuid': 'value',
+                     'facts': [{
+                         'namespace': 'qpc',
+                         'facts': {'bios_uuid': 'value', 'name': 'value'}}]},
+                    {'account': self.uuid, 'insights_client_id': 'value',
+                     'display_name': 'foo',
+                     'fqdn': 'foo', 'facts': [{
+                         'namespace': 'qpc',
+                         'facts': {'insights_client_id': 'value', 'name': 'foo'}}]}]
+        list_of_hosts = self.processor.generate_bulk_upload_list(hosts)
+        self.assertEqual(list_of_hosts, expected)
+
+    def test_split_host_list(self):
+        """Test splitting the host list into."""
+        self.processor.account_number = self.uuid
+        all_hosts = [{'account': self.uuid, 'display_name': 'value',
+                      'fqdn': 'value', 'bios_uuid': 'value',
+                      'facts': [{
+                          'namespace': 'qpc',
+                          'facts': {'bios_uuid': 'value', 'name': 'value'}}]},
+                     {'account': self.uuid, 'insights_client_id': 'value',
+                      'display_name': 'foo',
+                      'fqdn': 'foo', 'facts': [{
+                          'namespace': 'qpc',
+                          'facts': {'insights_client_id': 'value', 'name': 'foo'}}]}]
+        split_hosts = self.processor.split_hosts(all_hosts)
+        self.assertEqual(split_hosts, [all_hosts])
+
     def test_no_account_number_inventory_upload(self):
         """Testing no account number present when uploading to inventory."""
         self.processor.account_number = None
@@ -1088,6 +1108,7 @@ class ReportProcessorTests(TestCase):
 
     def test_successful_host_inventory_upload(self):
         """Testing successful upload to host inventory."""
+        self.processor.account_number = self.uuid
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
                  self.uuid3: {'ip_addresses': 'value', 'name': 'foo'},
@@ -1095,25 +1116,103 @@ class ReportProcessorTests(TestCase):
                  self.uuid5: {'vm_uuid': 'value', 'name': 'foo'},
                  self.uuid6: {'etc_machine_id': 'value'},
                  self.uuid7: {'subscription_manager_id': 'value'}}
+        bulk_response = {
+            'errors': 0,
+            'total': 7,
+            'data': []}
         with requests_mock.mock() as mock_req:
-            mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL, status_code=200)
+            mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL,
+                          status_code=207, json=bulk_response)
             retry_time_hosts, retry_commit_hosts = \
                 self.processor._upload_to_host_inventory(hosts)
             self.assertEqual(retry_time_hosts, [])
             self.assertEqual(retry_commit_hosts, [])
 
-    def test_host_inventory_upload_500(self):
-        """Testing successful upload to host inventory with 500 errors."""
+    def test_no_json_resp_host_inventory_upload(self):
+        """Testing unsuccessful upload to host inventory."""
+        self.processor.account_number = self.uuid
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
+
         expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+                           'cause': report_processor.FAILED_UPLOAD},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                           'cause': report_processor.FAILED_UPLOAD}]
+        with requests_mock.mock() as mock_req:
+            mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL,
+                          status_code=207, json=None)
+            retry_time_hosts, retry_commit_hosts = \
+                self.processor._upload_to_host_inventory(hosts)
+            for host in expected_hosts:
+                self.assertIn(host, retry_time_hosts)
+            self.assertEqual(retry_commit_hosts, [])
+
+    def test_400_resp_host_inventory_upload(self):
+        """Testing unsuccessful upload to host inventory."""
+        self.processor.account_number = self.uuid
+        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
+
+        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+                           'cause': report_processor.FAILED_UPLOAD},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                           'cause': report_processor.FAILED_UPLOAD}]
+        with requests_mock.mock() as mock_req:
+            mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL,
+                          status_code=400, json=None)
+            retry_time_hosts, retry_commit_hosts = \
+                self.processor._upload_to_host_inventory(hosts)
+            for host in expected_hosts:
+                self.assertIn(host, retry_commit_hosts)
+            self.assertEqual(retry_time_hosts, [])
+
+    def test_500_resp_host_inventory_upload(self):
+        """Testing unsuccessful upload to host inventory."""
+        self.processor.account_number = self.uuid
+        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
+
+        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+                           'cause': report_processor.FAILED_UPLOAD},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                           'cause': report_processor.FAILED_UPLOAD}]
+        with requests_mock.mock() as mock_req:
+            mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL,
+                          status_code=500, json=None)
+            retry_time_hosts, retry_commit_hosts = \
+                self.processor._upload_to_host_inventory(hosts)
+            for host in expected_hosts:
+                self.assertIn(host, retry_time_hosts)
+            self.assertEqual(retry_commit_hosts, [])
+
+    def test_host_inventory_upload_500(self):
+        """Testing successful upload to host inventory with 500 errors."""
+        self.processor.account_number = self.uuid
+        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value',
+                             'system_platform_id': self.uuid},
+                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
+                              'system_platform_id': self.uuid2}}
+        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
+                                       'system_platform_id': self.uuid},
                            'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 500},
-                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
+                                        'system_platform_id': self.uuid2},
                            'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 500}]
+        bulk_response = {
+            'errors': 2,
+            'total': 2,
+            'data': [
+                {'status': 500,
+                 'host': {'facts': [{'namespace': 'qpc', 'facts':
+                                     {'system_platform_id': self.uuid}}]}},
+                {'status': 500,
+                 'host': {'facts': [{'namespace': 'qpc', 'facts':
+                                     {'system_platform_id': self.uuid2}}]}}]}
         with requests_mock.mock() as mock_req:
-            mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL, status_code=500)
+            mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL,
+                          status_code=207, json=bulk_response)
             retry_time, retry_commit = self.processor._upload_to_host_inventory(hosts)
             self.assertEqual(retry_commit, [])
             for host in expected_hosts:
@@ -1121,21 +1220,37 @@ class ReportProcessorTests(TestCase):
 
     def test_host_inventory_upload_400(self):
         """Testing successful upload to host inventory with 500 errors."""
-        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
-                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+        self.processor.account_number = self.uuid
+        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value',
+                             'system_platform_id': self.uuid},
+                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
+                              'system_platform_id': self.uuid2},
                  self.uuid3: {'ip_addresses': 'value', 'name': 'foo'},
                  self.uuid4: {'mac_addresses': 'value', 'name': 'foo'},
                  self.uuid5: {'vm_uuid': 'value', 'name': 'foo'},
                  self.uuid6: {'etc_machine_id': 'value'},
                  self.uuid7: {'subscription_manager_id': 'value'}}
-        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
+                                       'system_platform_id': self.uuid},
                            'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 400},
-                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
+                                        'system_platform_id': self.uuid2},
                            'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 400}]
+        bulk_response = {
+            'errors': 2,
+            'total': 7,
+            'data': [
+                {'status': 400,
+                 'host': {'facts': [{'namespace': 'qpc', 'facts':
+                                     {'system_platform_id': self.uuid}}]}},
+                {'status': 400,
+                 'host': {'facts': [{'namespace': 'qpc', 'facts':
+                                     {'system_platform_id': self.uuid2}}]}}]}
         with requests_mock.mock() as mock_req:
-            mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL, status_code=400)
+            mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL,
+                          status_code=207, json=bulk_response)
             retry_time_hosts, retry_commit_hosts = \
                 self.processor._upload_to_host_inventory(hosts)
             self.assertEqual(retry_time_hosts, [])
