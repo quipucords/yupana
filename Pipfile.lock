@@ -39,11 +39,10 @@
         },
         "django": {
             "hashes": [
-                "sha256:275bec66fd2588dd517ada59b8bfb23d4a9abc5a362349139ddda3c7ff6f5ade",
-                "sha256:939652e9d34d7d53d74d5d8ef82a19e5f8bb2de75618f7e5360691b6e9667963"
+                "sha256:7c3543e4fb070d14e10926189a7fcf42ba919263b7473dceaefce34d54e8a119",
+                "sha256:a2814bffd1f007805b19194eb0b9a331933b82bd5da1c3ba3d7b7ba16e06dc4b"
             ],
-            "index": "pypi",
-            "version": "==2.1.7"
+            "version": "==2.2"
         },
         "django-environ": {
             "hashes": [
@@ -556,11 +555,10 @@
         },
         "sphinx": {
             "hashes": [
-                "sha256:9f3e17c64b34afc653d7c5ec95766e03043cc6d80b0de224f59b6b6e19d37c3c",
-                "sha256:c7658aab75c920288a8cf6f09f244c6cfdae30d82d803ac1634d9f223a80ca08"
+                "sha256:5a54f9132766c8ffdd4021de4d0ef8afeb93235569d64b617612e60070332583",
+                "sha256:91b29c8e98d18ed474bb92777e7af31931fae96e625b8f1bc595c67fb641c46d"
             ],
-            "index": "pypi",
-            "version": "==1.8.5"
+            "version": "==2.0.0"
         },
         "sphinx-autobuild": {
             "hashes": [
@@ -607,11 +605,10 @@
         },
         "tox": {
             "hashes": [
-                "sha256:04f8f1aa05de8e76d7a266ccd14e0d665d429977cd42123bc38efa9b59964e9e",
-                "sha256:25ef928babe88c71e3ed3af0c464d1160b01fca2dd1870a5bb26c2dea61a17fc"
+                "sha256:365656eb2a61053c3715d801f2fcc833eb3721155e52285111c63836ec3f0efc",
+                "sha256:57b0b5c90aadeae5110f4cd1c82fb3ac207f5c8f31b4201ae13b7fa5f754dbb4"
             ],
-            "index": "pypi",
-            "version": "==3.7.0"
+            "version": "==3.8.4"
         },
         "typed-ast": {
             "hashes": [
