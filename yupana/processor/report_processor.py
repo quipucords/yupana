@@ -1013,9 +1013,9 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                                              account_number=self.account_number,
                                              report_id=self.report_id))
                     try:
-                        print(response.json())
+                        LOG.error(response.json())
                     except ValueError:
-                        print('No response json')
+                        LOG.error('No response json')
                     LOG.error(format_message(
                         self.prefix,
                         'Unexpected response code %s' % str(response.status_code),
