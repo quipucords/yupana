@@ -842,7 +842,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         return products
 
     @staticmethod
-    def format_system_profile(host):
+    def format_system_profile(host, random_float=False):
         """Grab facts from original host for system profile.
 
         :param host: <dict> the host to pull facts from
@@ -868,19 +868,32 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         vm_host_socket_count = host.get('vm_host_socket_count')
         if cpu_count:
             system_profile['number_of_cpus'] = cpu_count
+
         if vm_host_socket_count:
             system_profile['number_of_sockets'] = vm_host_socket_count
         elif cpu_socket_count:
             system_profile['number_of_sockets'] = cpu_socket_count
+
         if cpu_core_per_socket:
             system_profile['cores_per_socket'] = cpu_core_per_socket
         elif vm_host_socket_count:
             if vm_host_core_count:
                 system_profile['cores_per_socket'] = \
-                    int(vm_host_core_count) / int(vm_host_socket_count)
+                    int(int(vm_host_core_count) / int(vm_host_socket_count))
             elif cpu_core_count:
                 system_profile['cores_per_socket'] = \
-                    int(cpu_core_count) / int(vm_host_socket_count)
+                    int(int(cpu_core_count) / int(vm_host_socket_count))
+        elif cpu_socket_count:
+            if vm_host_core_count:
+                system_profile['cores_per_socket'] = \
+                    int(int(vm_host_core_count) / int(cpu_socket_count))
+            elif cpu_core_count:
+                system_profile['cores_per_socket'] = \
+                    int(int(cpu_core_count) / int(cpu_socket_count))
+
+        if random_float:
+            system_profile['cores_per_socket'] = '10.0'
+
         return system_profile
 
     def generate_bulk_upload_list(self, hosts):  # pylint:disable=too-many-locals
@@ -893,11 +906,15 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             ['bios_uuid', 'ip_addresses',
              'mac_addresses', 'insights_client_id',
              'rhel_machine_id', 'subscription_manager_id']
+        count = 0
         for _, host in hosts.items():
             redhat_certs = host.get('redhat_certs', [])
             redhat_products = host.get('products', [])
             is_redhat = host.get('is_redhat', None)
-            system_profile = self.format_system_profile(host)
+            if count == 50:
+                system_profile = self.format_system_profile(host, random_float=True)
+            else:
+                system_profile = self.format_system_profile(host)
             formatted_certs = self.format_certs(redhat_certs)
             formatted_products = self.format_products(redhat_products,
                                                       is_redhat)
@@ -918,6 +935,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                     body[fact_name] = fact_value
 
             bulk_upload_list.append(body)
+            count += 1
         return bulk_upload_list
 
     @staticmethod
