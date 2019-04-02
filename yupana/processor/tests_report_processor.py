@@ -1342,9 +1342,15 @@ class ReportProcessorTests(TestCase):
         system_profile = self.processor.format_system_profile(host)
         expected_profile['cores_per_socket'] = 5
         self.assertEqual(expected_profile, system_profile)
-        # test system profile with non vm values
+        # test more mixed values
         host.pop('vm_host_socket_count')
+        host['vm_host_core_count'] = 9
         expected_profile['number_of_sockets'] = 5
+        expected_profile['cores_per_socket'] = 2
+        system_profile = self.processor.format_system_profile(host)
+        self.assertEqual(expected_profile, system_profile)
+        # test system profile with non vm values
+        host.pop('vm_host_core_count')
         expected_profile['cores_per_socket'] = 1
         system_profile = self.processor.format_system_profile(host)
         self.assertEqual(expected_profile, system_profile)
