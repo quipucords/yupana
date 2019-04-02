@@ -810,7 +810,80 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         finally:
             await producer.stop()
 
-    def generate_bulk_upload_list(self, hosts):
+    @staticmethod
+    def format_certs(redhat_certs):
+        """Strip the .pem from each cert in the list.
+
+        :param redhat_certs: <list> of redhat certs.
+        :returns: <list> of formatted certs.
+        """
+        return [int(cert.strip('.pem')) for cert in redhat_certs]
+
+    @staticmethod
+    def format_products(redhat_products, is_rhel):
+        """Return the installed products on the system.
+
+        :param redhat_products: <dict> of products.
+        :returns: a list of the installed products.
+        """
+        products = []
+        name_to_product = {'JBoss EAP': 'EAP',
+                           'JBoss Fuse': 'FUSE',
+                           'JBoss BRMS': 'DCSM',
+                           'JBoss Web Server': 'JWS'}
+        if is_rhel:
+            products.append('RHEL')
+        for product_dict in redhat_products:
+            if product_dict.get('presence') == 'present':
+                name = name_to_product.get(product_dict.get('name'))
+                if name:
+                    products.append(name)
+
+        return products
+
+    @staticmethod
+    def format_system_profile(host):
+        """Grab facts from original host for system profile.
+
+        :param host: <dict> the host to pull facts from
+        :returns: a list with the system profile facts.
+        """
+        qpc_to_system_profile = {
+            'infrastructure_type': 'infrastructure_type',
+            'architecture': 'arch',
+            'os_release': 'os_release',
+            'os_version': 'os_kernel_version',
+            'vm_host': 'infrastructure_vendor'
+        }
+        system_profile = {}
+        for qpc_fact, system_fact in qpc_to_system_profile.items():
+            fact_value = host.get(qpc_fact)
+            if fact_value:
+                system_profile[system_fact] = fact_value
+        cpu_count = host.get('cpu_count')
+        cpu_socket_count = host.get('cpu_socket_count')
+        cpu_core_count = host.get('cpu_core_count')
+        cpu_core_per_socket = host.get('cpu_core_per_socket')
+        vm_host_core_count = host.get('vm_host_core_count')
+        vm_host_socket_count = host.get('vm_host_socket_count')
+        if cpu_count:
+            system_profile['number_of_cpus'] = cpu_count
+        if vm_host_socket_count:
+            system_profile['number_of_sockets'] = vm_host_socket_count
+        elif cpu_socket_count:
+            system_profile['number_of_sockets'] = cpu_socket_count
+        if cpu_core_per_socket:
+            system_profile['cores_per_socket'] = cpu_core_per_socket
+        elif vm_host_socket_count:
+            if vm_host_core_count:
+                system_profile['cores_per_socket'] = \
+                    int(vm_host_core_count) / int(vm_host_socket_count)
+            elif cpu_core_count:
+                system_profile['cores_per_socket'] = \
+                    int(cpu_core_count) / int(vm_host_socket_count)
+        return system_profile
+
+    def generate_bulk_upload_list(self, hosts):  # pylint:disable=too-many-locals
         """Generate a list of hosts to upload.
 
         :param hosts: <dict> dictionary containing hosts to upload.
@@ -821,6 +894,15 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
              'mac_addresses', 'insights_client_id',
              'rhel_machine_id', 'subscription_manager_id']
         for _, host in hosts.items():
+            redhat_certs = host.get('redhat_certs', [])
+            redhat_products = host.get('products', [])
+            is_redhat = host.get('is_redhat', None)
+            system_profile = self.format_system_profile(host)
+            formatted_certs = self.format_certs(redhat_certs)
+            host['rh_product_certs'] = formatted_certs
+            formatted_products = self.format_products(redhat_products,
+                                                      is_redhat)
+            host['rh_products_installed'] = formatted_products
             body = {
                 'account': self.account_number,
                 'display_name': host.get('name'),
@@ -828,6 +910,8 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                 'facts': [{'namespace': 'qpc',
                            'facts': host}]
             }
+            if system_profile:
+                body['system_profile'] = system_profile
             for fact_name in non_null_facts:
                 fact_value = host.get(fact_name)
                 if fact_value:

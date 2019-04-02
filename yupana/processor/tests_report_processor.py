@@ -1069,12 +1069,14 @@ class ReportProcessorTests(TestCase):
                      'fqdn': 'value', 'bios_uuid': 'value',
                      'facts': [{
                          'namespace': 'qpc',
-                         'facts': {'bios_uuid': 'value', 'name': 'value'}}]},
+                         'facts': {'bios_uuid': 'value', 'name': 'value',
+                                   'rh_product_certs': [], 'rh_products_installed': []}}]},
                     {'account': self.uuid, 'insights_client_id': 'value',
                      'display_name': 'foo',
                      'fqdn': 'foo', 'facts': [{
                          'namespace': 'qpc',
-                         'facts': {'insights_client_id': 'value', 'name': 'foo'}}]}]
+                         'facts': {'insights_client_id': 'value', 'name': 'foo',
+                                   'rh_product_certs': [], 'rh_products_installed': []}}]}]
         list_of_hosts = self.processor.generate_bulk_upload_list(hosts)
         self.assertEqual(list_of_hosts, expected)
 
@@ -1109,7 +1111,16 @@ class ReportProcessorTests(TestCase):
     def test_successful_host_inventory_upload(self):
         """Testing successful upload to host inventory."""
         self.processor.account_number = self.uuid
-        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value',
+                             'infrastructure_type': 'virtualized',
+                             'architecture': 'x86',
+                             'os_release': 'Red Hat',
+                             'cpu_count': 2,
+                             'vm_host_core_count': 2,
+                             'cpu_socket_count': 5,
+                             'vm_host_socket_count': 1,
+                             'cpu_core_per_socket': 2,
+                             'cpu_core_count': 2},
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
                  self.uuid3: {'ip_addresses': 'value', 'name': 'foo'},
                  self.uuid4: {'mac_addresses': 'value', 'name': 'foo'},
@@ -1134,9 +1145,11 @@ class ReportProcessorTests(TestCase):
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
 
-        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
+                                       'rh_product_certs': [], 'rh_products_installed': []},
                            'cause': report_processor.FAILED_UPLOAD},
-                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
+                                        'rh_product_certs': [], 'rh_products_installed': []},
                            'cause': report_processor.FAILED_UPLOAD}]
         with requests_mock.mock() as mock_req:
             mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL,
@@ -1153,9 +1166,13 @@ class ReportProcessorTests(TestCase):
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
 
-        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
+                                       'rh_product_certs': [],
+                                       'rh_products_installed': []},
                            'cause': report_processor.FAILED_UPLOAD},
-                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
+                                        'rh_product_certs': [],
+                                        'rh_products_installed': []},
                            'cause': report_processor.FAILED_UPLOAD}]
         with requests_mock.mock() as mock_req:
             mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL,
@@ -1172,9 +1189,13 @@ class ReportProcessorTests(TestCase):
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
 
-        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
+                                       'rh_product_certs': [],
+                                       'rh_products_installed': []},
                            'cause': report_processor.FAILED_UPLOAD},
-                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
+                                        'rh_product_certs': [],
+                                        'rh_products_installed': []},
                            'cause': report_processor.FAILED_UPLOAD}]
         with requests_mock.mock() as mock_req:
             mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL,
@@ -1193,11 +1214,15 @@ class ReportProcessorTests(TestCase):
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
                               'system_platform_id': self.uuid2}}
         expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
-                                       'system_platform_id': self.uuid},
+                                       'system_platform_id': self.uuid,
+                                       'rh_product_certs': [],
+                                       'rh_products_installed': []},
                            'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 500},
                           {self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
-                                        'system_platform_id': self.uuid2},
+                                        'system_platform_id': self.uuid2,
+                                        'rh_product_certs': [],
+                                        'rh_products_installed': []},
                            'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 500}]
         bulk_response = {
@@ -1231,11 +1256,15 @@ class ReportProcessorTests(TestCase):
                  self.uuid6: {'etc_machine_id': 'value'},
                  self.uuid7: {'subscription_manager_id': 'value'}}
         expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
-                                       'system_platform_id': self.uuid},
+                                       'system_platform_id': self.uuid,
+                                       'rh_product_certs': [],
+                                       'rh_products_installed': []},
                            'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 400},
                           {self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
-                                        'system_platform_id': self.uuid2},
+                                        'system_platform_id': self.uuid2,
+                                        'rh_product_certs': [],
+                                        'rh_products_installed': []},
                            'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 400}]
         bulk_response = {
@@ -1270,3 +1299,69 @@ class ReportProcessorTests(TestCase):
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
         with patch('processor.report_processor.INSIGHTS_HOST_INVENTORY_URL', value='not none'):
             self.processor._upload_to_host_inventory(hosts)
+
+    def test_format_certs(self):
+        """Testing the format_certs function."""
+        certs = ['69.pem', '67.pem']
+        formatted_certs = self.processor.format_certs(certs)
+        self.assertEqual([69, 67], formatted_certs)
+        # assert empty list stays emtpy
+        certs = []
+        formatted_certs = self.processor.format_certs(certs)
+        self.assertEqual([], formatted_certs)
+
+    def test_format_products(self):
+        """Testing the format_prodcuts function."""
+        products = [
+            {'name': 'JBoss EAP',
+             'presence': 'present'},
+            {'name': 'JBoss Fuse',
+             'presence': 'present'},
+            {'name': 'JBoss BRMS',
+             'presence': 'absent'},
+            {'name': 'JBoss Web Server',
+             'presence': 'absent'}
+        ]
+        is_rhel = True
+        formatted_products = self.processor.format_products(products, is_rhel)
+        expected = ['RHEL', 'EAP', 'FUSE']
+        self.assertEqual(expected, formatted_products)
+        # test no products
+        products = []
+        is_rhel = None
+        formatted_products = self.processor.format_products(products, is_rhel)
+        self.assertEqual([], formatted_products)
+
+    def test_system_profile_basic(self):
+        """Testing the system profile function."""
+        host = {'infrastructure_type': 'virtualized',
+                'architecture': 'x86',
+                'os_release': 'Red Hat',
+                'cpu_count': 2,
+                'vm_host_core_count': 2,
+                'cpu_socket_count': 5,
+                'vm_host_socket_count': 1,
+                'cpu_core_per_socket': 2,
+                'cpu_core_count': 2}
+        system_profile = self.processor.format_system_profile(host)
+        expected_profile = {'infrastructure_type': 'virtualized',
+                            'arch': 'x86',
+                            'os_release': 'Red Hat',
+                            'number_of_cpus': 2,
+                            'number_of_sockets': 1,
+                            'cores_per_socket': 2}
+        self.assertEqual(expected_profile, system_profile)
+        # test cores_per_socket can be calculated from vm vals
+        host.pop('cpu_core_per_socket')
+        system_profile = self.processor.format_system_profile(host)
+        self.assertEqual(expected_profile, system_profile)
+        # test cores_per_socket is calculated with mixed vals
+        host.pop('vm_host_core_count')
+        system_profile = self.processor.format_system_profile(host)
+        self.assertEqual(expected_profile, system_profile)
+        # test system profile with non vm values
+        host.pop('vm_host_socket_count')
+        expected_profile['number_of_sockets'] = 5
+        expected_profile.pop('cores_per_socket')
+        system_profile = self.processor.format_system_profile(host)
+        self.assertEqual(expected_profile, system_profile)
