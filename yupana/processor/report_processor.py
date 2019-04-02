@@ -319,10 +319,8 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         try:
             if self.candidate_hosts:
                 candidates = self.generate_upload_candidates()
-                LOG.info('About to attempt the upload')
                 retry_time_candidates, retry_commit_candidates = \
                     self._upload_to_host_inventory(candidates)
-                LOG.info('Made it past the upload')
                 if not retry_time_candidates and not retry_commit_candidates:
                     LOG.info(format_message(self.prefix, 'All hosts were successfully uploaded.',
                                             account_number=self.account_number,
@@ -330,7 +328,6 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                     self.next_state = Report.HOSTS_UPLOADED
                     self.update_report_state(candidate_hosts=[])
                 else:
-                    LOG.info('inside of the else')
                     candidates = []
                     # if both retry_commit_candidates and retry_time_candidates are returned
                     # (ie. we got both 400 & 500 status codes were returned), we give the
@@ -345,7 +342,6 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                     LOG.info(format_message(self.prefix, 'Hosts were not successfully uploaded',
                                             account_number=self.account_number,
                                             report_id=self.report_id))
-                    LOG.info('before determine retry')
                     self.determine_retry(Report.FAILED_HOSTS_UPLOAD,
                                          Report.VALIDATION_REPORTED,
                                          candidate_hosts=candidates,
@@ -906,17 +902,12 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             ['bios_uuid', 'ip_addresses',
              'mac_addresses', 'insights_client_id',
              'rhel_machine_id', 'subscription_manager_id']
-        LOG.info('Inside of generate bulk upload list')
         for _, host in hosts.items():
-            LOG.info('grabbing the certs')
             redhat_certs = host.get('redhat_certs', [])
             redhat_products = host.get('products', [])
             is_redhat = host.get('is_redhat')
-            LOG.info('Before calling format system profile')
             system_profile = self.format_system_profile(host)
-            LOG.info('Before calling format certs')
             formatted_certs = self.format_certs(redhat_certs)
-            LOG.info('Before calling format products')
             formatted_products = self.format_products(redhat_products,
                                                       is_redhat)
 
@@ -955,7 +946,6 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         :param hosts: a list of dictionaries that have been validated.
         :returns None
         """
-        LOG.info('Inside of the host inventory function')
         self.prefix = 'UPLOAD TO HOST INVENTORY'
         identity_string = '{"identity": {"account_number": "%s"}}' % str(self.account_number)
         bytes_string = identity_string.encode()
@@ -963,13 +953,10 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         identity_header = {'x-rh-identity': x_rh_identity_value,
                            'Content-Type': 'application/json'}
         list_of_all_hosts = self.generate_bulk_upload_list(hosts)
-        LOG.info('After generate bulk upload')
         hosts_lists_to_upload = self.split_hosts(list_of_all_hosts)
-        LOG.info('After hosts_lists_to_upload')
         failed_hosts = []  # this is purely for counts and logging
         retry_time_hosts = []  # storing hosts to retry after time
         retry_commit_hosts = []  # storing hosts to retry after commit change
-        LOG.info('before the for loop')
         for hosts_list in hosts_lists_to_upload:  # pylint: disable=too-many-nested-blocks
             try:  # pylint: disable=too-many-nested-blocks
                 response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
@@ -1022,6 +1009,14 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                 elif str(response.status_code).startswith('5'):
                     # something went wrong on host inventory side and we should regenerate after
                     # some time has passed
+                    message = 'Attempted to upload the following: %s' % str(hosts_list)
+                    LOG.error(format_message(self.prefix, message,
+                                             account_number=self.account_number,
+                                             report_id=self.report_id))
+                    try:
+                        LOG.error(response.json())
+                    except ValueError:
+                        LOG.error('No response json')
                     LOG.error(format_message(
                         self.prefix,
                         'Unexpected response code %s' % str(response.status_code),
