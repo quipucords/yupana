@@ -1065,18 +1065,18 @@ class ReportProcessorTests(TestCase):
         self.processor.account_number = self.uuid
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
-        expected = [{'account': self.uuid, 'display_name': 'value',
-                     'fqdn': 'value', 'bios_uuid': 'value',
-                     'facts': [{
-                         'namespace': 'qpc',
-                         'facts': {'bios_uuid': 'value', 'name': 'value',
-                                   'rh_product_certs': [], 'rh_products_installed': []}}]},
-                    {'account': self.uuid, 'insights_client_id': 'value',
-                     'display_name': 'foo',
-                     'fqdn': 'foo', 'facts': [{
-                         'namespace': 'qpc',
-                         'facts': {'insights_client_id': 'value', 'name': 'foo',
-                                   'rh_product_certs': [], 'rh_products_installed': []}}]}]
+        expected = [{'account': self.uuid, 'display_name': 'value', 'fqdn': 'value',
+                     'facts': [{'namespace': 'qpc', 'facts':
+                                {'bios_uuid': 'value', 'name': 'value'},
+                                'rh_product_certs': [],
+                                'rh_products_installed': []}],
+                     'bios_uuid': 'value'},
+                    {'account': self.uuid, 'display_name': 'foo', 'fqdn': 'foo',
+                     'facts': [{'namespace': 'qpc', 'facts':
+                                {'insights_client_id': 'value', 'name': 'foo'},
+                                'rh_product_certs': [],
+                                'rh_products_installed': []}],
+                     'insights_client_id': 'value'}]
         list_of_hosts = self.processor.generate_bulk_upload_list(hosts)
         self.assertEqual(list_of_hosts, expected)
 
@@ -1145,11 +1145,9 @@ class ReportProcessorTests(TestCase):
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
 
-        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
-                                       'rh_product_certs': [], 'rh_products_installed': []},
+        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                            'cause': report_processor.FAILED_UPLOAD},
-                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
-                                        'rh_product_certs': [], 'rh_products_installed': []},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
                            'cause': report_processor.FAILED_UPLOAD}]
         with requests_mock.mock() as mock_req:
             mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL,
@@ -1166,13 +1164,9 @@ class ReportProcessorTests(TestCase):
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
 
-        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
-                                       'rh_product_certs': [],
-                                       'rh_products_installed': []},
+        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                            'cause': report_processor.FAILED_UPLOAD},
-                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
-                                        'rh_product_certs': [],
-                                        'rh_products_installed': []},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
                            'cause': report_processor.FAILED_UPLOAD}]
         with requests_mock.mock() as mock_req:
             mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL,
@@ -1189,13 +1183,9 @@ class ReportProcessorTests(TestCase):
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
 
-        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
-                                       'rh_product_certs': [],
-                                       'rh_products_installed': []},
+        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                            'cause': report_processor.FAILED_UPLOAD},
-                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
-                                        'rh_product_certs': [],
-                                        'rh_products_installed': []},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
                            'cause': report_processor.FAILED_UPLOAD}]
         with requests_mock.mock() as mock_req:
             mock_req.post(report_processor.INSIGHTS_HOST_INVENTORY_URL,
@@ -1214,15 +1204,11 @@ class ReportProcessorTests(TestCase):
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
                               'system_platform_id': self.uuid2}}
         expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
-                                       'system_platform_id': self.uuid,
-                                       'rh_product_certs': [],
-                                       'rh_products_installed': []},
+                                       'system_platform_id': self.uuid},
                            'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 500},
                           {self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
-                                        'system_platform_id': self.uuid2,
-                                        'rh_product_certs': [],
-                                        'rh_products_installed': []},
+                                        'system_platform_id': self.uuid2},
                            'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 500}]
         bulk_response = {
@@ -1256,15 +1242,11 @@ class ReportProcessorTests(TestCase):
                  self.uuid6: {'etc_machine_id': 'value'},
                  self.uuid7: {'subscription_manager_id': 'value'}}
         expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
-                                       'system_platform_id': self.uuid,
-                                       'rh_product_certs': [],
-                                       'rh_products_installed': []},
+                                       'system_platform_id': self.uuid},
                            'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 400},
                           {self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
-                                        'system_platform_id': self.uuid2,
-                                        'rh_product_certs': [],
-                                        'rh_products_installed': []},
+                                        'system_platform_id': self.uuid2},
                            'cause': report_processor.FAILED_UPLOAD,
                            'status_code': 400}]
         bulk_response = {

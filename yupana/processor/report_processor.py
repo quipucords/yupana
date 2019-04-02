@@ -899,16 +899,16 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             is_redhat = host.get('is_redhat', None)
             system_profile = self.format_system_profile(host)
             formatted_certs = self.format_certs(redhat_certs)
-            host['rh_product_certs'] = formatted_certs
             formatted_products = self.format_products(redhat_products,
                                                       is_redhat)
-            host['rh_products_installed'] = formatted_products
+
             body = {
                 'account': self.account_number,
                 'display_name': host.get('name'),
                 'fqdn': host.get('name'),
-                'facts': [{'namespace': 'qpc',
-                           'facts': host}]
+                'facts': [{'namespace': 'qpc', 'facts': host,
+                           'rh_product_certs': formatted_certs,
+                           'rh_products_installed': formatted_products}]
             }
             if system_profile:
                 body['system_profile'] = system_profile
@@ -1008,6 +1008,14 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                 else:
                     # something went wrong possibly on our side (if its a 400)
                     # and we should regenerate the hosts dictionary and re-upload after a commit
+                    message = 'Attempted to upload the following: %s' % str(hosts_list)
+                    LOG.error(format_message(self.prefix, message,
+                                             account_number=self.account_number,
+                                             report_id=self.report_id))
+                    try:
+                        print(response.json())
+                    except ValueError:
+                        print('No response json')
                     LOG.error(format_message(
                         self.prefix,
                         'Unexpected response code %s' % str(response.status_code),
