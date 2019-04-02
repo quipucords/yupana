@@ -868,7 +868,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         core_count = host.get('vm_host_core_count', cpu_core_count)
         try:
             core_per_socket = math.ceil(int(core_count) / int(socket_count))
-        except (ValueError, TypeError):
+        except Exception:  # pylint: disable=broad-except
             core_per_socket = None
         cpu_core_per_socket = host.get('cpu_core_per_socket', core_per_socket)
         if cpu_count:
@@ -893,7 +893,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         for _, host in hosts.items():
             redhat_certs = host.get('redhat_certs', [])
             redhat_products = host.get('products', [])
-            is_redhat = host.get('is_redhat', None)
+            is_redhat = host.get('is_redhat')
             system_profile = self.format_system_profile(host)
             formatted_certs = self.format_certs(redhat_certs)
             formatted_products = self.format_products(redhat_products,
