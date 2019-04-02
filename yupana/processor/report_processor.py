@@ -842,7 +842,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
 
         return products
 
-    @staticmethod  # noqa: C901 (too-complex)
+    @staticmethod
     def format_system_profile(host):
         """Grab facts from original host for system profile.
 
@@ -863,34 +863,20 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                 system_profile[system_fact] = fact_value
         cpu_count = host.get('cpu_count')
         cpu_socket_count = host.get('cpu_socket_count')
+        socket_count = host.get('vm_host_socket_count', cpu_socket_count)
         cpu_core_count = host.get('cpu_core_count')
-        cpu_core_per_socket = host.get('cpu_core_per_socket')
-        vm_host_core_count = host.get('vm_host_core_count')
-        vm_host_socket_count = host.get('vm_host_socket_count')
+        core_count = host.get('vm_host_core_count', cpu_core_count)
+        try:
+            core_per_socket = math.ceil(int(core_count) / int(socket_count))
+        except (ValueError, TypeError):
+            core_per_socket = None
+        cpu_core_per_socket = host.get('cpu_core_per_socket', core_per_socket)
         if cpu_count:
             system_profile['number_of_cpus'] = cpu_count
-
-        if vm_host_socket_count:
-            system_profile['number_of_sockets'] = vm_host_socket_count
-        elif cpu_socket_count:
-            system_profile['number_of_sockets'] = cpu_socket_count
-
+        if socket_count:
+            system_profile['number_of_sockets'] = socket_count
         if cpu_core_per_socket:
             system_profile['cores_per_socket'] = cpu_core_per_socket
-        elif vm_host_socket_count:
-            if vm_host_core_count:
-                system_profile['cores_per_socket'] = \
-                    math.ceil(int(vm_host_core_count) / int(vm_host_socket_count))
-            elif cpu_core_count:
-                system_profile['cores_per_socket'] = \
-                    math.ceil(int(cpu_core_count) / int(vm_host_socket_count))
-        elif cpu_socket_count:
-            if vm_host_core_count:
-                system_profile['cores_per_socket'] = \
-                    math.ceil(int(vm_host_core_count) / int(cpu_socket_count))
-            elif cpu_core_count:
-                system_profile['cores_per_socket'] = \
-                    math.ceil(int(cpu_core_count) / int(cpu_socket_count))
 
         return system_profile
 
