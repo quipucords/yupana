@@ -1284,7 +1284,7 @@ class ReportProcessorTests(TestCase):
 
     def test_format_certs(self):
         """Testing the format_certs function."""
-        certs = ['69.pem', '67.pem']
+        certs = ['69.pem', '67.pem', '']
         formatted_certs = self.processor.format_certs(certs)
         self.assertEqual([69, 67], formatted_certs)
         # assert empty list stays emtpy

@@ -822,7 +822,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         :param redhat_certs: <list> of redhat certs.
         :returns: <list> of formatted certs.
         """
-        return [int(cert.strip('.pem')) for cert in redhat_certs]
+        return [int(cert.strip('.pem')) for cert in redhat_certs if cert not in ['']]
 
     @staticmethod
     def format_products(redhat_products, is_rhel):
