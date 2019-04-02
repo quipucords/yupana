@@ -888,11 +888,11 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         # check for each of the above facts and add them to the profile if they
         # are not none
         if cpu_count:
-            system_profile['number_of_cpus'] = cpu_count
+            system_profile['number_of_cpus'] = math.ceil(cpu_count)
         if socket_count:
-            system_profile['number_of_sockets'] = socket_count
+            system_profile['number_of_sockets'] = math.ceil(socket_count)
         if cpu_core_per_socket:
-            system_profile['cores_per_socket'] = cpu_core_per_socket
+            system_profile['cores_per_socket'] = math.ceil(cpu_core_per_socket)
 
         return system_profile
 
