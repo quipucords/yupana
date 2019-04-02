@@ -867,20 +867,20 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         vm_host_core_count = host.get('vm_host_core_count')
         vm_host_socket_count = host.get('vm_host_socket_count')
         if cpu_count:
-            system_profile['number_of_cpus'] = int(cpu_count)
+            system_profile['number_of_cpus'] = cpu_count
         if vm_host_socket_count:
-            system_profile['number_of_sockets'] = int(vm_host_socket_count)
+            system_profile['number_of_sockets'] = vm_host_socket_count
         elif cpu_socket_count:
-            system_profile['number_of_sockets'] = int(cpu_socket_count)
+            system_profile['number_of_sockets'] = cpu_socket_count
         if cpu_core_per_socket:
-            system_profile['cores_per_socket'] = int(cpu_core_per_socket)
+            system_profile['cores_per_socket'] = cpu_core_per_socket
         elif vm_host_socket_count:
             if vm_host_core_count:
                 system_profile['cores_per_socket'] = \
-                    int(int(vm_host_core_count) / int(vm_host_socket_count))
+                    int(vm_host_core_count) / int(vm_host_socket_count)
             elif cpu_core_count:
                 system_profile['cores_per_socket'] = \
-                    int(int(cpu_core_count) / int(vm_host_socket_count))
+                    int(cpu_core_count) / int(vm_host_socket_count)
         return system_profile
 
     def generate_bulk_upload_list(self, hosts):  # pylint:disable=too-many-locals
