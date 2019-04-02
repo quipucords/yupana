@@ -862,15 +862,24 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             if fact_value:
                 system_profile[system_fact] = fact_value
         cpu_count = host.get('cpu_count')
+        # grab the default socket count
         cpu_socket_count = host.get('cpu_socket_count')
+        # grab the preferred socket count, and default if it does not exist
         socket_count = host.get('vm_host_socket_count', cpu_socket_count)
+        # grab the default core count
         cpu_core_count = host.get('cpu_core_count')
+        # grab the preferred core count, and default if it does not exist
         core_count = host.get('vm_host_core_count', cpu_core_count)
         try:
+            # try to get the cores per socket but wrap it in a try/catch
+            # because these values might not exist
             core_per_socket = math.ceil(int(core_count) / int(socket_count))
         except Exception:  # pylint: disable=broad-except
             core_per_socket = None
+        # grab the preferred core per socket, but default if it does not exist
         cpu_core_per_socket = host.get('cpu_core_per_socket', core_per_socket)
+        # check for each of the above facts and add them to the profile if they
+        # are not none
         if cpu_count:
             system_profile['number_of_cpus'] = cpu_count
         if socket_count:
