@@ -319,8 +319,10 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         try:
             if self.candidate_hosts:
                 candidates = self.generate_upload_candidates()
+                LOG.info('About to attempt the upload')
                 retry_time_candidates, retry_commit_candidates = \
                     self._upload_to_host_inventory(candidates)
+                LOG.info('Made it past the upload')
                 if not retry_time_candidates and not retry_commit_candidates:
                     LOG.info(format_message(self.prefix, 'All hosts were successfully uploaded.',
                                             account_number=self.account_number,
@@ -328,6 +330,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                     self.next_state = Report.HOSTS_UPLOADED
                     self.update_report_state(candidate_hosts=[])
                 else:
+                    LOG.info('inside of the else')
                     candidates = []
                     # if both retry_commit_candidates and retry_time_candidates are returned
                     # (ie. we got both 400 & 500 status codes were returned), we give the
@@ -342,6 +345,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                     LOG.info(format_message(self.prefix, 'Hosts were not successfully uploaded',
                                             account_number=self.account_number,
                                             report_id=self.report_id))
+                    LOG.info('before determine retry')
                     self.determine_retry(Report.FAILED_HOSTS_UPLOAD,
                                          Report.VALIDATION_REPORTED,
                                          candidate_hosts=candidates,
