@@ -903,12 +903,17 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             ['bios_uuid', 'ip_addresses',
              'mac_addresses', 'insights_client_id',
              'rhel_machine_id', 'subscription_manager_id']
+        LOG.info('Inside of generate bulk upload list')
         for _, host in hosts.items():
+            LOG.info('grabbing the certs')
             redhat_certs = host.get('redhat_certs', [])
             redhat_products = host.get('products', [])
             is_redhat = host.get('is_redhat')
+            LOG.info('Before calling format system profile')
             system_profile = self.format_system_profile(host)
+            LOG.info('Before calling format certs')
             formatted_certs = self.format_certs(redhat_certs)
+            LOG.info('Before calling format products')
             formatted_products = self.format_products(redhat_products,
                                                       is_redhat)
 
@@ -947,6 +952,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         :param hosts: a list of dictionaries that have been validated.
         :returns None
         """
+        LOG.info('Inside of the host inventory function')
         self.prefix = 'UPLOAD TO HOST INVENTORY'
         identity_string = '{"identity": {"account_number": "%s"}}' % str(self.account_number)
         bytes_string = identity_string.encode()
@@ -954,10 +960,13 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         identity_header = {'x-rh-identity': x_rh_identity_value,
                            'Content-Type': 'application/json'}
         list_of_all_hosts = self.generate_bulk_upload_list(hosts)
+        LOG.info('After generate bulk upload')
         hosts_lists_to_upload = self.split_hosts(list_of_all_hosts)
+        LOG.info('After hosts_lists_to_upload')
         failed_hosts = []  # this is purely for counts and logging
         retry_time_hosts = []  # storing hosts to retry after time
         retry_commit_hosts = []  # storing hosts to retry after commit change
+        LOG.info('before the for loop')
         for hosts_list in hosts_lists_to_upload:  # pylint: disable=too-many-nested-blocks
             try:  # pylint: disable=too-many-nested-blocks
                 response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
