@@ -20,6 +20,7 @@ import asyncio
 import base64
 import json
 import logging
+import math
 import tarfile
 import threading
 from datetime import datetime
@@ -810,7 +811,88 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         finally:
             await producer.stop()
 
-    def generate_bulk_upload_list(self, hosts):
+    @staticmethod
+    def format_certs(redhat_certs):
+        """Strip the .pem from each cert in the list.
+
+        :param redhat_certs: <list> of redhat certs.
+        :returns: <list> of formatted certs.
+        """
+        try:
+            return [int(cert.strip('.pem')) for cert in redhat_certs if cert]
+        except Exception:  # pylint: disable=broad-except
+            return []
+
+    @staticmethod
+    def format_products(redhat_products, is_rhel):
+        """Return the installed products on the system.
+
+        :param redhat_products: <dict> of products.
+        :returns: a list of the installed products.
+        """
+        products = []
+        name_to_product = {'JBoss EAP': 'EAP',
+                           'JBoss Fuse': 'FUSE',
+                           'JBoss BRMS': 'DCSM',
+                           'JBoss Web Server': 'JWS'}
+        if is_rhel:
+            products.append('RHEL')
+        for product_dict in redhat_products:
+            if product_dict.get('presence') == 'present':
+                name = name_to_product.get(product_dict.get('name'))
+                if name:
+                    products.append(name)
+
+        return products
+
+    @staticmethod
+    def format_system_profile(host):
+        """Grab facts from original host for system profile.
+
+        :param host: <dict> the host to pull facts from
+        :returns: a list with the system profile facts.
+        """
+        qpc_to_system_profile = {
+            'infrastructure_type': 'infrastructure_type',
+            'architecture': 'arch',
+            'os_release': 'os_release',
+            'os_version': 'os_kernel_version',
+            'vm_host': 'infrastructure_vendor'
+        }
+        system_profile = {}
+        for qpc_fact, system_fact in qpc_to_system_profile.items():
+            fact_value = host.get(qpc_fact)
+            if fact_value:
+                system_profile[system_fact] = fact_value
+        cpu_count = host.get('cpu_count')
+        # grab the default socket count
+        cpu_socket_count = host.get('cpu_socket_count')
+        # grab the preferred socket count, and default if it does not exist
+        socket_count = host.get('vm_host_socket_count', cpu_socket_count)
+        # grab the default core count
+        cpu_core_count = host.get('cpu_core_count')
+        # grab the preferred core count, and default if it does not exist
+        core_count = host.get('vm_host_core_count', cpu_core_count)
+        try:
+            # try to get the cores per socket but wrap it in a try/catch
+            # because these values might not exist
+            core_per_socket = math.ceil(int(core_count) / int(socket_count))
+        except Exception:  # pylint: disable=broad-except
+            core_per_socket = None
+        # grab the preferred core per socket, but default if it does not exist
+        cpu_core_per_socket = host.get('cpu_core_per_socket', core_per_socket)
+        # check for each of the above facts and add them to the profile if they
+        # are not none
+        if cpu_count:
+            system_profile['number_of_cpus'] = math.ceil(cpu_count)
+        if socket_count:
+            system_profile['number_of_sockets'] = math.ceil(socket_count)
+        if cpu_core_per_socket:
+            system_profile['cores_per_socket'] = math.ceil(cpu_core_per_socket)
+
+        return system_profile
+
+    def generate_bulk_upload_list(self, hosts):  # pylint:disable=too-many-locals
         """Generate a list of hosts to upload.
 
         :param hosts: <dict> dictionary containing hosts to upload.
@@ -821,13 +903,24 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
              'mac_addresses', 'insights_client_id',
              'rhel_machine_id', 'subscription_manager_id']
         for _, host in hosts.items():
+            redhat_certs = host.get('redhat_certs', [])
+            redhat_products = host.get('products', [])
+            is_redhat = host.get('is_redhat')
+            system_profile = self.format_system_profile(host)
+            formatted_certs = self.format_certs(redhat_certs)
+            formatted_products = self.format_products(redhat_products,
+                                                      is_redhat)
+
             body = {
                 'account': self.account_number,
                 'display_name': host.get('name'),
                 'fqdn': host.get('name'),
-                'facts': [{'namespace': 'qpc',
-                           'facts': host}]
+                'facts': [{'namespace': 'qpc', 'facts': host,
+                           'rh_product_certs': formatted_certs,
+                           'rh_products_installed': formatted_products}]
             }
+            if system_profile:
+                body['system_profile'] = system_profile
             for fact_name in non_null_facts:
                 fact_value = host.get(fact_name)
                 if fact_value:
@@ -916,6 +1009,14 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                 elif str(response.status_code).startswith('5'):
                     # something went wrong on host inventory side and we should regenerate after
                     # some time has passed
+                    message = 'Attempted to upload the following: %s' % str(hosts_list)
+                    LOG.error(format_message(self.prefix, message,
+                                             account_number=self.account_number,
+                                             report_id=self.report_id))
+                    try:
+                        LOG.error(response.json())
+                    except ValueError:
+                        LOG.error('No response json')
                     LOG.error(format_message(
                         self.prefix,
                         'Unexpected response code %s' % str(response.status_code),
@@ -924,6 +1025,14 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                 else:
                     # something went wrong possibly on our side (if its a 400)
                     # and we should regenerate the hosts dictionary and re-upload after a commit
+                    message = 'Attempted to upload the following: %s' % str(hosts_list)
+                    LOG.error(format_message(self.prefix, message,
+                                             account_number=self.account_number,
+                                             report_id=self.report_id))
+                    try:
+                        LOG.error(response.json())
+                    except ValueError:
+                        LOG.error('No response json')
                     LOG.error(format_message(
                         self.prefix,
                         'Unexpected response code %s' % str(response.status_code),
