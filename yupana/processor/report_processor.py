@@ -819,7 +819,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         :returns: <list> of formatted certs.
         """
         try:
-            return [int(cert.strip('.pem')) for cert in redhat_certs if cert not in ['']]
+            return [int(cert.strip('.pem')) for cert in redhat_certs if cert]
         except Exception:  # pylint: disable=broad-except
             return []
 

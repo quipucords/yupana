@@ -1287,8 +1287,12 @@ class ReportProcessorTests(TestCase):
         certs = ['69.pem', '67.pem', '']
         formatted_certs = self.processor.format_certs(certs)
         self.assertEqual([69, 67], formatted_certs)
-        # assert empty list stays emtpy
+        # assert empty list stays empty
         certs = []
+        formatted_certs = self.processor.format_certs(certs)
+        self.assertEqual([], formatted_certs)
+        # assert exception returns empty
+        certs = ['notint.pem']
         formatted_certs = self.processor.format_certs(certs)
         self.assertEqual([], formatted_certs)
 
