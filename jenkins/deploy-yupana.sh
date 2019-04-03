@@ -59,6 +59,7 @@ else
   # Application already exists, just need to start a new build
   echo "App Exists. Triggering application build and deployment"
   curl -d "{\"text\": \"${OPENSHIFT_PROJECT}/${APP_NAME} (STATUS) - App Exists. Triggering application build and deployment.\"}" -H "Content-Type: application/json" -X POST ${SLACK_QPC_BOTS}
+  oc process -f ${OPENSHIFT_TEMPLATE_PATH} | oc apply -f -
   BUILD_ID=`oc start-build ${BUILD_CONFIG} | awk '{print $2}' | sed -e 's/^"//' -e 's/"$//'`
 fi
 
