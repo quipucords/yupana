@@ -53,6 +53,7 @@ help:
 	@echo "oc-login-developer       login to openshift as developer"
 	@echo "oc-server-migrate        run migrations"
 	@echo "oc-update-template       update template and build"
+	@echo "oc-delete-yupana         delete the yupana app and data"
 
 
 clean:
@@ -141,6 +142,19 @@ oc-apply:
 oc-update-template:
 	oc process -f ${OPENSHIFT_TEMPLATE_PATH} | oc apply -f -
 	oc start-build yupana -n yupana
+
+oc-delete-yupana-data:
+	oc delete all -l app=yupana
+	oc delete persistentvolumeclaim yupana-pgsql
+	oc delete configmaps yupana-env
+	oc delete secret yupana-secret
+	oc delete secret yupana-pgsql
+
+oc-delete-project:
+	oc delete project yupana
+
+oc-delete-yupana:
+	oc-delete-yupana-data oc-delete-project
 
 oc-up-dev: oc-up oc-project oc-apply oc-new-app
 
