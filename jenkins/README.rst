@@ -13,7 +13,7 @@ We deploy Yupana to the Insights Dev & Production Clusters (subscriptions-ci, su
 Getting Started
 ===============
 
-You can access the deployment jobs via `Jenkins`_. The job names follow the pattern of ``deploy-yupana-PROJECT`` where PROJECT is one either ci, qa, stage, or prod. A copy of the shell script used for deployment is located `here <deploy-yupana.sh>`_.
+You can access the deployment jobs via `Jenkins`_. The job names follow the pattern of ``deploy-yupana-PROJECT`` where `PROJECT` is one either ci, qa, stage, or prod. A copy of the shell script used for deployment is located `here <deploy-yupana.sh>`_.
 Any changes made to the deployment `template <../openshift/yupana-template.yaml>`_, should be enforced when the jenkins jobs are ran.
 
 Deleting a Deployment
