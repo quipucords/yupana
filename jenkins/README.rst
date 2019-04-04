@@ -23,11 +23,7 @@ If it is ever necessary to delete the yupana deployment in any of the projects, 
 
     oc login https://api.insights-dev.openshift.com:443 --token=<your-token>
     oc project NAME_OF_PROJECT
-    oc delete all -l app=yupana
-    oc delete persistentvolumeclaim yupana-pgsql
-    oc delete configmaps yupana-env
-    oc delete secret yupana-secret
-    oc delete secret yupana-pgsql
+    make oc-delete-yupana-data
 
 After deleting the app, you can redeploy by rerunning the jenkins job, or you can visit `Jenkins`_ and choose ``Build Now`` for the ``deploy-yupana-ci/qa/stage/prod`` projects.
 
