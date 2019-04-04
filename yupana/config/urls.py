@@ -40,7 +40,7 @@ from django.views.generic import RedirectView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    url(r'^r/insights/platform/subscriptions/api/v1/', include('api.urls')),
+    url(r'^api/subscriptions/v1/', include('api.urls')),
 
     # static files (*.css, *.js, *.jpg, etc.)
     url(r'^(?!/?apidoc/)(?P<path>.*\..*)$',
