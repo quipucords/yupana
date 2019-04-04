@@ -641,9 +641,9 @@ parameters:
   displayName: Minimum Replicas
   name: MINIMUM_REPLICAS
   required: true
-  value: "1"
+  value: 1
 - description: Maximum Replicas for Autoscaling
   displayName: Maximum Replicas
   name: MAXIMUM_REPLICAS
   required: true
-  value: "10"
+  value: 10
