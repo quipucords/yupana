@@ -100,9 +100,9 @@ objects:
     annotations:
       description: Exposes and load balances the application pods
       service.alpha.openshift.io/dependencies: '[{"name": "${DATABASE_SERVICE_NAME}", "kind": "Service"}]'
-      prometheus.io/scrape: 'true'
+      prometheus.io/scrape: "true"
       prometheus.io/path: /metrics
-      prometheus.io/port: '8080'
+      prometheus.io/port: 8080
     name: ${NAME}
   spec:
     ports:
@@ -412,7 +412,7 @@ objects:
             timeoutSeconds: 10
           name: yupana-pgsql
           ports:
-          - containerPort: "5432"
+          - containerPort: 5432
             protocol: TCP
           readinessProbe:
             exec:

@@ -75,6 +75,8 @@ There are also other make targets available to step through the project deployme
     # Run the Django server locally with access to the OpenShift database
     make serve-with-oc
 
+    # Run a build with updated template changes
+    make oc-update-template
 
 Fedora
 ------
