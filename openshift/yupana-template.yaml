@@ -481,14 +481,14 @@ objects:
   metadata:
     labels:
       app: yupana
-    name: yupana-scale
+    name: yupana
   spec:
-    maxReplicas: 10
-    minReplicas: 1
+    maxReplicas: ${MAXIMUM_REPLICAS}
+    minReplicas: ${MINIMUM_REPLICAS}
     scaleTargetRef:
       apiVersion: v1
       kind: DeploymentConfig
-      name: yupana-scale
+      name: yupana
     targetCPUUtilizationPercentage: 75
 parameters:
 - description: The OpenShift Namespace where the ImageStream resides.
@@ -637,3 +637,13 @@ parameters:
   name: RETRIES_ALLOWED
   required: true
   value: "5"
+- description: Minimum Replicas for Autoscaling
+  displayName: Minimum Replicas
+  name: MINIMUM_REPLICAS
+  required: true
+  value: "1"
+- description: Maximum Replicas for Autoscaling
+  displayName: Maximum Replicas
+  name: MAXIMUM_REPLICAS
+  required: true
+  value: "10"
