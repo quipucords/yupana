@@ -481,14 +481,14 @@ objects:
   metadata:
     labels:
       app: yupana
-    name: yupana
+    name: yupana-scale
   spec:
     maxReplicas: 10
-    minReplicas: 2
+    minReplicas: 1
     scaleTargetRef:
       apiVersion: v1
       kind: DeploymentConfig
-      name: yupana
+      name: yupana-scale
     targetCPUUtilizationPercentage: 75
 parameters:
 - description: The OpenShift Namespace where the ImageStream resides.
