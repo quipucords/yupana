@@ -93,6 +93,9 @@ objects:
     insights-host-inventory-url: ${INSIGHTS_HOST_INVENTORY_URL}
     retries-allowed: ${RETRIES_ALLOWED}
     retry-time: ${RETRY_TIME}
+    minimum-replicas: ${MINIMUM_REPLICAS}
+    maximum-replicas: ${MAXIMUM_REPLICAS}
+    target-cpu-utilization: ${TARGET_CPU_UTILIZATION}
     log-level: INFO
 - apiVersion: v1
   kind: Service
@@ -102,7 +105,7 @@ objects:
       service.alpha.openshift.io/dependencies: '[{"name": "${DATABASE_SERVICE_NAME}", "kind": "Service"}]'
       prometheus.io/scrape: "true"
       prometheus.io/path: /metrics
-      prometheus.io/port: 8080
+      prometheus.io/port: "8080"
     name: ${NAME}
   spec:
     ports:
@@ -304,14 +307,32 @@ objects:
               valueFrom:
                 configMapKeyRef:
                   name: yupana-env
-                  key: retries_allowed
+                  key: retries-allowed
                   optional: true
             - name: RETRY_TIME
               valueFrom:
                 configMapKeyRef:
                   name: yupana-env
-                  key: retry_time
+                  key: retry-time
                   optional: true
+            - name: MINIMUM_REPLICAS
+              valueFrom:
+                configMapKeyRef:
+                  name: yupana-env
+                  key: minimum-replicas
+                  optional: false
+            - name: MAXIMUM_REPLICAS
+              valueFrom:
+                configMapKeyRef:
+                  name: yupana-env
+                  key: maximum-replicas
+                  optional: false
+            - name: TARGET_CPU_UTILIZATION
+              valueFrom:
+                configMapKeyRef:
+                  name: yupana-env
+                  key: target-cpu-utilization
+                  optional: false
           livenessProbe:
             failureThreshold: 3
             httpGet:
@@ -483,13 +504,13 @@ objects:
       app: yupana
     name: yupana
   spec:
-    maxReplicas: ${MAXIMUM_REPLICAS}
-    minReplicas: ${MINIMUM_REPLICAS}
+    maxReplicas: ${{MAXIMUM_REPLICAS}}
+    minReplicas: ${{MINIMUM_REPLICAS}}
     scaleTargetRef:
       apiVersion: v1
       kind: DeploymentConfig
       name: yupana
-    targetCPUUtilizationPercentage: 75
+    targetCPUUtilizationPercentage: ${{TARGET_CPU_UTILIZATION}}
 parameters:
 - description: The OpenShift Namespace where the ImageStream resides.
   displayName: Namespace
@@ -641,9 +662,14 @@ parameters:
   displayName: Minimum Replicas
   name: MINIMUM_REPLICAS
   required: true
-  value: 1
+  value: "1"
 - description: Maximum Replicas for Autoscaling
   displayName: Maximum Replicas
   name: MAXIMUM_REPLICAS
   required: true
-  value: 10
+  value: "10"
+- description: Target CPU Utilization Percentage
+  displayName: Target CPU Utilization
+  name: TARGET_CPU_UTILIZATION
+  required: true
+  value: "75"
