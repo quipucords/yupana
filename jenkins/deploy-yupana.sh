@@ -136,13 +136,6 @@ if [ $rc -ne 0 ]; then
     exit 1
 fi
 
-# scale up the test deployment
-RC_ID=`oc get rc | tail -1 | awk '{print $1}'`
-
-echo "Scaling up new deployment $test_rc_id"
-oc scale --replicas=1 rc $RC_ID
-
-
 echo "Checking for successful deployment at http://${APP_NAME}-${OPENSHIFT_PROJECT}.${OPENSHIFT_APP_DOMAIN}${APP_READINESS_PROBE}"
 set +e
 rc=1
