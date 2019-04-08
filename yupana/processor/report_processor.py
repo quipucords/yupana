@@ -57,6 +57,7 @@ EMPTY_QUEUE_SLEEP = 60
 RETRY = Enum('RETRY', 'clear increment keep_same')
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
+HOSTS_PER_REQ = 1000
 
 
 class FailDownloadException(Exception):
@@ -863,7 +864,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         for qpc_fact, system_fact in qpc_to_system_profile.items():
             fact_value = host.get(qpc_fact)
             if fact_value:
-                system_profile[system_fact] = fact_value
+                system_profile[system_fact] = str(fact_value)
         cpu_count = host.get('cpu_count')
         # grab the default socket count
         cpu_socket_count = host.get('cpu_socket_count')
@@ -932,7 +933,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
     @staticmethod
     def split_hosts(list_of_all_hosts):
         """Split up the hosts into lists of 1000 or less."""
-        hosts_per_request = 1000
+        hosts_per_request = HOSTS_PER_REQ
         hosts_lists_to_upload = \
             [list_of_all_hosts[i:i + hosts_per_request]
              for i in range(0, len(list_of_all_hosts), hosts_per_request)]
@@ -957,7 +958,14 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         failed_hosts = []  # this is purely for counts and logging
         retry_time_hosts = []  # storing hosts to retry after time
         retry_commit_hosts = []  # storing hosts to retry after commit change
+        group_count = 0
         for hosts_list in hosts_lists_to_upload:  # pylint: disable=too-many-nested-blocks
+            group_count += 1
+            LOG.info(format_message(
+                self.prefix,
+                'Uploading hosts group %s/%s. Group size: %s hosts' %
+                (group_count, len(hosts_lists_to_upload), HOSTS_PER_REQ),
+                account_number=self.account_number, report_id=self.report_id))
             try:  # pylint: disable=too-many-nested-blocks
                 response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
                                          data=json.dumps(hosts_list),
