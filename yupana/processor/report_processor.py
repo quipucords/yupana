@@ -963,7 +963,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             group_count += 1
             LOG.info(format_message(
                 self.prefix,
-                'Uploading hosts group %s/%s. Group size: %s hosts' % \
+                'Uploading hosts group %s/%s. Group size: %s hosts' % 
                     (group_count, len(hosts_lists_to_upload), HOSTS_PER_REQ),
                 account_number=self.account_number, report_id=self.report_id))
             try:  # pylint: disable=too-many-nested-blocks
