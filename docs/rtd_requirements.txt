@@ -1,6 +1,6 @@
 -i https://pypi.python.org/simple
 aiokafka==0.5.1
-asynctest==0.12.2
+asynctest==0.12.3
 certifi==2019.3.9
 chardet==3.0.4
 django-environ==0.4.5
