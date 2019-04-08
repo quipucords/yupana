@@ -847,10 +847,10 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
 
     @staticmethod
     def format_system_profile(host):
-        """Grab facts from original host for system profile.
+        """Grab facts from original host for  profile.
 
         :param host: <dict> the host to pull facts from
-        :returns: a list with the system profile facts.
+        :returns: a list with the  profile facts.
         """
         qpc_to_system_profile = {
             'infrastructure_type': 'infrastructure_type',
@@ -863,7 +863,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         for qpc_fact, system_fact in qpc_to_system_profile.items():
             fact_value = host.get(qpc_fact)
             if fact_value:
-                system_profile[system_fact] = fact_value
+                system_profile[system_fact] = str(fact_value)
         cpu_count = host.get('cpu_count')
         # grab the default socket count
         cpu_socket_count = host.get('cpu_socket_count')
