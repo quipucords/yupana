@@ -848,10 +848,10 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
 
     @staticmethod
     def format_system_profile(host):
-        """Grab facts from original host for  profile.
+        """Grab facts from original host for system profile.
 
         :param host: <dict> the host to pull facts from
-        :returns: a list with the  profile facts.
+        :returns: a list with the system profile facts.
         """
         qpc_to_system_profile = {
             'infrastructure_type': 'infrastructure_type',
@@ -963,8 +963,8 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             group_count += 1
             LOG.info(format_message(
                 self.prefix,
-                'Uploading hosts group %s/%s. Group size: %s hosts' % 
-                    (group_count, len(hosts_lists_to_upload), HOSTS_PER_REQ),
+                'Uploading hosts group %s/%s. Group size: %s hosts' %
+                (group_count, len(hosts_lists_to_upload), HOSTS_PER_REQ),
                 account_number=self.account_number, report_id=self.report_id))
             try:  # pylint: disable=too-many-nested-blocks
                 response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
