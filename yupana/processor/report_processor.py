@@ -23,7 +23,7 @@ import logging
 import math
 import tarfile
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from http import HTTPStatus
 from io import BytesIO
@@ -147,7 +147,15 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         report_found_message = 'Starting report processor. State is "%s".'
         if self.report is None:
             try:
-                reports_to_process = Report.objects.filter(state=Report.NEW) # add more queries here
+                current_time = datetime.now(pytz.utc)
+                status_info = Status()
+                minimum_update_time = current_time - timedelta(minutes=RETRY_TIME)
+                reports_to_process = Report.objects.filter(state=Report.NEW) \
+                    | Report.objects.filter(retry_type=Report.TIME,
+                                            last_update_time__lt=minimum_update_time).exclude(
+                                                state=Report.NEW) \
+                    | Report.objects.filter(retry_type=Report.GIT_COMMIT).exclude(
+                        state=Report.NEW).exclude(git_commit=status_info.git_commit)
                 reports_count = reports_to_process.count()
                 LOG.info(format_message(
                     self.prefix,
@@ -156,8 +164,6 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                 # look for the oldest report in the db
                 assign = False
                 oldest_report = Report.objects.earliest('last_update_time')
-                current_time = datetime.now(pytz.utc)
-                status_info = Status()
                 same_commit = oldest_report.git_commit == status_info.git_commit
                 minutes_passed = int(
                     (current_time - oldest_report.last_update_time).total_seconds() / 60)
