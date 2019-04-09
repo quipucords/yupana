@@ -96,7 +96,7 @@ class RetryUploadCommitException(Exception):
     pass
 
 
-# pylint: disable=broad-except, too-many-lines
+# pylint: disable=broad-except, too-many-lines, too-many-public-methods
 class ReportProcessor():  # pylint: disable=too-many-instance-attributes
     """Class for processing saved reports that have been uploaded."""
 
@@ -134,6 +134,29 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             else:
                 await asyncio.sleep(EMPTY_QUEUE_SLEEP)
 
+    @staticmethod
+    def calculate_queued_reports(current_time, status_info):
+        """Calculate the number of reports waiting to be processed.
+
+        :param current_time: time object.
+        :param status_info: status object.
+        """
+        minimum_update_time = current_time - timedelta(minutes=RETRY_TIME)
+        # we want to grab all the new reports, or all the reports that are ready to be retried
+        # based on time, or commit
+        all_reports = Report.objects.all()
+        new_reports = all_reports.filter(state=Report.NEW)
+        retry_time_reports = all_reports.filter(
+            retry_type=Report.TIME,
+            last_update_time__lte=minimum_update_time).exclude(state=Report.NEW)
+        retry_commit_reports = all_reports.filter(
+            retry_type=Report.GIT_COMMIT).exclude(
+                state=Report.NEW).exclude(git_commit=status_info.git_commit)
+        reports_count = \
+            new_reports.count() + retry_time_reports.count() + retry_commit_reports.count()
+
+        return reports_count
+
     @transaction.atomic
     def assign_report(self):
         """Assign the report processor reports that are saved in the db.
@@ -149,14 +172,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             try:
                 current_time = datetime.now(pytz.utc)
                 status_info = Status()
-                minimum_update_time = current_time - timedelta(minutes=RETRY_TIME)
-                reports_to_process = Report.objects.filter(state=Report.NEW) \
-                    | Report.objects.filter(retry_type=Report.TIME,
-                                            last_update_time__lt=minimum_update_time).exclude(
-                                                state=Report.NEW) \
-                    | Report.objects.filter(retry_type=Report.GIT_COMMIT).exclude(
-                        state=Report.NEW).exclude(git_commit=status_info.git_commit)
-                reports_count = reports_to_process.count()
+                reports_count = self.calculate_queued_reports(current_time, status_info)
                 LOG.info(format_message(
                     self.prefix,
                     'There are %s reports waiting to be processed.' % reports_count,

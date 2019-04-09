@@ -33,7 +33,7 @@ from processor import (kafka_msg_handler as msg_handler,
                        report_processor,
                        tests_kafka_msg_handler as test_handler)
 
-from api.models import Report, ReportArchive
+from api.models import Report, ReportArchive, Status
 
 
 # pylint: disable=too-many-public-methods
@@ -1358,3 +1358,83 @@ class ReportProcessorTests(TestCase):
         expected_profile['cores_per_socket'] = 1
         system_profile = self.processor.format_system_profile(host)
         self.assertEqual(expected_profile, system_profile)
+
+    def test_calculating_queued_reports(self):
+        """Test the calculate_queued_reports method."""
+        status_info = Status()
+        current_time = datetime.now(pytz.utc)
+        self.report_record.state = Report.NEW
+        self.report_record.save()
+        reports_to_process = self.processor.calculate_queued_reports(current_time, status_info)
+        self.assertEqual(reports_to_process, 1)
+
+        min_old_time = current_time - timedelta(hours=8)
+        older_report = Report(
+            upload_srv_kafka_msg=json.dumps(self.msg),
+            rh_account='4321',
+            report_platform_id=self.uuid2,
+            state=Report.STARTED,
+            report_json=json.dumps([]),
+            state_info=json.dumps([Report.NEW]),
+            last_update_time=min_old_time,
+            candidate_hosts=json.dumps({}),
+            failed_hosts=json.dumps([]),
+            retry_count=1,
+            retry_type=Report.TIME)
+        older_report.save()
+
+        retry_commit_report = Report(
+            upload_srv_kafka_msg=json.dumps(self.msg),
+            rh_account='4321',
+            report_platform_id=self.uuid2,
+            state=Report.DOWNLOADED,
+            report_json=json.dumps([]),
+            state_info=json.dumps([Report.NEW]),
+            last_update_time=min_old_time,
+            candidate_hosts=json.dumps({}),
+            failed_hosts=json.dumps([]),
+            git_commit='3948384729',
+            retry_type=Report.GIT_COMMIT,
+            retry_count=1)
+        retry_commit_report.save()
+
+        # create some reports that should not be counted
+        not_old_enough = current_time - timedelta(hours=1)
+        too_young_report = Report(
+            upload_srv_kafka_msg=json.dumps(self.msg),
+            rh_account='4321',
+            report_platform_id=self.uuid2,
+            state=Report.DOWNLOADED,
+            report_json=json.dumps([]),
+            state_info=json.dumps([Report.NEW]),
+            last_update_time=not_old_enough,
+            candidate_hosts=json.dumps({}),
+            failed_hosts=json.dumps([]),
+            git_commit='3948384729',
+            retry_type=Report.TIME,
+            retry_count=1)
+        too_young_report.save()
+
+        same_commit_report = Report(
+            upload_srv_kafka_msg=json.dumps(self.msg),
+            rh_account='4321',
+            report_platform_id=self.uuid2,
+            state=Report.DOWNLOADED,
+            report_json=json.dumps([]),
+            state_info=json.dumps([Report.NEW]),
+            last_update_time=min_old_time,
+            candidate_hosts=json.dumps({}),
+            failed_hosts=json.dumps([]),
+            git_commit=status_info.git_commit,
+            retry_type=Report.GIT_COMMIT,
+            retry_count=1)
+        same_commit_report.save()
+
+        reports_to_process = self.processor.calculate_queued_reports(current_time, status_info)
+        self.assertEqual(reports_to_process, 3)
+
+        # delete the older report object
+        Report.objects.get(id=older_report.id).delete()
+        Report.objects.get(id=retry_commit_report.id).delete()
+        Report.objects.get(id=too_young_report.id).delete()
+        Report.objects.get(id=same_commit_report.id).delete()
