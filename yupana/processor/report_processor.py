@@ -147,6 +147,12 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         report_found_message = 'Starting report processor. State is "%s".'
         if self.report is None:
             try:
+                reports_to_process = Report.objects.filter(state=Report.NEW) # add more queries here
+                reports_count = reports_to_process.count()
+                LOG.info(format_message(
+                    self.prefix,
+                    'There are %s reports waiting to be processed.' % reports_count,
+                    account_number=self.account_number, report_id=self.report_id))
                 # look for the oldest report in the db
                 assign = False
                 oldest_report = Report.objects.earliest('last_update_time')
