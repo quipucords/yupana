@@ -23,7 +23,7 @@ import logging
 import math
 import tarfile
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from http import HTTPStatus
 from io import BytesIO
@@ -96,7 +96,7 @@ class RetryUploadCommitException(Exception):
     pass
 
 
-# pylint: disable=broad-except, too-many-lines
+# pylint: disable=broad-except, too-many-lines, too-many-public-methods
 class ReportProcessor():  # pylint: disable=too-many-instance-attributes
     """Class for processing saved reports that have been uploaded."""
 
@@ -134,6 +134,29 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             else:
                 await asyncio.sleep(EMPTY_QUEUE_SLEEP)
 
+    @staticmethod
+    def calculate_queued_reports(current_time, status_info):
+        """Calculate the number of reports waiting to be processed.
+
+        :param current_time: time object.
+        :param status_info: status object.
+        """
+        minimum_update_time = current_time - timedelta(minutes=RETRY_TIME)
+        # we want to grab all the new reports, or all the reports that are ready to be retried
+        # based on time, or commit
+        all_reports = Report.objects.all()
+        new_reports = all_reports.filter(state=Report.NEW)
+        retry_time_reports = all_reports.filter(
+            retry_type=Report.TIME,
+            last_update_time__lte=minimum_update_time).exclude(state=Report.NEW)
+        retry_commit_reports = all_reports.filter(
+            retry_type=Report.GIT_COMMIT).exclude(
+                state=Report.NEW).exclude(git_commit=status_info.git_commit)
+        reports_count = \
+            new_reports.count() + retry_time_reports.count() + retry_commit_reports.count()
+
+        return reports_count
+
     @transaction.atomic
     def assign_report(self):
         """Assign the report processor reports that are saved in the db.
@@ -147,11 +170,16 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         report_found_message = 'Starting report processor. State is "%s".'
         if self.report is None:
             try:
+                current_time = datetime.now(pytz.utc)
+                status_info = Status()
+                reports_count = self.calculate_queued_reports(current_time, status_info)
+                LOG.info(format_message(
+                    self.prefix,
+                    'There are %s reports waiting to be processed.' % reports_count,
+                    account_number=self.account_number, report_id=self.report_id))
                 # look for the oldest report in the db
                 assign = False
                 oldest_report = Report.objects.earliest('last_update_time')
-                current_time = datetime.now(pytz.utc)
-                status_info = Status()
                 same_commit = oldest_report.git_commit == status_info.git_commit
                 minutes_passed = int(
                     (current_time - oldest_report.last_update_time).total_seconds() / 60)
