@@ -74,7 +74,8 @@ HOST_UPLOAD_REQUEST_LATENCY = Summary(
     'inventory_upload_latency',
     'The time in seconds that it takes to post to the host inventory')
 VALIDATION_LATENCY = Summary('validation_latency', 'The time it takes to validate a report')
-HOSTS_PER_REPORT = Gauge('hosts_per_report', 'The total number of hosts per report')
+INVALID_HOSTS = Gauge('invalid_hosts_per_report', 'The total number of invalid hosts per report')
+VALID_HOSTS = Gauge('valid_hosts_per_report', 'The total number of valid hosts per report')
 HOSTS_UPLOADED_SUCCESS = Gauge('hosts_uploaded', 'The total number of hosts successfully uploaded')
 HOSTS_UPLOADED_FAILED = Gauge('hosts_failed', 'The total number of hosts that fail to upload')
 
@@ -314,6 +315,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             account_number=self.account_number))
         try:
             self.candidate_hosts, self.failed_hosts = self._validate_report_details()
+            INVALID_HOSTS.set(len(self.failed_hosts))
             self.report_id = self.report_json.get('report_platform_id')
             self.status = SUCCESS_CONFIRM_STATUS
             self.next_state = Report.VALIDATED
@@ -1156,7 +1158,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         total_hosts_count = len(hosts)
         failed_hosts_count = len(failed_hosts)
         successful = total_hosts_count - failed_hosts_count
-        HOSTS_PER_REPORT.set(total_hosts_count)
+        VALID_HOSTS.set(total_hosts_count)
         HOSTS_UPLOADED_SUCCESS.set(successful)
         HOSTS_UPLOADED_FAILED.set(failed_hosts_count)
         upload_msg = format_message(

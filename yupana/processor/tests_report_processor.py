@@ -464,9 +464,12 @@ class ReportProcessorTests(TestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'bios_uuid': 'value'}}}
+            'hosts': {self.uuid: {'bios_uuid': 'value'},
+                      self.uuid2: {'foo': 'bar'}}}
         self.processor.transition_to_validated()
+        invalid_hosts = REGISTRY.get_sample_value('invalid_hosts_per_report')
         self.assertEqual(self.report_record.state, Report.VALIDATED)
+        self.assertEqual(invalid_hosts, 1)
 
     def test_transition_to_validated_report_exception(self):
         """Test that a report with invalid type is still marked as validated."""
@@ -1139,7 +1142,7 @@ class ReportProcessorTests(TestCase):
                 self.processor._upload_to_host_inventory(hosts)
             self.assertEqual(retry_time_hosts, [])
             self.assertEqual(retry_commit_hosts, [])
-            total_hosts = REGISTRY.get_sample_value('hosts_per_report')
+            total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
             uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
             failed_hosts = REGISTRY.get_sample_value('hosts_failed')
             self.assertEqual(total_hosts, 7)
@@ -1164,7 +1167,7 @@ class ReportProcessorTests(TestCase):
             for host in expected_hosts:
                 self.assertIn(host, retry_time_hosts)
             self.assertEqual(retry_commit_hosts, [])
-            total_hosts = REGISTRY.get_sample_value('hosts_per_report')
+            total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
             uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
             failed_hosts = REGISTRY.get_sample_value('hosts_failed')
             self.assertEqual(total_hosts, 2)
@@ -1189,7 +1192,7 @@ class ReportProcessorTests(TestCase):
             for host in expected_hosts:
                 self.assertIn(host, retry_commit_hosts)
             self.assertEqual(retry_time_hosts, [])
-            total_hosts = REGISTRY.get_sample_value('hosts_per_report')
+            total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
             uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
             failed_hosts = REGISTRY.get_sample_value('hosts_failed')
             self.assertEqual(total_hosts, 2)
@@ -1214,7 +1217,7 @@ class ReportProcessorTests(TestCase):
             for host in expected_hosts:
                 self.assertIn(host, retry_time_hosts)
             self.assertEqual(retry_commit_hosts, [])
-            total_hosts = REGISTRY.get_sample_value('hosts_per_report')
+            total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
             uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
             failed_hosts = REGISTRY.get_sample_value('hosts_failed')
             self.assertEqual(total_hosts, 2)
@@ -1253,7 +1256,7 @@ class ReportProcessorTests(TestCase):
             self.assertEqual(retry_commit, [])
             for host in expected_hosts:
                 self.assertIn(host, retry_time)
-            total_hosts = REGISTRY.get_sample_value('hosts_per_report')
+            total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
             uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
             failed_hosts = REGISTRY.get_sample_value('hosts_failed')
             self.assertEqual(total_hosts, 2)
@@ -1298,7 +1301,7 @@ class ReportProcessorTests(TestCase):
             self.assertEqual(retry_time_hosts, [])
             for host in expected_hosts:
                 self.assertIn(host, retry_commit_hosts)
-            total_hosts = REGISTRY.get_sample_value('hosts_per_report')
+            total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
             uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
             failed_hosts = REGISTRY.get_sample_value('hosts_failed')
             self.assertEqual(total_hosts, 7)
