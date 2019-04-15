@@ -32,6 +32,7 @@ from django.test import TestCase
 from processor import (kafka_msg_handler as msg_handler,
                        report_processor,
                        tests_kafka_msg_handler as test_handler)
+from prometheus_client import REGISTRY
 
 from api.models import Report, ReportArchive, Status
 
@@ -463,9 +464,12 @@ class ReportProcessorTests(TestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'bios_uuid': 'value'}}}
+            'hosts': {self.uuid: {'bios_uuid': 'value'},
+                      self.uuid2: {'foo': 'bar'}}}
         self.processor.transition_to_validated()
+        invalid_hosts = REGISTRY.get_sample_value('invalid_hosts_per_report')
         self.assertEqual(self.report_record.state, Report.VALIDATED)
+        self.assertEqual(invalid_hosts, 1)
 
     def test_transition_to_validated_report_exception(self):
         """Test that a report with invalid type is still marked as validated."""
@@ -1138,6 +1142,14 @@ class ReportProcessorTests(TestCase):
                 self.processor._upload_to_host_inventory(hosts)
             self.assertEqual(retry_time_hosts, [])
             self.assertEqual(retry_commit_hosts, [])
+            total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
+            uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
+            failed_hosts = REGISTRY.get_sample_value('hosts_failed')
+            upload_group_size = REGISTRY.get_sample_value('upload_group_size')
+            self.assertEqual(total_hosts, 7)
+            self.assertEqual(uploaded_hosts, 7)
+            self.assertEqual(failed_hosts, 0)
+            self.assertEqual(upload_group_size, 7)
 
     def test_no_json_resp_host_inventory_upload(self):
         """Testing unsuccessful upload to host inventory."""
@@ -1157,6 +1169,14 @@ class ReportProcessorTests(TestCase):
             for host in expected_hosts:
                 self.assertIn(host, retry_time_hosts)
             self.assertEqual(retry_commit_hosts, [])
+            total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
+            uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
+            failed_hosts = REGISTRY.get_sample_value('hosts_failed')
+            upload_group_size = REGISTRY.get_sample_value('upload_group_size')
+            self.assertEqual(total_hosts, 2)
+            self.assertEqual(uploaded_hosts, 0)
+            self.assertEqual(failed_hosts, 2)
+            self.assertEqual(upload_group_size, 2)
 
     def test_400_resp_host_inventory_upload(self):
         """Testing unsuccessful upload to host inventory."""
@@ -1176,6 +1196,14 @@ class ReportProcessorTests(TestCase):
             for host in expected_hosts:
                 self.assertIn(host, retry_commit_hosts)
             self.assertEqual(retry_time_hosts, [])
+            total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
+            uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
+            failed_hosts = REGISTRY.get_sample_value('hosts_failed')
+            upload_group_size = REGISTRY.get_sample_value('upload_group_size')
+            self.assertEqual(total_hosts, 2)
+            self.assertEqual(uploaded_hosts, 0)
+            self.assertEqual(failed_hosts, 2)
+            self.assertEqual(upload_group_size, 2)
 
     def test_500_resp_host_inventory_upload(self):
         """Testing unsuccessful upload to host inventory."""
@@ -1195,6 +1223,14 @@ class ReportProcessorTests(TestCase):
             for host in expected_hosts:
                 self.assertIn(host, retry_time_hosts)
             self.assertEqual(retry_commit_hosts, [])
+            total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
+            uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
+            failed_hosts = REGISTRY.get_sample_value('hosts_failed')
+            upload_group_size = REGISTRY.get_sample_value('upload_group_size')
+            self.assertEqual(total_hosts, 2)
+            self.assertEqual(uploaded_hosts, 0)
+            self.assertEqual(failed_hosts, 2)
+            self.assertEqual(upload_group_size, 2)
 
     def test_host_inventory_upload_500(self):
         """Testing successful upload to host inventory with 500 errors."""
@@ -1228,6 +1264,14 @@ class ReportProcessorTests(TestCase):
             self.assertEqual(retry_commit, [])
             for host in expected_hosts:
                 self.assertIn(host, retry_time)
+            total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
+            uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
+            failed_hosts = REGISTRY.get_sample_value('hosts_failed')
+            upload_group_size = REGISTRY.get_sample_value('upload_group_size')
+            self.assertEqual(total_hosts, 2)
+            self.assertEqual(uploaded_hosts, 0)
+            self.assertEqual(failed_hosts, 2)
+            self.assertEqual(upload_group_size, 2)
 
     def test_host_inventory_upload_400(self):
         """Testing successful upload to host inventory with 500 errors."""
@@ -1267,6 +1311,14 @@ class ReportProcessorTests(TestCase):
             self.assertEqual(retry_time_hosts, [])
             for host in expected_hosts:
                 self.assertIn(host, retry_commit_hosts)
+            total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
+            uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
+            failed_hosts = REGISTRY.get_sample_value('hosts_failed')
+            upload_group_size = REGISTRY.get_sample_value('upload_group_size')
+            self.assertEqual(total_hosts, 7)
+            self.assertEqual(uploaded_hosts, 5)
+            self.assertEqual(failed_hosts, 2)
+            self.assertEqual(upload_group_size, 7)
 
     @patch('processor.report_processor.requests.post')
     def test_host_url_exceptions(self, mock_request):
@@ -1438,3 +1490,11 @@ class ReportProcessorTests(TestCase):
         Report.objects.get(id=retry_commit_report.id).delete()
         Report.objects.get(id=too_young_report.id).delete()
         Report.objects.get(id=same_commit_report.id).delete()
+
+    def test_state_to_metric(self):
+        """Test the state_to_metric function."""
+        self.processor.state = Report.FAILED_DOWNLOAD
+        failed_download_before = REGISTRY.get_sample_value('failed_download_total')
+        self.processor.record_failed_state_metrics()
+        failed_download_after = REGISTRY.get_sample_value('failed_download_total')
+        self.assertEqual(1, failed_download_after - failed_download_before)
