@@ -73,6 +73,8 @@ COMMIT_RETRIES = Counter('commit_retries',
 HOST_UPLOAD_REQUEST_LATENCY = Summary(
     'inventory_upload_latency',
     'The time in seconds that it takes to post to the host inventory')
+UPLOAD_GROUP_SIZE = Gauge('upload_group_size',
+                          'The amount of hosts being uploaded in a single bulk request.')
 VALIDATION_LATENCY = Summary('validation_latency', 'The time it takes to validate a report')
 INVALID_HOSTS = Gauge('invalid_hosts_per_report', 'The total number of invalid hosts per report')
 VALID_HOSTS = Gauge('valid_hosts_per_report', 'The total number of valid hosts per report')
@@ -1035,11 +1037,12 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         retry_commit_hosts = []  # storing hosts to retry after commit change
         group_count = 0
         for hosts_list in hosts_lists_to_upload:  # pylint: disable=too-many-nested-blocks
+            UPLOAD_GROUP_SIZE.set(len(hosts_list))
             group_count += 1
             LOG.info(format_message(
                 self.prefix,
                 'Uploading hosts group %s/%s. Group size: %s hosts' %
-                (group_count, len(hosts_lists_to_upload), HOSTS_PER_REQ),
+                (group_count, len(hosts_lists_to_upload), len(hosts_list)),
                 account_number=self.account_number, report_id=self.report_id))
             try:  # pylint: disable=too-many-nested-blocks
                 with HOST_UPLOAD_REQUEST_LATENCY.time():

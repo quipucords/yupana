@@ -1145,9 +1145,11 @@ class ReportProcessorTests(TestCase):
             total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
             uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
             failed_hosts = REGISTRY.get_sample_value('hosts_failed')
+            upload_group_size = REGISTRY.get_sample_value('upload_group_size')
             self.assertEqual(total_hosts, 7)
             self.assertEqual(uploaded_hosts, 7)
             self.assertEqual(failed_hosts, 0)
+            self.assertEqual(upload_group_size, 7)
 
     def test_no_json_resp_host_inventory_upload(self):
         """Testing unsuccessful upload to host inventory."""
@@ -1170,9 +1172,11 @@ class ReportProcessorTests(TestCase):
             total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
             uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
             failed_hosts = REGISTRY.get_sample_value('hosts_failed')
+            upload_group_size = REGISTRY.get_sample_value('upload_group_size')
             self.assertEqual(total_hosts, 2)
             self.assertEqual(uploaded_hosts, 0)
             self.assertEqual(failed_hosts, 2)
+            self.assertEqual(upload_group_size, 2)
 
     def test_400_resp_host_inventory_upload(self):
         """Testing unsuccessful upload to host inventory."""
@@ -1195,9 +1199,11 @@ class ReportProcessorTests(TestCase):
             total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
             uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
             failed_hosts = REGISTRY.get_sample_value('hosts_failed')
+            upload_group_size = REGISTRY.get_sample_value('upload_group_size')
             self.assertEqual(total_hosts, 2)
             self.assertEqual(uploaded_hosts, 0)
             self.assertEqual(failed_hosts, 2)
+            self.assertEqual(upload_group_size, 2)
 
     def test_500_resp_host_inventory_upload(self):
         """Testing unsuccessful upload to host inventory."""
@@ -1220,9 +1226,11 @@ class ReportProcessorTests(TestCase):
             total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
             uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
             failed_hosts = REGISTRY.get_sample_value('hosts_failed')
+            upload_group_size = REGISTRY.get_sample_value('upload_group_size')
             self.assertEqual(total_hosts, 2)
             self.assertEqual(uploaded_hosts, 0)
             self.assertEqual(failed_hosts, 2)
+            self.assertEqual(upload_group_size, 2)
 
     def test_host_inventory_upload_500(self):
         """Testing successful upload to host inventory with 500 errors."""
@@ -1259,9 +1267,11 @@ class ReportProcessorTests(TestCase):
             total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
             uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
             failed_hosts = REGISTRY.get_sample_value('hosts_failed')
+            upload_group_size = REGISTRY.get_sample_value('upload_group_size')
             self.assertEqual(total_hosts, 2)
             self.assertEqual(uploaded_hosts, 0)
             self.assertEqual(failed_hosts, 2)
+            self.assertEqual(upload_group_size, 2)
 
     def test_host_inventory_upload_400(self):
         """Testing successful upload to host inventory with 500 errors."""
@@ -1304,9 +1314,11 @@ class ReportProcessorTests(TestCase):
             total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
             uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
             failed_hosts = REGISTRY.get_sample_value('hosts_failed')
+            upload_group_size = REGISTRY.get_sample_value('upload_group_size')
             self.assertEqual(total_hosts, 7)
             self.assertEqual(uploaded_hosts, 5)
             self.assertEqual(failed_hosts, 2)
+            self.assertEqual(upload_group_size, 7)
 
     @patch('processor.report_processor.requests.post')
     def test_host_url_exceptions(self, mock_request):
