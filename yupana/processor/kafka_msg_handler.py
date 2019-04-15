@@ -25,6 +25,7 @@ from datetime import datetime
 import pytz
 from aiokafka import AIOKafkaConsumer
 from kafka.errors import ConnectionError as KafkaConnectionError
+from prometheus_client import Counter
 
 from api.models import Report
 from config.settings.base import INSIGHTS_KAFKA_ADDRESS
@@ -34,6 +35,8 @@ EVENT_LOOP = asyncio.get_event_loop()
 MSG_PENDING_QUEUE = asyncio.Queue()
 QPC_TOPIC = 'platform.upload.qpc'
 AVAILABLE_TOPIC = 'platform.upload.available'
+
+MSG_UPLOADS = Counter('uploaded_messages', 'Number of messages uploaded to qpc topic')
 
 
 def format_message(prefix, message, account_number=None, report_id=None):
@@ -127,6 +130,7 @@ async def save_message_and_ack(consumer, consumer_record):
                     failed_hosts=json.dumps([]),
                     retry_count=0)
                 uploaded_report.save()
+                MSG_UPLOADS.inc()
                 LOG.info(format_message(
                     prefix, 'Upload service message saved. Ready for processing.'))
                 await consumer.commit()

@@ -36,6 +36,7 @@ from kafka.errors import ConnectionError as KafkaConnectionError
 from processor.kafka_msg_handler import (KafkaMsgHandlerError,
                                          QPCReportException,
                                          format_message)
+from prometheus_client import Counter, Gauge, Summary
 
 from api.models import Report, ReportArchive, Status
 from config.settings.base import (INSIGHTS_HOST_INVENTORY_URL,
@@ -58,6 +59,24 @@ RETRY = Enum('RETRY', 'clear increment keep_same')
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
 HOSTS_PER_REQ = 1000
+
+# setup for prometheus metrics
+QUEUED_REPORTS = Gauge('queued_reports', 'Reports waiting to be processed')
+ARCHIVED_FAIL = Counter('archived_fail', 'Reports that have been archived as failures')
+ARCHIVED_SUCCESS = Counter('archived_success', 'Reports that have been archived as successes')
+FAILED_TO_DOWNLOAD = Counter('failed_download', 'Reports that failed to downlaod')
+FAILED_TO_VALIDATE = Counter('failed_validation', 'Reports that could not be validated')
+INVALID_REPORTS = Counter('invalid_reports', 'Reports containing invalid syntax')
+TIME_RETRIES = Counter('time_retries', 'The total number of retries based on time for all reports')
+COMMIT_RETRIES = Counter('commit_retries',
+                         'The total number of retries based on commit for all reports')
+HOST_UPLOAD_REQUEST_LATENCY = Summary(
+    'inventory_upload_latency',
+    'The time in seconds that it takes to post to the host inventory')
+VALIDATION_LATENCY = Summary('validation_latency', 'The time it takes to validate a report')
+HOSTS_PER_REPORT = Gauge('hosts_per_report', 'The total number of hosts per report')
+HOSTS_UPLOADED_SUCCESS = Gauge('hosts_uploaded', 'The total number of hosts successfully uploaded')
+HOSTS_UPLOADED_FAILED = Gauge('hosts_failed', 'The total number of hosts that fail to upload')
 
 
 class FailDownloadException(Exception):
@@ -173,9 +192,10 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                 current_time = datetime.now(pytz.utc)
                 status_info = Status()
                 reports_count = self.calculate_queued_reports(current_time, status_info)
+                QUEUED_REPORTS.set(reports_count)
                 LOG.info(format_message(
                     self.prefix,
-                    'There are %s reports waiting to be processed.' % reports_count,
+                    'Number of reports waiting to be processed: %s' % reports_count,
                     account_number=self.account_number, report_id=self.report_id))
                 # look for the oldest report in the db
                 assign = False
@@ -387,10 +407,20 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
             self.determine_retry(Report.FAILED_HOSTS_UPLOAD, Report.VALIDATION_REPORTED,
                                  retry_type=Report.GIT_COMMIT)
 
+    def record_failed_state_metrics(self):
+        """Record the metrics based on the report state."""
+        state_to_metric = {
+            Report.FAILED_DOWNLOAD: FAILED_TO_DOWNLOAD.inc,
+            Report.FAILED_VALIDATION: FAILED_TO_VALIDATE.inc
+        }
+        if self.state in state_to_metric.keys():
+            state_to_metric.get(self.state)()
+
     @transaction.atomic
     def archive_report(self):
         """Archive the report object."""
         self.prefix = 'ARCHIVING REPORT'
+        failed = False
         LOG.info(format_message(self.prefix, 'Archiving report.',
                                 account_number=self.account_number, report_id=self.report_id))
         archived = ReportArchive(
@@ -409,8 +439,20 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         if self.report_json:
             archived.report_json = self.report_json
         if self.status:
+            if self.status == FAILURE_CONFIRM_STATUS:
+                failed = True
+                INVALID_REPORTS.inc()
             archived.upload_ack_status = self.status
         archived.save()
+        failed_states = [Report.FAILED_DOWNLOAD, Report.FAILED_VALIDATION,
+                         Report.FAILED_VALIDATION_REPORTING, Report.FAILED_HOSTS_UPLOAD]
+        if self.state in failed_states or failed:
+            print('Increment failed archive')
+            ARCHIVED_FAIL.inc()
+        else:
+            print('Increment success archive')
+            ARCHIVED_SUCCESS.inc()
+        self.record_failed_state_metrics()
         try:
             Report.objects.get(id=self.report.id).delete()
         except Report.DoesNotExist:
@@ -508,10 +550,12 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
         else:
             self.next_state = current_state
             if retry_type == Report.GIT_COMMIT:
+                COMMIT_RETRIES.inc()
                 log_message = \
                     'Saving the report to retry when a new commit '\
                     'is pushed. Retries: %s' % str(self.report.retry_count + 1)
             else:
+                TIME_RETRIES.inc()
                 log_message = \
                     'Saving the report to retry at in %s minutes. '\
                     'Retries: %s' % (str(RETRY_TIME),
@@ -683,6 +727,7 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                                'Unexpected error reading tar.gz: %s' % str(err),
                                account_number=self.account_number))
 
+    @VALIDATION_LATENCY.time()
     def _validate_report_details(self):  # pylint: disable=too-many-locals
         """
         Verify that the report contents are a valid Insights report.
@@ -995,10 +1040,10 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                 (group_count, len(hosts_lists_to_upload), HOSTS_PER_REQ),
                 account_number=self.account_number, report_id=self.report_id))
             try:  # pylint: disable=too-many-nested-blocks
-                response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
-                                         data=json.dumps(hosts_list),
-                                         headers=identity_header)
-
+                with HOST_UPLOAD_REQUEST_LATENCY.time():
+                    response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
+                                             data=json.dumps(hosts_list),
+                                             headers=identity_header)
                 if response.status_code in [HTTPStatus.MULTI_STATUS]:
                     try:
                         json_body = response.json()
@@ -1108,7 +1153,12 @@ class ReportProcessor():  # pylint: disable=too-many-instance-attributes
                         'system_platform_id': host_id,
                         'host': host_data})
 
-        successful = len(hosts) - len(failed_hosts)
+        total_hosts_count = len(hosts)
+        failed_hosts_count = len(failed_hosts)
+        successful = total_hosts_count - failed_hosts_count
+        HOSTS_PER_REPORT.set(total_hosts_count)
+        HOSTS_UPLOADED_SUCCESS.set(successful)
+        HOSTS_UPLOADED_FAILED.set(failed_hosts_count)
         upload_msg = format_message(
             self.prefix, '%s/%s hosts uploaded to host inventory' %
             (successful, len(hosts)),
