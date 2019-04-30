@@ -126,8 +126,6 @@ async def save_message_and_ack(consumer, consumer_record):
                     state=Report.NEW,
                     state_info=json.dumps([Report.NEW]),
                     last_update_time=datetime.now(pytz.utc),
-                    candidate_hosts=json.dumps([]),
-                    failed_hosts=json.dumps([]),
                     retry_count=0)
                 uploaded_report.save()
                 MSG_UPLOADS.inc()
