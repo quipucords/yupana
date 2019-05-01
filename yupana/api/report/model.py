@@ -26,6 +26,7 @@ class AbstractReport(models.Model):
     upload_ack_status = models.TextField(null=True)
     upload_srv_kafka_msg = models.TextField(null=True)
     git_commit = models.TextField(null=True)
+    ready_to_archive = models.BooleanField(null=False, default=False)
 
     NEW = 'new'
     STARTED = 'started'

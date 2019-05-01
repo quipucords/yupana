@@ -113,6 +113,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
 
     def reset_variables(self):
         """Reset the class variables to original values."""
+        print('RESETTING THE VARIABLES in lieu of archiving')
         self.report_or_slice = None
         self.state = None
         self.account_number = None
@@ -224,7 +225,6 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         If none of the above qualify, we look for the oldest objects that are in the new state.
         """
         self.prefix = 'ASSIGNING %s' % self.object_prefix
-        print('This is the failing function!')
         if self.report_or_slice is None:
             try:
                 assign, oldest_object = self.get_oldest_object_retry()
@@ -260,11 +260,13 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         self.pre_delegate()
         print('after calling pre-delegate')
         # if the function is async, we must await it
-        if self.state_functions.get(self.state, None):
+        if self.state_functions.get(self.state):
             if self.state in self.async_states:
                 await self.state_functions.get(self.state)()
             else:
                 self.state_functions.get(self.state)()
+        else: 
+            self.reset_variables()
 
     def update_object_state(self, retry=RETRY.clear,   # noqa: C901 (too-complex)
                             retry_type=None, report_json=None,

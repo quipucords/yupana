@@ -35,6 +35,7 @@ class ReportSliceSerializer(ModelSerializer):
     last_update_time = DateField(null=True)
     failed_hosts = JSONField(null=True)
     candidate_hosts = JSONField(null=True)
+    ready_to_archive = BooleanField(required=True)
 
     class Meta:
         """Meta class for ReportSliceSerializer."""

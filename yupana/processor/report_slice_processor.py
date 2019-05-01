@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-"""Report Slice Finite State Machine."""
+"""Report Slice Processor."""
 
 import asyncio
 import base64
@@ -36,6 +36,16 @@ from kafka.errors import ConnectionError as KafkaConnectionError
 from processor.kafka_msg_handler import (KafkaMsgHandlerError,
                                          QPCReportException,
                                          format_message)
+
+from processor.abstract_processor import (AbstractProcessor, COMMIT_RETRIES, 
+                                          TIME_RETRIES, INVALID_HOSTS,
+                                          ARCHIVED_FAIL, ARCHIVED_SUCCESS,
+                                          FAILED_TO_DOWNLOAD, FAILED_TO_VALIDATE,
+                                          INVALID_REPORTS, VALIDATION_LATENCY,
+                                          UPLOAD_GROUP_SIZE, HOST_UPLOAD_REQUEST_LATENCY,
+                                          HOSTS_UPLOADED_FAILED, HOSTS_UPLOADED_SUCCESS,
+                                          VALID_HOSTS)
+
 from prometheus_client import Counter, Gauge, Summary
 
 from api.models import (Report, ReportArchive, 
@@ -47,7 +57,7 @@ from config.settings.base import (INSIGHTS_HOST_INVENTORY_URL,
                                   RETRY_TIME)
 
 LOG = logging.getLogger(__name__)
-PROCESSING_LOOP = asyncio.new_event_loop()
+SLICE_PROCESSING_LOOP = asyncio.new_event_loop()
 VALIDATION_TOPIC = 'platform.upload.validation'
 SUCCESS_CONFIRM_STATUS = 'success'
 FAILURE_CONFIRM_STATUS = 'failure'
@@ -76,78 +86,73 @@ class RetryUploadCommitException(Exception):
     pass
 
 
-class ReportSliceFSM():
+class ReportSliceProcessor(AbstractProcessor):
     """Class for processing report slices that have been created."""
 
     def __init__(self):
         """Create a report slice state machine."""
-        self.report = None
-        self.state = None
-        self.next_state = None
-        self.account_number = None
-        self.upload_message = None
-        self.report_id = None
-        self.report_json = None
-        self.candidate_hosts = None
-        self.failed_hosts = None
-        self.status = None
-        self.prefix = 'PROCESSING REPORT'
-        self.should_run = True
+        self.state_functions = {
+            ReportSlice.RETRY_VALIDATION: self.transition_to_new,
+            ReportSlice.NEW: self.transition_to_started,
+            ReportSlice.STARTED: self.transition_to_hosts_uploaded,
+            ReportSlice.VALIDATED: self.transition_to_hosts_uploaded,
+            ReportSlice.HOSTS_UPLOADED: self.archive_report,
+            ReportSlice.FAILED_VALIDATION: self.archive_report,
+            ReportSlice.FAILED_HOSTS_UPLOAD: self.archive_report}
+        super().__init__(pre_delegate=self.pre_delegate,
+                         state_functions=self.state_functions,
+                         async_states=[],
+                         object_prefix='REPORT SLICE',
+                         object_class=ReportSlice
+                         )
 
-    def reset_variables(self):
-        """Reset the class variables to original values."""
-        self.report = None
-        self.state = None
-        self.account_number = None
-        self.upload_message = None
-        self.report_id = None
-        self.report_json = None
-        self.candidate_hosts = None
-        self.failed_hosts = None
-        self.status = None
-        self.prefix = 'PROCESSING REPORT'
-
-    async def delegate_state(self):
+    def pre_delegate(self):
         """Call the correct function based on report slice state.
 
         If the function is async, make sure to await it.
         """
-        self.report = self.object
-        self.state = self.report.state
-        self.account_number = self.report.rh_account
-        self.upload_message = json.loads(self.report.upload_srv_kafka_msg)
-        if self.report.candidate_hosts:
-            self.candidate_hosts = json.loads(self.report.candidate_hosts)
-        if self.report.failed_hosts:
-            self.failed_hosts = json.loads(self.report.failed_hosts)
-        if self.report.report_json:
-            self.report_json = json.loads(self.report.report_json)
-        if self.report.report_platform_id:
-            self.report_id = self.report.report_platform_id
-        if self.report.upload_ack_status:
-            self.status = self.report.upload_ack_status
-        async_function_call_states = [Report.VALIDATED]
-        state_functions = {Report.NEW: self.transition_to_started,
-                           Report.STARTED: self.transition_to_hosts_uploaded,
-                           Report.HOSTS_UPLOADED: self.archive_report,
-                           Report.FAILED_VALIDATION: self.archive_report,
-                           Report.FAILED_HOSTS_UPLOAD: self.archive_report}
-        # if the function is async, we must await it
-        if self.state in async_function_call_states:
-            await state_functions.get(self.state)()
-        else:
-            state_functions.get(self.state)()
+        self.state = self.report_or_slice.state
+        self.account_number = self.report_or_slice.rh_account
+        if self.report_or_slice.candidate_hosts:
+            self.candidate_hosts = json.loads(self.report_or_slice.candidate_hosts)
+        if self.report_or_slice.failed_hosts:
+            self.failed_hosts = json.loads(self.report_or_slice.failed_hosts)
+        if self.report_or_slice.report_json:
+            self.report_json = json.loads(self.report_or_slice.report_json)
+        if self.report_or_slice.report_platform_id:
+            self.report_id = self.report_or_slice.report_platform_id
 
-    def transition_to_started(self):
-        """Attempt to change the state to started."""
-        self.next_state = Report.STARTED
-        self.update_report_state()
+    def transition_to_new(self):
+        """The slice is in the failed validation state so we need to revalidate it."""
+        self.prefix = 'ATTEMPTING VALIDATION'
+        LOG.info(format_message(
+            self.prefix, 'Uploading hosts to inventory. State is "%s".' % self.report_or_slice.state,
+            account_number=self.account_number, report_id=self.report_id))
+        try: 
+            self.report_json = json.loads(self.report_or_slice.report_json)
+            self.candidate_hosts, self.failed_hosts = self._validate_report_details()
+            INVALID_HOSTS.set(len(self.failed_hosts))
+            # Here we want to update the report state of the actual report slice & when finished, of the report
+            self.next_state = ReportSlice.NEW
+            self.update_object_state(candidate_hosts=self.candidate_hosts, failed_hosts=self.failed_hosts)
+        except QPCReportException:
+            # if any QPCReportExceptions occur, we know that the report is not valid but has been
+            # successfully validated
+            # that means that this slice is invalid and only awaits being archived 
+            self.next_state = ReportSlice.FAILED_VALIDATION
+            self.update_object_state()
+        except Exception as error:
+            # This slice blew up validation - we want to retry it later, which means it enters our odd state 
+            # of requiring validation 
+            LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error)))
+            self.determine_retry(ReporSlice.FAILED_VALIDATION, ReportSlice.RETRY_VALIDATION, 
+                                 retry_type=ReportSlice.GIT_COMMIT)
 
     def transition_to_hosts_uploaded(self):
         """Upload the host candidates to inventory & move to hosts_uploaded state."""
         self.prefix = 'ATTEMPTING HOST UPLOAD'
         LOG.info(format_message(
-            self.prefix, 'Uploading hosts to inventory. State is "%s".' % self.report.state,
+            self.prefix, 'Uploading hosts to inventory. State is "%s".' % self.report_or_slice.state,
             account_number=self.account_number, report_id=self.report_id))
         try:
             if self.candidate_hosts:
@@ -158,7 +163,7 @@ class ReportSliceFSM():
                     LOG.info(format_message(self.prefix, 'All hosts were successfully uploaded.',
                                             account_number=self.account_number,
                                             report_id=self.report_id))
-                    self.next_state = Report.HOSTS_UPLOADED
+                    self.next_state = ReportSlice.HOSTS_UPLOADED
                     self.update_report_state(candidate_hosts=[])
                 else:
                     candidates = []
@@ -168,15 +173,15 @@ class ReportSliceFSM():
                     # they will succeed and leave behind the retry_commit hosts
                     if retry_commit_candidates:
                         candidates += retry_commit_candidates
-                        retry_type = Report.GIT_COMMIT
+                        retry_type = ReportSlice.GIT_COMMIT
                     if retry_time_candidates:
                         candidates += retry_time_candidates
-                        retry_type = Report.TIME
+                        retry_type = ReportSlice.TIME
                     LOG.info(format_message(self.prefix, 'Hosts were not successfully uploaded',
                                             account_number=self.account_number,
                                             report_id=self.report_id))
-                    self.determine_retry(Report.FAILED_HOSTS_UPLOAD,
-                                         Report.VALIDATION_REPORTED,
+                    self.determine_retry(ReportSlice.FAILED_HOSTS_UPLOAD,
+                                         ReportSlice.VALIDATED,
                                          candidate_hosts=candidates,
                                          retry_type=retry_type)
             else:
@@ -188,60 +193,53 @@ class ReportSliceFSM():
         except Exception as error:
             LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error),
                                      account_number=self.account_number, report_id=self.report_id))
-            self.determine_retry(Report.FAILED_HOSTS_UPLOAD, Report.VALIDATION_REPORTED,
-                                 retry_type=Report.GIT_COMMIT)
+            self.determine_retry(ReportSlice.FAILED_HOSTS_UPLOAD, ReportSlice.VALIDATED,
+                                 retry_type=ReportSlice.GIT_COMMIT)
 
     def record_failed_state_metrics(self):
         """Record the metrics based on the report state."""
         state_to_metric = {
-            Report.FAILED_DOWNLOAD: FAILED_TO_DOWNLOAD.inc,
-            Report.FAILED_VALIDATION: FAILED_TO_VALIDATE.inc
+            ReportSlice.FAILED_DOWNLOAD: FAILED_TO_DOWNLOAD.inc,
+            ReportSlice.FAILED_VALIDATION: FAILED_TO_VALIDATE.inc
         }
         if self.state in state_to_metric.keys():
             state_to_metric.get(self.state)()
 
     @transaction.atomic
     def archive_report(self):
-        """Archive the report object."""
+        """Archive the report slice object."""
         self.prefix = 'ARCHIVING REPORT'
         failed = False
         LOG.info(format_message(self.prefix, 'Archiving report.',
                                 account_number=self.account_number, report_id=self.report_id))
-        archived = ReportArchive(
+        archived = ReportSliceArchive(
             rh_account=self.account_number,
-            retry_count=self.report.retry_count,
-            retry_type=self.report.retry_type,
-            candidate_hosts=self.report.candidate_hosts,
-            failed_hosts=self.report.failed_hosts,
+            retry_count=self.report_or_slice.retry_count,
+            retry_type=self.report_or_slice.retry_type,
+            candidate_hosts=self.report_or_slice.candidate_hosts,
+            failed_hosts=self.report_or_slice.failed_hosts,
             state=self.state,
-            state_info=self.report.state_info,
-            last_update_time=self.report.last_update_time,
-            upload_srv_kafka_msg=self.upload_message
+            state_info=self.report_or_slice.state_info,
+            last_update_time=self.report_or_slice.last_update_time,
         )
         if self.report_id:
             archived.report_platform_id = self.report_id
         if self.report_json:
             archived.report_json = self.report_json
-        if self.status:
-            if self.status == FAILURE_CONFIRM_STATUS:
-                failed = True
-                INVALID_REPORTS.inc()
-            archived.upload_ack_status = self.status
         archived.save()
-        failed_states = [Report.FAILED_DOWNLOAD, Report.FAILED_VALIDATION,
-                         Report.FAILED_VALIDATION_REPORTING, Report.FAILED_HOSTS_UPLOAD]
+
+        failed_states = [ReportSlice.FAILED_VALIDATION, ReportSlice.FAILED_HOSTS_UPLOAD]
         if self.state in failed_states or failed:
-            print('Increment failed archive')
             ARCHIVED_FAIL.inc()
         else:
             print('Increment success archive')
             ARCHIVED_SUCCESS.inc()
         self.record_failed_state_metrics()
         try:
-            Report.objects.get(id=self.report.id).delete()
-        except Report.DoesNotExist:
+            ReportSlice.objects.get(id=self.report_or_slice.id).delete()
+        except ReportSlice.DoesNotExist:
             pass
-        LOG.info(format_message(self.prefix, 'Report successfully archived.',
+        LOG.info(format_message(self.prefix, 'Report slice successfully archived.',
                                 account_number=self.account_number, report_id=self.report_id))
         self.reset_variables()
 
@@ -363,6 +361,21 @@ class ReportSliceFSM():
 
             bulk_upload_list.append(body)
         return bulk_upload_list
+
+    def generate_upload_candidates(self):
+        """Generate dictionary of hosts that need to be uploaded to host inventory.
+         If a retry has not occurred then we return the candidate_hosts
+        but if a retry has occurred and failed at uploading, we want to retry
+        the hosts that failed upload while excluding the ones that succeeded.
+        """
+        candidate_hosts = json.loads(self.report_or_slice.candidate_hosts)
+        candidates = {}
+        # we want to generate a dictionary of just the id mapped to the data
+        # so we iterate the list creating a dictionary of the key: value if
+        # the key is not 'cause' or 'status_code'
+        candidates = {key: host[key] for host in candidate_hosts
+                      for key in host.keys() if key not in ['cause', 'status_code']}
+        return candidates
 
     @staticmethod
     def split_hosts(list_of_all_hosts):
@@ -547,7 +560,7 @@ class ReportSliceFSM():
         return retry_time_hosts, retry_commit_hosts
 
 
- def asyncio_report_processor_thread(loop):  # pragma: no cover
+def asyncio_report_processor_thread(loop):  # pragma: no cover
     """
     Worker thread function to run the asyncio event loop.
 
@@ -556,11 +569,11 @@ class ReportSliceFSM():
     :param loop: event loop
     :returns None
     """
-    processor = ReportProcessor()
+    processor = ReportSliceProcessor()
     loop.run_until_complete(processor.run())
 
 
-def initialize_report_processor():  # pragma: no cover
+def initialize_report_slice_processor():  # pragma: no cover
     """
     Create asyncio tasks and daemon thread to run event loop.
 
@@ -570,6 +583,6 @@ def initialize_report_processor():  # pragma: no cover
     :returns None
     """
     event_loop_thread = threading.Thread(target=asyncio_report_processor_thread,
-                                         args=(PROCESSING_LOOP,))
+                                         args=(SLICE_PROCESSING_LOOP,))
     event_loop_thread.daemon = True
     event_loop_thread.start()   

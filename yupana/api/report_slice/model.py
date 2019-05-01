@@ -23,12 +23,14 @@ class AbstractReportSlice(models.Model):
     rh_account = models.TextField(null=True)
     report_json = models.TextField(null=True)
     git_commit = models.TextField(null=True)
+    ready_to_archive = models.BooleanField(null=False, default=False)
     report = models.ForeignKey(Report, null=True, on_delete=models.CASCADE)
 
     PENDING = 'pending'
     NEW = 'new'
     RETRY_VALIDATION = 'retry_validation'
     FAILED_VALIDATION = 'failed_validation'
+    VALIDATED = 'validated'
     STARTED = 'started'
     HOSTS_UPLOADED = 'hosts uploaded'
     FAILED_HOSTS_UPLOAD = 'failed to upload hosts'
@@ -36,6 +38,7 @@ class AbstractReportSlice(models.Model):
                      ('NEW', NEW),
                      ('RETRY_VALIDATION', RETRY_VALIDATION),
                      ('FAILED_VALIDATION', FAILED_VALIDATION),
+                     ('VALIDATED', VALIDATED),
                      ('STARTED', STARTED),
                      ('HOSTS_UPLOADED', HOSTS_UPLOADED),
                      ('FAILED_HOSTS_UPLOAD', FAILED_HOSTS_UPLOAD))

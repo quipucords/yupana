@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-"""Report Finite State Machine."""
+"""Report Processor."""
 
 import asyncio
 import base64
@@ -52,7 +52,7 @@ from config.settings.base import (INSIGHTS_HOST_INVENTORY_URL,
                                   RETRY_TIME)
 
 LOG = logging.getLogger(__name__)
-PROCESSING_LOOP = asyncio.new_event_loop()
+REPORT_PROCESSING_LOOP = asyncio.new_event_loop()
 VALIDATION_TOPIC = 'platform.upload.validation'
 SUCCESS_CONFIRM_STATUS = 'success'
 FAILURE_CONFIRM_STATUS = 'failure'
@@ -103,7 +103,7 @@ class ReportProcessor(AbstractProcessor):
             Report.STARTED: self.transition_to_downloaded,
             Report.DOWNLOADED: self.transition_to_validated,
             Report.VALIDATED: self.transition_to_validation_reported,
-            Report.VALIDATION_REPORTED: self.archive_report,
+            Report.VALIDATION_REPORTED: self.reset_variables,
             Report.FAILED_DOWNLOAD: self.archive_report,
             Report.FAILED_VALIDATION: self.archive_report,
             Report.FAILED_VALIDATION_REPORTING: self.archive_report}
@@ -246,10 +246,12 @@ class ReportProcessor(AbstractProcessor):
                 # if any QPCReportExceptions occur, we know that the report is not valid but has been
                 # successfully validated
                 # that means that this slice is invalid and only awaits being archived 
+                # TODO: add a retry here 
                 self.update_slice_state(state=ReportSlice.FAILED_VALIDATION, report_slice=slice)
             except Exception as error:
                 # This slice blew up validation - we want to retry it later, which means it enters our odd state 
                 # of requiring validation 
+                # TODO: add a retry here
                 LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error)))
                 self.update_slice_state(state=ReportSlice.RETRY_VALIDATION, report_slice=slice)
         if self.status == 'failure':
@@ -532,7 +534,7 @@ class ReportProcessor(AbstractProcessor):
         """
         self.prefix = 'REPORT VALIDATION STATE ON KAFKA'
         producer = AIOKafkaProducer(
-            loop=PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
+            loop=REPORT_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
         )
         try:
             await producer.start()
@@ -599,7 +601,7 @@ def initialize_report_processor():  # pragma: no cover
     :returns None
     """
     event_loop_thread = threading.Thread(target=asyncio_report_processor_thread,
-                                         args=(PROCESSING_LOOP,))
+                                         args=(REPORT_PROCESSING_LOOP,))
     event_loop_thread.daemon = True
     event_loop_thread.start()
     

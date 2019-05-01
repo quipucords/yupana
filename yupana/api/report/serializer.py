@@ -37,6 +37,7 @@ class ReportSerializer(ModelSerializer):
     state_info = JSONField(null=True)
     retry_count = IntegerField(null=True)
     last_update_time = DateField(null=True)
+    ready_to_archive = BooleanField(required=True)
 
     class Meta:
         """Meta class for ReportSerializer."""
