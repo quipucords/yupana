@@ -17,37 +17,27 @@
 """Report Processor."""
 
 import asyncio
-import base64
 import json
 import logging
-import math
 import tarfile
 import threading
-from datetime import datetime, timedelta
-from enum import Enum
+from datetime import datetime
 from http import HTTPStatus
 from io import BytesIO
 
 import pytz
 import requests
 from aiokafka import AIOKafkaProducer
-from django.db import transaction
 from kafka.errors import ConnectionError as KafkaConnectionError
+from processor.abstract_processor import (AbstractProcessor,
+                                          FAILED_TO_DOWNLOAD, FAILED_TO_VALIDATE,
+                                          INVALID_HOSTS, RETRY)
 from processor.kafka_msg_handler import (KafkaMsgHandlerError,
                                          QPCReportException,
                                          format_message)
-from processor.abstract_processor import (AbstractProcessor, COMMIT_RETRIES, 
-                                          TIME_RETRIES, INVALID_HOSTS,
-                                          ARCHIVED_FAIL, ARCHIVED_SUCCESS,
-                                          FAILED_TO_DOWNLOAD, FAILED_TO_VALIDATE,
-                                          INVALID_REPORTS, VALIDATION_LATENCY)
-from prometheus_client import Counter, Gauge, Summary
 
-from api.models import (Report, ReportArchive, 
-                        ReportSlice, ReportSliceArchive, 
-                        Status)
-from config.settings.base import (INSIGHTS_HOST_INVENTORY_URL,
-                                  INSIGHTS_KAFKA_ADDRESS,
+from api.models import (Report, ReportSlice, Status)
+from config.settings.base import (INSIGHTS_KAFKA_ADDRESS,
                                   RETRIES_ALLOWED,
                                   RETRY_TIME)
 
@@ -56,13 +46,6 @@ REPORT_PROCESSING_LOOP = asyncio.new_event_loop()
 VALIDATION_TOPIC = 'platform.upload.validation'
 SUCCESS_CONFIRM_STATUS = 'success'
 FAILURE_CONFIRM_STATUS = 'failure'
-CANONICAL_FACTS = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addresses',
-                   'vm_uuid', 'etc_machine_id', 'subscription_manager_id']
-
-FAILED_VALIDATION = 'VALIDATION'
-FAILED_UPLOAD = 'UPLOAD'
-EMPTY_QUEUE_SLEEP = 60
-RETRY = Enum('RETRY', 'clear increment keep_same')
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
 HOSTS_PER_REQ = 1000
@@ -93,23 +76,28 @@ class RetryExtractException(Exception):
     pass
 
 
-class ReportProcessor(AbstractProcessor):
+class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-attributes
     """Class for processing report that have been created."""
 
     def __init__(self):
         """Create a report processor."""
-        self.state_functions = {
+        state_functions = {
             Report.NEW: self.transition_to_started,
             Report.STARTED: self.transition_to_downloaded,
             Report.DOWNLOADED: self.transition_to_validated,
             Report.VALIDATED: self.transition_to_validation_reported,
-            Report.VALIDATION_REPORTED: self.reset_variables,
-            Report.FAILED_DOWNLOAD: self.archive_report,
-            Report.FAILED_VALIDATION: self.archive_report,
-            Report.FAILED_VALIDATION_REPORTING: self.archive_report}
+            Report.VALIDATION_REPORTED: self.archive_report_and_slices,
+            Report.FAILED_DOWNLOAD: self.archive_report_and_slices,
+            Report.FAILED_VALIDATION: self.archive_report_and_slices,
+            Report.FAILED_VALIDATION_REPORTING: self.archive_report_and_slices}
+        state_metrics = {
+            Report.FAILED_DOWNLOAD: FAILED_TO_DOWNLOAD.inc,
+            Report.FAILED_VALIDATION: FAILED_TO_VALIDATE.inc
+        }
         self.async_states = [Report.VALIDATED]
         super().__init__(pre_delegate=self.pre_delegate,
-                         state_functions=self.state_functions,
+                         state_functions=state_functions,
+                         state_metrics=state_metrics,
                          async_states=self.async_states,
                          object_prefix='REPORT',
                          object_class=Report
@@ -129,8 +117,10 @@ class ReportProcessor(AbstractProcessor):
             self.status = self.report_or_slice.upload_ack_status
 
     def transition_to_downloaded(self):
-        """Attempt to download the report, extract the json,
-           create the report slices, & move to downloaded state."""
+        """Attempt to download report, extract json, and create slices.
+
+        As long as we have one valid slice, we set the status to success.
+        """
         self.prefix = 'ATTEMPTING DOWNLOAD'
         report_download_failed_msg = \
             'The report could not be downloaded due to the following error: %s.'
@@ -148,7 +138,7 @@ class ReportProcessor(AbstractProcessor):
             qpc_server_id = metadata_json.get('qpc_server_id')
             self.next_state = Report.DOWNLOADED
             # update the report or slice with downloaded info
-            self.update_object_state(report_id=report_platform_id, 
+            self.update_object_state(report_id=report_platform_id,
                                      qpc_server_version=qpc_server_version,
                                      qpc_server_id=qpc_server_id,
                                      report_version=report_version)
@@ -159,7 +149,7 @@ class ReportProcessor(AbstractProcessor):
                 report_download_failed_msg % err,
                 account_number=self.account_number))
             self.next_state = Report.FAILED_DOWNLOAD
-            self.update_object_state()
+            self.update_object_state(ready_to_archive=True)
         except (RetryDownloadException, RetryExtractException) as err:
             LOG.error(format_message(
                 self.prefix,
@@ -167,9 +157,124 @@ class ReportProcessor(AbstractProcessor):
                 account_number=self.account_number))
             self.determine_retry(Report.FAILED_DOWNLOAD, Report.STARTED)
 
-    def update_slice_state(self, state, report_slice, retry=RETRY.clear,   # noqa: C901 (too-complex)
-                           retry_type=None, candidate_hosts=None,
-                           failed_hosts=None):
+    def transition_to_validated(self):
+        """Validate that the report contents & move to validated state."""
+        self.prefix = 'ATTEMPTING VALIDATE'
+        LOG.info(format_message(
+            self.prefix,
+            'Validating the report contents. State is "%s".' % self.report_or_slice.state,
+            account_number=self.account_number))
+        # find all associated report slices
+        report_slices = ReportSlice.objects.all().filter(report=self.report_or_slice)
+        self.status = FAILURE_CONFIRM_STATUS
+        for report_slice in report_slices:
+            try:
+                self.report_json = json.loads(report_slice.report_json)
+                candidate_hosts, failed_hosts = self._validate_report_details()
+                if candidate_hosts:
+                    self.status = SUCCESS_CONFIRM_STATUS
+                INVALID_HOSTS.set(len(failed_hosts))
+                # Here we want to update the report state of the actual report slice
+                self.update_slice_state(state=ReportSlice.NEW, report_slice=report_slice,
+                                        candidate_hosts=candidate_hosts,
+                                        failed_hosts=failed_hosts)
+            except QPCReportException:
+                # if any QPCReportExceptions occur, we know that the report is not valid
+                # but has been successfully validated
+                # that means that this slice is invalid and only awaits being archived
+                self.update_slice_state(state=ReportSlice.FAILED_VALIDATION,
+                                        report_slice=report_slice,
+                                        ready_to_archive=True)
+            except Exception as error:  # pylint: disable=broad-except
+                # This slice blew up validation - we want to retry it later,
+                # which means it enters our odd state of retrying validation
+                LOG.error(format_message(self.prefix,
+                                         'The following error occurred: %s.' % str(error)))
+                self.update_slice_state(state=ReportSlice.RETRY_VALIDATION,
+                                        report_slice=report_slice, retry=RETRY.increment)
+        if self.status == 'failure':
+            LOG.warning(
+                format_message(
+                    self.prefix,
+                    'The uploaded report was invalid. Status set to "%s".' % self.status,
+                    account_number=self.account_number))
+        self.next_state = Report.VALIDATED
+        self.update_object_state(status=self.status)
+
+    async def transition_to_validation_reported(self):
+        """Upload the validation status & move to validation reported state."""
+        self.prefix = 'ATTEMPTING STATUS UPLOAD'
+        LOG.info(format_message(
+            self.prefix,
+            'Uploading validation status "%s". State is "%s".' %
+            (self.status, self.state),
+            account_number=self.account_number, report_id=self.report_id))
+        message_hash = self.upload_message['hash']
+        try:
+            await self._send_confirmation(message_hash)
+            self.next_state = Report.VALIDATION_REPORTED
+            self.update_object_state(ready_to_archive=True)
+            LOG.info(format_message(
+                self.prefix,
+                'Status successfully uploaded.',
+                account_number=self.account_number, report_id=self.report_id))
+            if self.status == FAILURE_CONFIRM_STATUS:
+                self.update_object_state(retry=RETRY.keep_same, ready_to_archive=True)
+                self.archive_report_and_slices()
+        except Exception as error:  # pylint: disable=broad-except
+            LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error),
+                                     account_number=self.account_number, report_id=self.report_id))
+            self.determine_retry(Report.FAILED_VALIDATION_REPORTING, Report.VALIDATED)
+
+    def create_report_slice(self, report_json, report_slice_id):
+        """Create report slice.
+
+        Returns a boolean regarding whether or not the slice was created.
+        """
+        LOG.info(
+            format_message(
+                self.prefix, 'Creating report slice %s' % report_slice_id,
+                account_number=self.account_number, report_id=self.report_id))
+
+        # first we should see if any slices exist with this slice id & report_platform_id
+        # if they exist we will not create the slice
+        created = False
+        existing_report_slices = ReportSlice.objects.filter(
+            report_platform_id=self.report_id).filter(report_slice_id=report_slice_id)
+        if existing_report_slices.count() > 0:
+            LOG.error(format_message(
+                self.prefix,
+                'a report slice with the report_platform_id %s and report_slice_id %s '
+                'already exists.' % (self.report_id, report_slice_id),
+                account_number=self.account_number, report_id=self.report_id))
+            return created
+
+        # The slice does not exist, so we should create it
+        report_slice = ReportSlice(
+            state=ReportSlice.PENDING,
+            rh_account=self.account_number,
+            state_info=json.dumps([ReportSlice.PENDING]),
+            last_update_time=datetime.now(pytz.utc),
+            retry_count=0,
+            report_json=json.dumps(report_json),
+            report_platform_id=self.report_id,
+            failed_hosts=json.dumps({}),
+            candidate_hosts=json.dumps({}),
+            report_slice_id=report_slice_id,
+            report=self.report_or_slice
+        )
+        report_slice.save()
+        LOG.info(
+            format_message(
+                self.prefix, 'Successfully created report slice %s' % report_slice_id,
+                account_number=self.account_number, report_id=self.report_id))
+        created = True
+        return created, report_slice
+
+    # pylint: disable=too-many-arguments
+    def update_slice_state(self, state, report_slice, retry=RETRY.clear,
+                           retry_type=None, candidate_hosts=None,   # noqa: C901 (too-complex)
+                           failed_hosts=None, ready_to_archive=None):
         """
         Update the report processor state and save.
 
@@ -189,7 +294,7 @@ class ReportProcessor(AbstractProcessor):
             report_slice.last_update_time = datetime.now(pytz.utc)
             report_slice.state = state
             report_slice.git_commit = status_info.git_commit
-            if not retry_type: 
+            if not retry_type:
                 retry_type = ReportSlice.TIME
             if retry == RETRY.clear:
                 # reset the count to 0 (default behavior)
@@ -212,175 +317,22 @@ class ReportProcessor(AbstractProcessor):
                 for host in failed_hosts:
                     failed.append(host)
                 report_slice.failed_hosts = json.dumps(failed)
+            if ready_to_archive:
+                report_slice.ready_to_archive = ready_to_archive
             state_info = json.loads(report_slice.state_info)
             state_info.append(self.next_state)
             report_slice.state_info = json.dumps(state_info)
             report_slice.save()
-            LOG.info(format_message(self.prefix, 'Successfully updated report slice %s' % report_slice.report_slice_id,
-                account_number=self.account_number, report_id=self.report_id))
-        except Exception as error:
+            LOG.info(
+                format_message(
+                    self.prefix,
+                    'Successfully updated report slice %s' % report_slice.report_slice_id,
+                    account_number=self.account_number, report_id=self.report_id))
+        except Exception as error:  # pylint: disable=broad-except
             LOG.error(format_message(
                 self.prefix,
                 'Could not update report slice record due to the following error %s.' % str(error),
                 account_number=self.account_number, report_id=self.report_id))
-
-    def transition_to_validated(self):
-        """Validate that the report contents & move to validated state."""
-        self.prefix = 'ATTEMPTING VALIDATE'
-        LOG.info(format_message(
-            self.prefix, 'Validating the report contents. State is "%s".' % self.report_or_slice.state,
-            account_number=self.account_number))
-        # find all associated report slices
-        report_slices = ReportSlice.objects.all().filter(report=self.report_or_slice)
-        self.status = FAILURE_CONFIRM_STATUS
-        for slice in report_slices:
-            try: 
-                self.report_json = json.loads(slice.report_json)
-                candidate_hosts, failed_hosts = self._validate_report_details()
-                if candidate_hosts: 
-                    self.status = SUCCESS_CONFIRM_STATUS
-                INVALID_HOSTS.set(len(failed_hosts))
-                # Here we want to update the report state of the actual report slice & when finished, of the report
-                self.update_slice_state(state=ReportSlice.NEW, report_slice=slice, candidate_hosts=candidate_hosts, failed_hosts=failed_hosts)
-            except QPCReportException:
-                # if any QPCReportExceptions occur, we know that the report is not valid but has been
-                # successfully validated
-                # that means that this slice is invalid and only awaits being archived 
-                # TODO: add a retry here 
-                self.update_slice_state(state=ReportSlice.FAILED_VALIDATION, report_slice=slice)
-            except Exception as error:
-                # This slice blew up validation - we want to retry it later, which means it enters our odd state 
-                # of requiring validation 
-                # TODO: add a retry here
-                LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error)))
-                self.update_slice_state(state=ReportSlice.RETRY_VALIDATION, report_slice=slice)
-        if self.status == 'failure':
-            LOG.warning(format_message(
-                    self.prefix,
-                    'The uploaded report was invalid. Status set to "%s".' % self.status,
-                    account_number=self.account_number))
-        self.next_state = Report.VALIDATED
-        self.update_object_state(status=self.status)
-        
-
-    async def transition_to_validation_reported(self):
-        """Upload the validation status & move to validation reported state."""
-        self.prefix = 'ATTEMPTING STATUS UPLOAD'
-        LOG.info(format_message(
-            self.prefix,
-            'Uploading validation status "%s". State is "%s".' %
-            (self.status, self.state),
-            account_number=self.account_number, report_id=self.report_id))
-        message_hash = self.upload_message['hash']
-        try:
-            await self._send_confirmation(message_hash)
-            self.next_state = Report.VALIDATION_REPORTED
-            self.update_object_state()
-            LOG.info(format_message(
-                self.prefix,
-                'Status successfully uploaded.',
-                account_number=self.account_number, report_id=self.report_id))
-            if self.status == FAILURE_CONFIRM_STATUS:
-                self.archive_report()
-        except Exception as error:
-            LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error),
-                                     account_number=self.account_number, report_id=self.report_id))
-            self.determine_retry(Report.FAILED_VALIDATION_REPORTING, Report.VALIDATED)
-
-    def record_failed_state_metrics(self):
-        """Record the metrics based on the report state."""
-        state_to_metric = {
-            Report.FAILED_DOWNLOAD: FAILED_TO_DOWNLOAD.inc,
-            Report.FAILED_VALIDATION: FAILED_TO_VALIDATE.inc
-        }
-        if self.state in state_to_metric.keys():
-            state_to_metric.get(self.state)()
-
-    @transaction.atomic
-    def archive_report(self):
-        """Archive the report object."""
-        self.prefix = 'ARCHIVING REPORT'
-        failed = False
-        LOG.info(format_message(self.prefix, 'Archiving report.',
-                                account_number=self.account_number, report_id=self.report_id))
-        archived = ReportArchive(
-            rh_account=self.account_number,
-            retry_count=self.report_or_slice.retry_count,
-            retry_type=self.report_or_slice.retry_type,
-            state=self.state,
-            state_info=self.report_or_slice.state_info,
-            last_update_time=self.report_or_slice.last_update_time,
-            upload_srv_kafka_msg=self.upload_message
-        )
-        if self.report_id:
-            archived.report_platform_id = self.report_id
-        if self.report_json:
-            archived.report_json = self.report_json
-        if self.status:
-            if self.status == FAILURE_CONFIRM_STATUS:
-                failed = True
-                INVALID_REPORTS.inc()
-            archived.upload_ack_status = self.status
-        archived.save()
-        failed_states = [Report.FAILED_DOWNLOAD, Report.FAILED_VALIDATION,
-                         Report.FAILED_VALIDATION_REPORTING]
-        if self.state in failed_states or failed:
-            print('Increment failed archive')
-            ARCHIVED_FAIL.inc()
-        else:
-            print('Increment success archive')
-            ARCHIVED_SUCCESS.inc()
-        self.record_failed_state_metrics()
-        try:
-            Report.objects.get(id=self.report_or_slice.id).delete()
-        except Report.DoesNotExist:
-            pass
-        LOG.info(format_message(self.prefix, 'Report successfully archived.',
-                                account_number=self.account_number, report_id=self.report_id))
-        self.reset_variables()
-
-
-    def create_report_slice(self, report_json, report_slice_id):
-        """Create report slice.
-        
-        Returns a boolean regarding whether or not the slice was created.
-        """
-        LOG.info(format_message(self.prefix, 'Creating report slice %s' % report_slice_id,
-                account_number=self.account_number, report_id=self.report_id))
-
-        # first we should see if any slices exist with this slice id & report_platform_id
-        # if they exist we will not create the slice 
-        created = False
-        existing_report_slices = ReportSlice.objects.filter(
-            report_platform_id=self.report_id).filter(report_slice_id=report_slice_id)
-        if existing_report_slices.count() > 0:
-            LOG.error(format_message(
-                self.prefix,
-                'a report slice with the report_platform_id %s and report_slice_id %s already exists.' % \
-                (self.report_id, report_slice_id),
-                account_number=self.account_number, report_id=self.report_id))
-            return created
-        
-        # The slice does not exist, so we should create it
-        report_slice = ReportSlice(
-            state=ReportSlice.PENDING,
-            rh_account=self.account_number,
-            state_info=json.dumps([ReportSlice.PENDING]),
-            last_update_time=datetime.now(pytz.utc),
-            retry_count=0,
-            report_json=json.dumps(report_json),
-            report_platform_id=self.report_id,
-            failed_hosts=json.dumps({}),
-            candidate_hosts=json.dumps({}),
-            report_slice_id=report_slice_id,
-            report=self.report_or_slice
-        )
-        report_slice.save()
-        LOG.info(format_message(self.prefix, 'Successfully created report slice %s' % report_slice_id,
-                account_number=self.account_number, report_id=self.report_id))
-        created = True
-        return created, report_slice
-
 
     def _download_report(self):
         """
@@ -435,6 +387,7 @@ class ReportProcessor(AbstractProcessor):
                                (report_url, err),
                                account_number=self.account_number))
 
+    # pylint: disable=too-many-locals, too-many-nested-blocks, too-many-branches
     def _extract_and_create_slices(self, report_tar_gz):  # noqa: C901 (too-complex)
         """Extract Insights report from tar.gz file.
 
@@ -447,25 +400,24 @@ class ReportProcessor(AbstractProcessor):
             tar = tarfile.open(fileobj=BytesIO(report_tar_gz), mode='r:gz')
             files = tar.getmembers()
             json_files = []
-            print('all files: ')
-            print(files)
             metadata_file = None
             for file in files:
-                # First we need to Find the metadata file 
+                # First we need to Find the metadata file
                 if 'metadata.json' in file.name:
                     metadata_file = tar.extractfile(file)
                 # Next we want to add all .json files to our list
                 elif '.json' in file.name:
                     json_files.append(file)
             if json_files and metadata_file:
-                try: 
+                try:
                     metadata_str = metadata_file.read().decode('utf-8')
                     metadata_json = json.loads(metadata_str)
                     # save all of the metadata info to the report record
                     report_slices = metadata_json.get('report_slices', {})
                     self.report_id = metadata_json.get('report_platform_id')
                     report_names = {}
-                    # loop through the keys in the report_slices dictionary to find the names of the files that we need to save 
+                    # loop through the keys in the report_slices dictionary to find the names of the
+                    # files that we need to save
                     # check the number of hosts and if permissible, find the associated json payload
                     for report_name, report_info in report_slices.items():
                         num_hosts = int(report_info.get('number_host', MAX_HOSTS_PER_REP + 1))
@@ -477,29 +429,37 @@ class ReportProcessor(AbstractProcessor):
                                     report_slice_string = report_slice.read().decode('utf-8')
                                     report_slice_json = json.loads(report_slice_string)
                                     report_slice_id = report_slice_json.get('report_slice_id', '')
-                                    created = self.create_report_slice(report_json=report_slice_json, report_slice_id=report_slice_id)
-                                    if created: 
+                                    created = self.create_report_slice(
+                                        report_json=report_slice_json,
+                                        report_slice_id=report_slice_id)
+                                    if created:
                                         report_names[report_name] = True
                                     break
-                        else: 
-                            # else we want to warn that the report had too many hosts for yupana to process
-                            large_slice_message = 'Report %s has %s hosts. There must be no more than %s hosts per report.' % \
-                                (report_name, str(num_hosts), str(MAX_HOSTS_PER_REP))
-                            LOG.warning(format_message(self.prefix, large_slice_message, 
-                                        account_number=self.account_number, report_id=self.report_id))
+                        else:
+                            # else we want to warn that the report had too many hosts for yupana
+                            # to process
+                            large_slice_message = 'Report %s has %s hosts. '\
+                                                  'There must be no more than %s hosts per'\
+                                                  ' report.' % \
+                                                  (report_name, str(num_hosts),
+                                                   str(MAX_HOSTS_PER_REP))
+                            LOG.warning(
+                                format_message(self.prefix, large_slice_message,
+                                               account_number=self.account_number,
+                                               report_id=self.report_id))
 
                     if not report_names:
-                        raise FailExtractException(
-                        format_message(self.prefix,
-                                       'Report contained no valid JSON payloads.',
-                                       account_number=self.account_number))
-                    else:
-                        LOG.info(
-                            format_message(
-                                self.prefix, 'successfully extracted & created report slices',
-                                account_number=self.account_number,
-                                report_id=self.report_id))
-                        return metadata_json
+                        raise FailExtractException(format_message(
+                            self.prefix,
+                            'Report contained no valid JSON payloads.',
+                            account_number=self.account_number))
+                    LOG.info(
+                        format_message(
+                            self.prefix,
+                            'successfully extracted & created report slices',
+                            account_number=self.account_number,
+                            report_id=self.report_id))
+                    return metadata_json
                 except ValueError as error:
                     raise FailExtractException(
                         format_message(self.prefix,
@@ -573,7 +533,7 @@ class ReportProcessor(AbstractProcessor):
                     'a report with the report_platform_id %s already exists.' %
                     self.report_or_slice.report_platform_id,
                     account_number=self.account_number, report_id=self.report_id))
-                self.archive_report()
+                self.archive_report_and_slices()
         except Report.DoesNotExist:
             pass
 
@@ -604,4 +564,3 @@ def initialize_report_processor():  # pragma: no cover
                                          args=(REPORT_PROCESSING_LOOP,))
     event_loop_thread.daemon = True
     event_loop_thread.start()
-    

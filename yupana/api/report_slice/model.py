@@ -12,7 +12,8 @@
 """Model for report slice progress."""
 
 from django.db import models
-from api.models import Report
+
+from api.report.model import Report
 
 
 class AbstractReportSlice(models.Model):
@@ -94,7 +95,7 @@ class AbstractReportSlice(models.Model):
                 self.candidate_hosts) + '}'
 
     class Meta:
-        """Metadata for abstract report model."""
+        """Metadata for abstract report slice model."""
 
         abstract = True
 

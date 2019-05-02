@@ -11,7 +11,8 @@
 
 """Serializer for report slice progress."""
 
-from rest_framework.serializers import (CharField,
+from rest_framework.serializers import (BooleanField,
+                                        CharField,
                                         ChoiceField,
                                         DateField,
                                         IntegerField,
@@ -28,8 +29,8 @@ class ReportSliceSerializer(ModelSerializer):
     rh_account = CharField(required=False)
     report_json = JSONField(null=True)
     git_commit = CharField(required=False)
-    state = ChoiceField(read_only=True, choices=AbstractReport.STATE_CHOICES)
-    retry_type = ChoiceField(read_only=True, choices=AbstractReport.RETRY_CHOICES)
+    state = ChoiceField(read_only=True, choices=AbstractReportSlice.STATE_CHOICES)
+    retry_type = ChoiceField(read_only=True, choices=AbstractReportSlice.RETRY_CHOICES)
     state_info = JSONField(null=True)
     retry_count = IntegerField(null=True)
     last_update_time = DateField(null=True)

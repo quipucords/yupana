@@ -32,30 +32,25 @@ class ReportModelTest(TestCase):
         self.uuid = str(uuid.uuid4())
         self.upload_srv_msg = {'accountid': '13423',
                                'msg_url': 'foo'}
-        self.report_json = {'report_platform_id': self.uuid,
-                            'report_type': 'insights',
-                            'hosts': {}}
         self.date = datetime.now()
         self.report = Report(report_platform_id=self.uuid,
                              upload_srv_kafka_msg=self.upload_srv_msg,
                              rh_account='13423',
-                             report_json=self.report_json,
                              state=Report.NEW,
                              state_info=[Report.NEW],
                              retry_count=0,
                              last_update_time=self.date,
-                             failed_hosts=[],
-                             candidate_hosts=[])
+                             ready_to_archive=False)
 
     def test_report_fields(self):
         """Test the report fields."""
         self.assertEqual(self.report.report_platform_id, self.uuid)
         self.assertEqual(self.report.upload_srv_kafka_msg,
                          self.upload_srv_msg)
-        self.assertEqual(self.report.report_json, self.report_json)
+        self.assertEqual(self.report.ready_to_archive, False)
         self.assertEqual(self.report.state, Report.NEW)
         self.assertEqual(self.report.state_info, [Report.NEW])
         self.assertEqual(self.report.last_update_time, self.date)
         # pylint: disable=line-too-long
-        expected = "{report_platform_id:%s, rh_account: 13423, upload_ack_status: None, upload_srv_kafka_msg:{'accountid': '13423', 'msg_url': 'foo'}, report_json:{'report_platform_id': '%s', 'report_type': 'insights', 'hosts': {}}, git_commit:None, state:new, state_info:['new'], retry_count:0, retry_type:time, last_update_time:%s, failed_hosts:[], candidate_hosts:[] }" % (self.uuid, self.uuid, self.date)  # noqa
+        expected = "{report_platform_id:%s, report_version: None, qpc_server_version: None, qpc_server_id: None, rh_account: 13423, upload_ack_status: None, upload_srv_kafka_msg: {'accountid': '13423', 'msg_url': 'foo'}, git_commit: None, state: new, state_info: ['new'], retry_count: 0, retry_type: time, last_update_time: %s }" % (self.uuid, self.date)  # noqa
         self.assertEqual(str(self.report), expected)

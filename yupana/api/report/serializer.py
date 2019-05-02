@@ -11,14 +11,15 @@
 
 """Serializer for report progress."""
 
-from rest_framework.serializers import (CharField,
+from rest_framework.serializers import (BooleanField,
+                                        CharField,
                                         ChoiceField,
                                         DateField,
                                         IntegerField,
                                         JSONField,
                                         ModelSerializer)
 
-from api.models import AbstractReport, ReportSlice
+from api.models import AbstractReport
 
 
 class ReportSerializer(ModelSerializer):

@@ -21,53 +21,26 @@ import base64
 import json
 import logging
 import math
-import tarfile
 import threading
-from datetime import datetime, timedelta
-from enum import Enum
 from http import HTTPStatus
-from io import BytesIO
 
-import pytz
 import requests
-from aiokafka import AIOKafkaProducer
-from django.db import transaction
-from kafka.errors import ConnectionError as KafkaConnectionError
-from processor.kafka_msg_handler import (KafkaMsgHandlerError,
-                                         QPCReportException,
+from processor.abstract_processor import (AbstractProcessor, FAILED_TO_VALIDATE,
+                                          HOSTS_UPLOADED_FAILED, HOSTS_UPLOADED_SUCCESS,
+                                          HOST_UPLOAD_REQUEST_LATENCY, INVALID_HOSTS,
+                                          UPLOAD_GROUP_SIZE, VALID_HOSTS)
+from processor.kafka_msg_handler import (QPCReportException,
                                          format_message)
 
-from processor.abstract_processor import (AbstractProcessor, COMMIT_RETRIES, 
-                                          TIME_RETRIES, INVALID_HOSTS,
-                                          ARCHIVED_FAIL, ARCHIVED_SUCCESS,
-                                          FAILED_TO_DOWNLOAD, FAILED_TO_VALIDATE,
-                                          INVALID_REPORTS, VALIDATION_LATENCY,
-                                          UPLOAD_GROUP_SIZE, HOST_UPLOAD_REQUEST_LATENCY,
-                                          HOSTS_UPLOADED_FAILED, HOSTS_UPLOADED_SUCCESS,
-                                          VALID_HOSTS)
-
-from prometheus_client import Counter, Gauge, Summary
-
-from api.models import (Report, ReportArchive, 
-                        ReportSlice, ReportSliceArchive, 
-                        Status)
+from api.models import ReportSlice
 from config.settings.base import (INSIGHTS_HOST_INVENTORY_URL,
-                                  INSIGHTS_KAFKA_ADDRESS,
                                   RETRIES_ALLOWED,
                                   RETRY_TIME)
 
 LOG = logging.getLogger(__name__)
 SLICE_PROCESSING_LOOP = asyncio.new_event_loop()
-VALIDATION_TOPIC = 'platform.upload.validation'
-SUCCESS_CONFIRM_STATUS = 'success'
-FAILURE_CONFIRM_STATUS = 'failure'
-CANONICAL_FACTS = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addresses',
-                   'vm_uuid', 'etc_machine_id', 'subscription_manager_id']
 
-FAILED_VALIDATION = 'VALIDATION'
 FAILED_UPLOAD = 'UPLOAD'
-EMPTY_QUEUE_SLEEP = 60
-RETRY = Enum('RETRY', 'clear increment keep_same')
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
 HOSTS_PER_REQ = 1000
@@ -86,21 +59,25 @@ class RetryUploadCommitException(Exception):
     pass
 
 
-class ReportSliceProcessor(AbstractProcessor):
+class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-attributes
     """Class for processing report slices that have been created."""
 
     def __init__(self):
         """Create a report slice state machine."""
-        self.state_functions = {
+        state_functions = {
             ReportSlice.RETRY_VALIDATION: self.transition_to_new,
             ReportSlice.NEW: self.transition_to_started,
             ReportSlice.STARTED: self.transition_to_hosts_uploaded,
             ReportSlice.VALIDATED: self.transition_to_hosts_uploaded,
-            ReportSlice.HOSTS_UPLOADED: self.archive_report,
-            ReportSlice.FAILED_VALIDATION: self.archive_report,
-            ReportSlice.FAILED_HOSTS_UPLOAD: self.archive_report}
+            ReportSlice.HOSTS_UPLOADED: self.archive_report_and_slices,
+            ReportSlice.FAILED_VALIDATION: self.archive_report_and_slices,
+            ReportSlice.FAILED_HOSTS_UPLOAD: self.archive_report_and_slices}
+        state_metrics = {
+            ReportSlice.FAILED_VALIDATION: FAILED_TO_VALIDATE.inc
+        }
         super().__init__(pre_delegate=self.pre_delegate,
-                         state_functions=self.state_functions,
+                         state_functions=state_functions,
+                         state_metrics=state_metrics,
                          async_states=[],
                          object_prefix='REPORT SLICE',
                          object_class=ReportSlice
@@ -123,48 +100,54 @@ class ReportSliceProcessor(AbstractProcessor):
             self.report_id = self.report_or_slice.report_platform_id
 
     def transition_to_new(self):
-        """The slice is in the failed validation state so we need to revalidate it."""
+        """Revalidate the slice because it is in the failed validation state."""
         self.prefix = 'ATTEMPTING VALIDATION'
         LOG.info(format_message(
-            self.prefix, 'Uploading hosts to inventory. State is "%s".' % self.report_or_slice.state,
+            self.prefix,
+            'Uploading hosts to inventory. State is "%s".' % self.report_or_slice.state,
             account_number=self.account_number, report_id=self.report_id))
-        try: 
+        try:
             self.report_json = json.loads(self.report_or_slice.report_json)
             self.candidate_hosts, self.failed_hosts = self._validate_report_details()
             INVALID_HOSTS.set(len(self.failed_hosts))
-            # Here we want to update the report state of the actual report slice & when finished, of the report
+            # Here we want to update the report state of the actual report slice & when finished
             self.next_state = ReportSlice.NEW
-            self.update_object_state(candidate_hosts=self.candidate_hosts, failed_hosts=self.failed_hosts)
+            self.update_object_state(candidate_hosts=self.candidate_hosts,
+                                     failed_hosts=self.failed_hosts)
         except QPCReportException:
             # if any QPCReportExceptions occur, we know that the report is not valid but has been
             # successfully validated
-            # that means that this slice is invalid and only awaits being archived 
+            # that means that this slice is invalid and only awaits being archived
             self.next_state = ReportSlice.FAILED_VALIDATION
             self.update_object_state()
-        except Exception as error:
-            # This slice blew up validation - we want to retry it later, which means it enters our odd state 
-            # of requiring validation 
+        except Exception as error:  # pylint: disable=broad-except
+            # This slice blew up validation - we want to retry it later,
+            # which means it enters our odd state
+            # of requiring validation
             LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error)))
-            self.determine_retry(ReporSlice.FAILED_VALIDATION, ReportSlice.RETRY_VALIDATION, 
+            self.determine_retry(ReportSlice.FAILED_VALIDATION, ReportSlice.RETRY_VALIDATION,
                                  retry_type=ReportSlice.GIT_COMMIT)
 
     def transition_to_hosts_uploaded(self):
         """Upload the host candidates to inventory & move to hosts_uploaded state."""
         self.prefix = 'ATTEMPTING HOST UPLOAD'
         LOG.info(format_message(
-            self.prefix, 'Uploading hosts to inventory. State is "%s".' % self.report_or_slice.state,
+            self.prefix,
+            'Uploading hosts to inventory. State is "%s".' % self.report_or_slice.state,
             account_number=self.account_number, report_id=self.report_id))
         try:
             if self.candidate_hosts:
                 candidates = self.generate_upload_candidates()
-                retry_time_candidates, retry_commit_candidates = \
-                    self._upload_to_host_inventory(candidates)
+                # retry_time_candidates, retry_commit_candidates = \
+                #     self._upload_to_host_inventory(candidates)
+                retry_time_candidates = []
+                retry_commit_candidates = []
                 if not retry_time_candidates and not retry_commit_candidates:
                     LOG.info(format_message(self.prefix, 'All hosts were successfully uploaded.',
                                             account_number=self.account_number,
                                             report_id=self.report_id))
                     self.next_state = ReportSlice.HOSTS_UPLOADED
-                    self.update_report_state(candidate_hosts=[])
+                    self.update_object_state(candidate_hosts=[], ready_to_archive=True)
                 else:
                     candidates = []
                     # if both retry_commit_candidates and retry_time_candidates are returned
@@ -189,60 +172,13 @@ class ReportSliceProcessor(AbstractProcessor):
                 LOG.info(format_message(self.prefix, 'There are no valid hosts to upload',
                                         account_number=self.account_number,
                                         report_id=self.report_id))
-                self.archive_report()
-        except Exception as error:
+                self.update_object_state(ready_to_archive=True)
+                self.archive_report_and_slices()
+        except Exception as error:  # pylint: disable=broad-except
             LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error),
                                      account_number=self.account_number, report_id=self.report_id))
             self.determine_retry(ReportSlice.FAILED_HOSTS_UPLOAD, ReportSlice.VALIDATED,
                                  retry_type=ReportSlice.GIT_COMMIT)
-
-    def record_failed_state_metrics(self):
-        """Record the metrics based on the report state."""
-        state_to_metric = {
-            ReportSlice.FAILED_DOWNLOAD: FAILED_TO_DOWNLOAD.inc,
-            ReportSlice.FAILED_VALIDATION: FAILED_TO_VALIDATE.inc
-        }
-        if self.state in state_to_metric.keys():
-            state_to_metric.get(self.state)()
-
-    @transaction.atomic
-    def archive_report(self):
-        """Archive the report slice object."""
-        self.prefix = 'ARCHIVING REPORT'
-        failed = False
-        LOG.info(format_message(self.prefix, 'Archiving report.',
-                                account_number=self.account_number, report_id=self.report_id))
-        archived = ReportSliceArchive(
-            rh_account=self.account_number,
-            retry_count=self.report_or_slice.retry_count,
-            retry_type=self.report_or_slice.retry_type,
-            candidate_hosts=self.report_or_slice.candidate_hosts,
-            failed_hosts=self.report_or_slice.failed_hosts,
-            state=self.state,
-            state_info=self.report_or_slice.state_info,
-            last_update_time=self.report_or_slice.last_update_time,
-        )
-        if self.report_id:
-            archived.report_platform_id = self.report_id
-        if self.report_json:
-            archived.report_json = self.report_json
-        archived.save()
-
-        failed_states = [ReportSlice.FAILED_VALIDATION, ReportSlice.FAILED_HOSTS_UPLOAD]
-        if self.state in failed_states or failed:
-            ARCHIVED_FAIL.inc()
-        else:
-            print('Increment success archive')
-            ARCHIVED_SUCCESS.inc()
-        self.record_failed_state_metrics()
-        try:
-            ReportSlice.objects.get(id=self.report_or_slice.id).delete()
-        except ReportSlice.DoesNotExist:
-            pass
-        LOG.info(format_message(self.prefix, 'Report slice successfully archived.',
-                                account_number=self.account_number, report_id=self.report_id))
-        self.reset_variables()
-
 
     @staticmethod
     def format_certs(redhat_certs):
@@ -364,6 +300,7 @@ class ReportSliceProcessor(AbstractProcessor):
 
     def generate_upload_candidates(self):
         """Generate dictionary of hosts that need to be uploaded to host inventory.
+
          If a retry has not occurred then we return the candidate_hosts
         but if a retry has occurred and failed at uploading, we want to retry
         the hosts that failed upload while excluding the ones that succeeded.
@@ -585,4 +522,4 @@ def initialize_report_slice_processor():  # pragma: no cover
     event_loop_thread = threading.Thread(target=asyncio_report_processor_thread,
                                          args=(SLICE_PROCESSING_LOOP,))
     event_loop_thread.daemon = True
-    event_loop_thread.start()   
+    event_loop_thread.start()

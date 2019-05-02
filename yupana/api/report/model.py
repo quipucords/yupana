@@ -75,7 +75,6 @@ class AbstractReport(models.Model):
             'rh_account: {}, ' \
             'upload_ack_status: {}, ' \
             'upload_srv_kafka_msg: {}, ' \
-            'report_slices: {}, '\
             'git_commit: {}, '\
             'state: {}, '\
             'state_info: {}, '\
@@ -89,7 +88,6 @@ class AbstractReport(models.Model):
                 self.rh_account,
                 self.upload_ack_status,
                 self.upload_srv_kafka_msg,
-                self.report_slices,
                 self.git_commit,
                 self.state,
                 self.state_info,

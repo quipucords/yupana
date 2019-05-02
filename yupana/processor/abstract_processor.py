@@ -17,52 +17,33 @@
 """Upload message report processor."""
 
 import asyncio
-import base64
 import json
 import logging
-import math
-import tarfile
-import threading
-from abc import ABC, abstractmethod
+from abc import ABC
 from datetime import datetime, timedelta
 from enum import Enum
-from http import HTTPStatus
-from io import BytesIO
 
 import pytz
-import requests
-from aiokafka import AIOKafkaProducer
 from django.db import transaction
-from kafka.errors import ConnectionError as KafkaConnectionError
-from processor.kafka_msg_handler import (KafkaMsgHandlerError,
-                                         QPCReportException,
+from processor.kafka_msg_handler import (QPCReportException,
                                          format_message)
 from prometheus_client import Counter, Gauge, Summary
 
-from api.models import (Report, ReportArchive, 
-                        ReportSlice, ReportSliceArchive, 
+from api.models import (Report, ReportArchive,
+                        ReportSlice, ReportSliceArchive,
                         Status)
-from config.settings.base import (INSIGHTS_HOST_INVENTORY_URL,
-                                  INSIGHTS_KAFKA_ADDRESS,
-                                  RETRIES_ALLOWED,
-                                  RETRY_TIME)
+from config.settings.base import (RETRIES_ALLOWED, RETRY_TIME)
 
 LOG = logging.getLogger(__name__)
-PROCESSING_LOOP = asyncio.new_event_loop()
-VALIDATION_TOPIC = 'platform.upload.validation'
-SUCCESS_CONFIRM_STATUS = 'success'
 FAILURE_CONFIRM_STATUS = 'failure'
 CANONICAL_FACTS = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addresses',
                    'vm_uuid', 'etc_machine_id', 'subscription_manager_id']
 
 FAILED_VALIDATION = 'VALIDATION'
-FAILED_UPLOAD = 'UPLOAD'
 EMPTY_QUEUE_SLEEP = 60
 RETRY = Enum('RETRY', 'clear increment keep_same')
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
-HOSTS_PER_REQ = 1000
-MAX_HOSTS_PER_REP = 10000
 
 # setup for prometheus metrics
 QUEUED_OBJECTS = Gauge('queued_objects', 'Reports & Report slices waiting to be processed')
@@ -90,13 +71,15 @@ HOSTS_UPLOADED_FAILED = Gauge('hosts_failed', 'The total number of hosts that fa
 class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
     """Class for processing saved reports that have been uploaded."""
 
-    def __init__(self, pre_delegate, state_functions, 
-                async_states, object_prefix, object_class):
+    # pylint: disable=too-many-arguments
+    def __init__(self, pre_delegate, state_functions, state_metrics,
+                 async_states, object_prefix, object_class):
         """Create an abstract processor."""
         self.report_or_slice = None
         self.object_class = object_class
-        self.pre_delegate = pre_delegate
+        self.run_before_delegate = pre_delegate
         self.state_functions = state_functions
+        self.state_to_metric = state_metrics
         self.async_states = async_states
         self.object_prefix = object_prefix
         self.prefix = 'PROCESSING %s' % self.object_prefix
@@ -113,7 +96,6 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
 
     def reset_variables(self):
         """Reset the class variables to original values."""
-        print('RESETTING THE VARIABLES in lieu of archiving')
         self.report_or_slice = None
         self.state = None
         self.account_number = None
@@ -123,6 +105,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         self.candidate_hosts = None
         self.failed_hosts = None
         self.status = None
+        self.report = None
         self.prefix = 'PROCESSING %s' % self.object_prefix
 
     async def run(self):
@@ -144,12 +127,6 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     self.reset_variables()
             else:
                 await asyncio.sleep(EMPTY_QUEUE_SLEEP)
-
-    def transition_to_started(self):
-        """Attempt to change the state to started."""
-        self.next_state = self.object_class.STARTED
-        print('made it to started')
-        self.update_object_state()
 
     def calculate_queued_objects(self, current_time, status_info):
         """Calculate the number of reports waiting to be processed.
@@ -175,7 +152,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
 
     def get_oldest_object_retry(self):
         """Grab the oldest report or report slice object.
-        
+
         returns: boolean and oldest report or report slice object.
         """
         assign = False
@@ -185,10 +162,9 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         QUEUED_OBJECTS.set(objects_count)
         LOG.info(format_message(
             self.prefix,
-            'Number of %s waiting to be processed: %s' % 
+            'Number of %s waiting to be processed: %s' %
             (self.object_prefix.lower() + 's', objects_count)))
         # look for the oldest object in the db
-        #check now
         oldest_object = self.object_class.objects.earliest('last_update_time')
         same_commit = oldest_object.git_commit == status_info.git_commit
         minutes_passed = int(
@@ -210,16 +186,17 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             state=self.object_class.NEW).earliest('last_update_time')
         object_found_message = 'Starting %s processor. State is "%s".' % \
                                (self.object_prefix.lower(), self.report_or_slice.state)
-        LOG.info(format_message(
-                    self.prefix, object_found_message,
-                    account_number=self.account_number, report_id=self.report_id))
+        LOG.info(
+            format_message(
+                self.prefix, object_found_message,
+                account_number=self.account_number, report_id=self.report_id))
         self.transition_to_started()
 
     @transaction.atomic
     def assign_object(self):
         """Assign the object processor objects that are saved in the db.
 
-        First priority is the oldest object in any state. We check to see if an 
+        First priority is the oldest object in any state. We check to see if an
         appropriate amount of time has passed before we retry this object.
 
         If none of the above qualify, we look for the oldest objects that are in the new state.
@@ -248,7 +225,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 except (Report.DoesNotExist, ReportSlice.DoesNotExist):
                     object_not_found_message = \
                         'No %s to be processed at this time. '\
-                        'Checking again in %s seconds.' % (self.object_prefix.lower() + 's', str(EMPTY_QUEUE_SLEEP))
+                        'Checking again in %s seconds.' \
+                        % (self.object_prefix.lower() + 's', str(EMPTY_QUEUE_SLEEP))
                     LOG.info(format_message(self.prefix, object_not_found_message))
 
     async def delegate_state(self):
@@ -256,24 +234,28 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
 
         If the function is async, make sure to await it.
         """
-        print('inside of delegate state.')
-        self.pre_delegate()
-        print('after calling pre-delegate')
+        self.run_before_delegate()
         # if the function is async, we must await it
         if self.state_functions.get(self.state):
             if self.state in self.async_states:
                 await self.state_functions.get(self.state)()
             else:
                 self.state_functions.get(self.state)()
-        else: 
+        else:
             self.reset_variables()
 
+    def transition_to_started(self):
+        """Attempt to change the state to started."""
+        self.next_state = self.object_class.STARTED
+        self.update_object_state()
+
+    #  pylint: disable=too-many-locals, too-many-branches
     def update_object_state(self, retry=RETRY.clear,   # noqa: C901 (too-complex)
                             retry_type=None, report_json=None,
                             report_id=None, candidate_hosts=None,
                             failed_hosts=None, status=None,
                             qpc_server_version=None, qpc_server_id=None,
-                            report_version=None):
+                            report_version=None, ready_to_archive=None):
         """
         Update the report processor state and save.
 
@@ -294,7 +276,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             self.report_or_slice.last_update_time = datetime.now(pytz.utc)
             self.report_or_slice.state = self.next_state
             self.report_or_slice.git_commit = status_info.git_commit
-            if not retry_type: 
+            if not retry_type:
                 retry_type = self.object_class.TIME
             if retry == RETRY.clear:
                 # reset the count to 0 (default behavior)
@@ -325,10 +307,12 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 self.report_or_slice.upload_ack_status = status
             if qpc_server_version:
                 self.report_or_slice.qpc_server_version = qpc_server_version
-            if qpc_server_id: 
+            if qpc_server_id:
                 self.report_or_slice.qpc_server_id = qpc_server_id
             if report_version:
                 self.report_or_slice.report_version = report_version
+            if ready_to_archive:
+                self.report_or_slice.ready_to_archive = ready_to_archive
             state_info = json.loads(self.report_or_slice.state_info)
             state_info.append(self.next_state)
             self.report_or_slice.state_info = json.dumps(state_info)
@@ -339,6 +323,12 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 'Could not update %s record due to the following error %s.' % (
                     self.object_prefix.lower(), str(error)),
                 account_number=self.account_number, report_id=self.report_id))
+
+    def move_candidates_to_failed(self):
+        """Before entering a failed state any candidates should be moved to the failed hosts."""
+        for host in self.candidate_hosts:
+            self.failed_hosts.append(host)
+        self.candidate_hosts = []
 
     def determine_retry(self, fail_state, current_state,
                         candidate_hosts=None, retry_type=Report.TIME):
@@ -352,7 +342,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         if (self.report_or_slice.retry_count + 1) >= RETRIES_ALLOWED:
             LOG.error(format_message(
                 self.prefix,
-                'This %s has reached the retry limit of %s.' % (self.object_prefix.lower(), str(RETRIES_ALLOWED)),
+                'This %s has reached the retry limit of %s.'
+                % (self.object_prefix.lower(), str(RETRIES_ALLOWED)),
                 account_number=self.account_number, report_id=self.report_id))
             self.next_state = fail_state
             candidates = None
@@ -363,14 +354,15 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 failed = self.failed_hosts
             self.update_object_state(retry=RETRY.increment, retry_type=retry_type,
                                      candidate_hosts=candidates,
-                                     failed_hosts=failed)
+                                     failed_hosts=failed, ready_to_archive=True)
         else:
             self.next_state = current_state
             if retry_type == self.object_class.GIT_COMMIT:
                 COMMIT_RETRIES.inc()
                 log_message = \
                     'Saving the %s to retry when a new commit '\
-                    'is pushed. Retries: %s' % (self.object_prefix.lower(), str(self.report_or_slice.retry_count + 1))
+                    'is pushed. Retries: %s' % (self.object_prefix.lower(),
+                                                str(self.report_or_slice.retry_count + 1))
             else:
                 TIME_RETRIES.inc()
                 log_message = \
@@ -386,6 +378,100 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             self.update_object_state(retry=RETRY.increment,
                                      retry_type=retry_type,
                                      candidate_hosts=candidate_hosts)
+            self.reset_variables()
+
+    def record_failed_state_metrics(self):
+        """Record the metrics based on the report or slice state."""
+        if self.state in self.state_to_metric.keys():
+            self.state_to_metric.get(self.state)()
+
+    @transaction.atomic  # noqa: C901 (too-complex)
+    def archive_report_and_slices(self):  # pylint: disable=too-many-statements
+        """Archive the report slice objects & associated report."""
+        self.prefix = 'ARCHIVING'
+        if self.object_class == Report:
+            report = self.report_or_slice
+        else:
+            report = self.report_or_slice.report
+        all_report_slices = []
+        all_slices_ready = True
+        try:
+            all_report_slices = ReportSlice.objects.all().filter(report=report)
+            for report_slice in all_report_slices:
+                if not report_slice.ready_to_archive:
+                    all_slices_ready = False
+        except ReportSlice.DoesNotExist:
+            pass
+
+        if report.ready_to_archive and all_slices_ready:
+            for report_slice in all_report_slices:
+                archived = ReportSliceArchive(
+                    rh_account=report_slice.rh_account,
+                    retry_count=report_slice.retry_count,
+                    retry_type=report_slice.retry_type,
+                    candidate_hosts=report_slice.candidate_hosts,
+                    failed_hosts=report_slice.failed_hosts,
+                    state=report_slice.state,
+                    ready_to_archive=report_slice.ready_to_archive,
+                    state_info=report_slice.state_info,
+                    last_update_time=report_slice.last_update_time,
+                    report_slice_id=report_slice.report_slice_id)
+                if report_slice.report_id:
+                    archived.report_platform_id = report_slice.report_id
+                if report_slice.report_json:
+                    archived.report_json = report_slice.report_json
+                archived.save()
+                failed_states = [ReportSlice.FAILED_VALIDATION, ReportSlice.FAILED_HOSTS_UPLOAD]
+                if report_slice.state in failed_states:
+                    ARCHIVED_FAIL.inc()
+                else:
+                    ARCHIVED_SUCCESS.inc()
+                LOG.info(format_message(
+                    self.prefix,
+                    'Archiving report slice %s.' % report_slice.report_slice_id,
+                    account_number=self.account_number,
+                    report_id=self.report_id))
+
+            failed = False
+            LOG.info(format_message(self.prefix, 'Archiving report.',
+                                    account_number=self.account_number, report_id=self.report_id))
+            archived_rep = ReportArchive(
+                rh_account=report.rh_account,
+                retry_count=report.retry_count,
+                retry_type=report.retry_type,
+                state=report.state,
+                state_info=report.state_info,
+                ready_to_archive=report.ready_to_archive,
+                last_update_time=report.last_update_time,
+                upload_srv_kafka_msg=report.upload_srv_kafka_msg
+            )
+            if self.status:
+                if self.status == FAILURE_CONFIRM_STATUS:
+                    failed = True
+                    INVALID_REPORTS.inc()
+                archived_rep.upload_ack_status = report.upload_ack_status
+            archived_rep.save()
+
+            failed_states = [Report.FAILED_DOWNLOAD, Report.FAILED_VALIDATION,
+                             Report.FAILED_VALIDATION_REPORTING]
+            if report.state in failed_states or failed:
+                ARCHIVED_FAIL.inc()
+            else:
+                ARCHIVED_SUCCESS.inc()
+            self.record_failed_state_metrics()
+            try:
+                Report.objects.get(id=report.id).delete()
+            except Report.DoesNotExist:
+                pass
+            LOG.info(format_message(self.prefix, 'Report slice successfully archived.',
+                                    account_number=self.account_number, report_id=self.report_id))
+            self.reset_variables()
+
+        else:
+            LOG.info(format_message(self.prefix,
+                                    'Could not archive report because one or more associated slices'
+                                    ' are still being processed.',
+                                    account_number=self.account_number, report_id=self.report_id))
             self.reset_variables()
 
     def _validate_report_details(self):  # pylint: disable=too-many-locals
