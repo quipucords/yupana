@@ -420,7 +420,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     # files that we need to save
                     # check the number of hosts and if permissible, find the associated json payload
                     for report_name, report_info in report_slices.items():
-                        num_hosts = int(report_info.get('number_host', MAX_HOSTS_PER_REP + 1))
+                        num_hosts = int(report_info.get('number_hosts', MAX_HOSTS_PER_REP + 1))
                         if num_hosts <= MAX_HOSTS_PER_REP:
                             # loop through the list of json files found within the payload
                             for file in json_files:
