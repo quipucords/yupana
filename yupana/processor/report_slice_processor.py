@@ -138,10 +138,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         try:
             if self.candidate_hosts:
                 candidates = self.generate_upload_candidates()
-                # retry_time_candidates, retry_commit_candidates = \
-                #     self._upload_to_host_inventory(candidates)
-                retry_time_candidates = []
-                retry_commit_candidates = []
+                retry_time_candidates, retry_commit_candidates = \
+                    self._upload_to_host_inventory(candidates)
                 if not retry_time_candidates and not retry_commit_candidates:
                     LOG.info(format_message(self.prefix, 'All hosts were successfully uploaded.',
                                             account_number=self.account_number,

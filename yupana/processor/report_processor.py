@@ -320,7 +320,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             if ready_to_archive:
                 report_slice.ready_to_archive = ready_to_archive
             state_info = json.loads(report_slice.state_info)
-            state_info.append(self.next_state)
+            state_info.append(state)
             report_slice.state_info = json.dumps(state_info)
             report_slice.save()
             LOG.info(

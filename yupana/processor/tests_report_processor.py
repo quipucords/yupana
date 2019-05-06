@@ -332,6 +332,7 @@ class ReportProcessorTests(TestCase):
 
         def download_side_effect():
             """Transition the state to downloaded."""
+            self.processor.state = Report.DOWNLOADED
             self.report_record.state = Report.DOWNLOADED
             self.report_record.save()
         with patch('processor.report_processor.ReportProcessor.transition_to_downloaded',
@@ -358,6 +359,31 @@ class ReportProcessorTests(TestCase):
         event_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(event_loop)
         coro = asyncio.coroutine(self.async_test_delegate_state)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
+
+    async def async_test_delegate_state_exception(self):
+        """Set up the test for delegate state with exception."""
+        self.report_record.state = Report.STARTED
+        self.report_record.report_platform_id = self.uuid
+        self.report_record.upload_ack_status = report_processor.SUCCESS_CONFIRM_STATUS
+        self.report_record.save()
+        self.processor.report_or_slice = self.report_record
+
+        def delegate_side_effect():
+            """Transition the state to downloaded."""
+            self.processor.should_run = False
+            raise Exception('Test')
+        with patch('processor.report_processor.ReportProcessor.delegate_state',
+                   side_effect=delegate_side_effect):
+            await self.processor.run()
+            self.check_variables_are_reset()
+
+    def test_run_delegate_exception(self):
+        """Test the async function delegate state."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.async_test_delegate_state_exception)
         event_loop.run_until_complete(coro())
         event_loop.close()
 
@@ -396,7 +422,6 @@ class ReportProcessorTests(TestCase):
         """Test that the transition to download works successfully."""
         metadata_json = {
             'report_id': 1,
-            'report_type': 'insights',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
@@ -476,7 +501,7 @@ class ReportProcessorTests(TestCase):
         self.assertEqual(self.report_record.retry_count, 0)
 
     def test_transition_to_validated_general_exception(self):
-        """Test that when a general exception is raised, we validate as failure (if no slices are valid)."""
+        """Test that exceptions are validated as failure (if no slices are valid)."""
         self.report_record.state = Report.DOWNLOADED
         self.report_record.save()
         self.processor.report_or_slice = self.report_record
@@ -787,7 +812,6 @@ class ReportProcessorTests(TestCase):
             'report_id': 1,
             'report_type': 'insights',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
             'report_slices': {'2345322': {'number_hosts': 1}}
         }
@@ -804,13 +828,69 @@ class ReportProcessorTests(TestCase):
         result = self.processor._extract_and_create_slices(buffer_content)
         self.assertEqual(result, metadata_json)
 
+    def test_extract_and_create_slices_two_reps_copy(self):
+        """Testing the extract method with valid buffer content."""
+        self.report_slice.report = self.report_record
+        self.report_slice.report_platform_id = self.uuid
+        self.report_slice.report_slice_id = self.uuid2
+        self.report_slice.save()
+        self.processor.report_id = self.uuid
+        metadata_json = {
+            'report_id': 1,
+            'report_type': 'insights',
+            'report_platform_id': self.uuid,
+            'report_version': '1.0.0.1b025b8',
+            'report_slices': {'234532a2': {'number_hosts': 1},
+                              self.uuid2: {'number_hosts': 3}}
+        }
+        report_json = {
+            'report_slice_id': '2345322',
+            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'hosts': {self.uuid: {'key': 'value'}}}
+        report_json2 = {
+            'report_slice_id': self.uuid2,
+            'report_platform_id': self.uuid,
+            'hosts': {self.uuid: {'key': 'value'}}}
+        report_files = {
+            'metadata.json': metadata_json,
+            '234532a2.json': report_json,
+            '%s.json' % self.uuid2: report_json2
+        }
+        self.processor.report_or_slice = self.report_record
+        buffer_content = test_handler.create_tar_buffer(report_files)
+        result = self.processor._extract_and_create_slices(buffer_content)
+        self.assertEqual(result, metadata_json)
+
+    def test_extract_and_create_slices_two_reps(self):
+        """Testing the extract method with valid buffer content."""
+        metadata_json = {
+            'report_id': 1,
+            'report_type': 'insights',
+            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'report_version': '1.0.0.1b025b8',
+            'report_slices': {'2345322': {'number_hosts': 1},
+                              '23453223': {'number_hosts': 100000}}
+        }
+        report_json = {
+            'report_slice_id': '2345322',
+            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'hosts': {self.uuid: {'key': 'value'}}}
+
+        report_files = {
+            'metadata.json': metadata_json,
+            '2345322.json': report_json
+        }
+        self.processor.report_or_slice = self.report_record
+        buffer_content = test_handler.create_tar_buffer(report_files)
+        result = self.processor._extract_and_create_slices(buffer_content)
+        self.assertEqual(result, metadata_json)
+
     def test_extract_and_create_slices_failure(self):
         """Testing the extract method failure no matching report_slice."""
         metadata_json = {
             'report_id': 1,
             'report_type': 'insights',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
             'report_slices': {'2345322': {'number_hosts': 1}}
         }
@@ -840,7 +920,24 @@ class ReportProcessorTests(TestCase):
             'report_id': 1,
             'report_type': 'insights',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'report_version': '1.0.0.1b025b8',
+            'report_slices': {'2345322': {'number_hosts': 1}}
+        }
+        report_json = 'This is not JSON.'
+        report_files = {
+            '2345322.json': report_json,
+            'metadata.json': metadata_json
+        }
+        buffer_content = test_handler.create_tar_buffer(report_files)
+        with self.assertRaises(report_processor.RetryExtractException):
+            self.processor._extract_and_create_slices(buffer_content)
+
+    def test__extract_and_create_slices_failure_no_json(self):
+        """Testing the extract method failure invalid json."""
+        metadata_json = {
+            'report_id': 1,
             'report_type': 'insights',
+            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'report_version': '1.0.0.1b025b8',
             'report_slices': {'2345322': {'number_hosts': 1}}
         }
@@ -873,7 +970,6 @@ class ReportProcessorTests(TestCase):
             'report_id': 1,
             'report_type': 'insights',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
             'report_slices': {'2345322': {'number_hosts': 1}}
         }

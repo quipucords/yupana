@@ -92,6 +92,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         self.candidate_hosts = None
         self.failed_hosts = None
         self.status = None
+        self.report = None
         self.should_run = True
 
     def reset_variables(self):
