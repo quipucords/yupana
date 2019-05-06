@@ -100,7 +100,7 @@ class AbstractReportSlice(models.Model):
         abstract = True
 
 
-class ReportSlice(AbstractReportSlice):
+class ReportSlice(AbstractReportSlice):  # pylint: disable=too-many-instance-attributes
     """Represents report slice records."""
 
     pass

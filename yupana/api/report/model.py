@@ -19,9 +19,8 @@ class AbstractReport(models.Model):
 
     report_platform_id = models.CharField(max_length=50, null=True)
     report_version = models.TextField(null=True)
-    qpc_server_version = models.TextField(null=True)
-    qpc_server_id = models.CharField(max_length=50, null=True)
-
+    report_type = models.TextField(null=True)
+    report_id = models.IntegerField(null=True)
     rh_account = models.TextField(null=True)
     upload_ack_status = models.TextField(null=True)
     upload_srv_kafka_msg = models.TextField(null=True)
@@ -70,8 +69,8 @@ class AbstractReport(models.Model):
         """Convert to string."""
         return '{' + 'report_platform_id:{}, '\
             'report_version: {}, '\
-            'qpc_server_version: {}, '\
-            'qpc_server_id: {}, '\
+            'report_id: {}, '\
+            'report_type: {}, '\
             'rh_account: {}, ' \
             'upload_ack_status: {}, ' \
             'upload_srv_kafka_msg: {}, ' \
@@ -83,8 +82,8 @@ class AbstractReport(models.Model):
             'last_update_time: {} '.format(
                 self.report_platform_id,
                 self.report_version,
-                self.qpc_server_version,
-                self.qpc_server_id,
+                self.report_id,
+                self.report_type,
                 self.rh_account,
                 self.upload_ack_status,
                 self.upload_srv_kafka_msg,

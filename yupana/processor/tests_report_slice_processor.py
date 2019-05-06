@@ -32,7 +32,10 @@ from processor import (abstract_processor,
                        tests_kafka_msg_handler as test_handler)
 from prometheus_client import REGISTRY
 
-from api.models import Report, ReportSlice
+from api.models import (Report,
+                        ReportArchive,
+                        ReportSlice,
+                        ReportSliceArchive)
 
 
 # pylint: disable=too-many-public-methods
@@ -90,7 +93,7 @@ class ReportProcessorTests(TestCase):
 
     def check_variables_are_reset(self):
         """Check that report processor members have been cleared."""
-        processor_attributes = [self.processor.report_id,
+        processor_attributes = [self.processor.report_platform_id,
                                 self.processor.report,
                                 self.processor.state,
                                 self.processor.account_number,
@@ -104,14 +107,14 @@ class ReportProcessorTests(TestCase):
 
     async def async_test_delegate_state(self):
         """Set up the test for delegate state."""
-        self.report_slice.state = Report.VALIDATED
+        self.report_slice.state = ReportSlice.VALIDATED
         self.report_slice.report_platform_id = self.uuid
-        self.report_slice.candidate_hosts = \
-            json.dumps([{self.uuid3: {'ip_addresses': 'value', 'name': 'value'},
-                         'cause': report_slice_processor.FAILED_UPLOAD}])
-        self.report_slice.failed_hosts = \
-            json.dumps([{self.uuid2: {'ip_addresses': 'value', 'name': 'value'},
-                         'cause': abstract_processor.FAILED_VALIDATION}])
+        self.report_slice.candidate_hosts = json.dumps([
+            {self.uuid3: {'ip_addresses': 'value', 'name': 'value'},
+             'cause': report_slice_processor.FAILED_UPLOAD}])
+        self.report_slice.failed_hosts = json.dumps(
+            [{self.uuid2: {'ip_addresses': 'value', 'name': 'value'},
+              'cause': abstract_processor.FAILED_VALIDATION}])
         self.report_slice.save()
         self.processor.report_or_slice = self.report_slice
 
@@ -127,8 +130,15 @@ class ReportProcessorTests(TestCase):
                 side_effect=upload_side_effect):
             await self.processor.delegate_state()
             self.check_variables_are_reset()
-            # self.assertEqual(self.processor.report_id, self.report_slice.report_platform_id)
+            # self.assertEqual(self.processor.report_or_slice.report_platform_id,
+            #                  self.report_slice.report_platform_id)
             # self.assertEqual(self.processor.report_or_slice.state, ReportSlice.HOSTS_UPLOADED)
+
+        # test pending state for delegate
+        self.report_slice.state = ReportSlice.PENDING
+        self.processor.report_or_slice = self.report_slice
+        await self.processor.delegate_state()
+        self.check_variables_are_reset()
 
     def test_run_delegate(self):
         """Test the async function delegate state."""
@@ -138,28 +148,89 @@ class ReportProcessorTests(TestCase):
         event_loop.run_until_complete(coro())
         event_loop.close()
 
+    def test_update_slice_state(self):
+        """Test updating the slice state."""
+        self.report_slice.failed_hosts = json.dumps([])
+        self.report_slice.save()
+        report_json = {
+            'report_id': 1,
+            'report_type': 'deployments',
+            'report_version': '1.0.0.1b025b8',
+            'status': 'completed',
+            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'hosts': {self.uuid: {'key': 'value'}}}
+        failed_hosts = [{self.uuid6: {'etc_machine_id': 'value'}},
+                        {self.uuid7: {'subscription_manager_id': 'value'}}]
+        self.processor.report_or_slice = self.report_slice
+        self.processor.update_object_state(report_json=report_json,
+                                           failed_hosts=failed_hosts)
+        self.assertEqual(json.loads(self.report_slice.report_json), report_json)
+        self.assertEqual(json.loads(self.report_slice.failed_hosts), failed_hosts)
+
     def test_transition_to_validated_general_exception(self):
         """Test that when a general exception is raised, we don't pass validation."""
         self.report_slice.state = ReportSlice.RETRY_VALIDATION
         self.report_slice.save()
         self.processor.report_or_slice = self.report_slice
-        # self.processor.report_json = {
-        #     'report_id': 1,
-        #     'report_type': 'deployments',
-        #     'report_version': '1.0.0.1b025b8',
-        #     'status': 'completed',
-        #     'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-        #     'hosts': {self.uuid: {'key': 'value'}}}
 
         def validate_side_effect():
             """Transition the state to downloaded."""
             raise Exception('Test')
 
-        with patch('processor.report_processor.ReportProcessor._validate_report_details',
+        with patch('processor.report_slice_processor.ReportSliceProcessor._validate_report_details',
                    side_effect=validate_side_effect):
             self.processor.transition_to_new()
-            # self.assertEqual(self.report_slice.state, ReportSlice.RETRY_VALIDATION)
-            # self.assertEqual(self.report_slice.retry_count, 1)
+            self.assertEqual(self.report_slice.state, ReportSlice.RETRY_VALIDATION)
+            self.assertEqual(self.report_slice.retry_count, 1)
+
+    def test_transition_to_validated(self):
+        """Test that when a general exception is raised, we don't pass validation."""
+        self.report_slice.state = ReportSlice.RETRY_VALIDATION
+        report_json = {
+            'report_id': 1,
+            'report_slice_id': '384794738',
+            'report_type': 'insights',
+            'report_version': '1.0.0.1b025b8',
+            'status': 'completed',
+            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'hosts': {self.uuid: {'ip_addresses': 'value'}}}
+        self.report_slice.report_json = json.dumps(report_json)
+        self.report_slice.save()
+        self.processor.report_or_slice = self.report_slice
+        self.processor.transition_to_new()
+        self.assertEqual(self.report_slice.state, ReportSlice.VALIDATED)
+        self.assertEqual(self.report_slice.retry_count, 0)
+
+    def test_moved_candidates_to_failed(self):
+        """Test that we reset candidates after moving them to failed."""
+        candidates = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'}}]
+        self.processor.candidate_hosts = candidates
+        self.processor.failed_hosts = [
+            {self.uuid2: {'bios_uuid': 'value', 'name': 'value'},
+             'cause': abstract_processor.FAILED_VALIDATION}]
+        self.processor.move_candidates_to_failed()
+        self.assertEqual(self.processor.candidate_hosts, [])
+        for host in candidates:
+            self.assertIn(host, self.processor.failed_hosts)
+
+    def test_determine_retry_limit(self):
+        """Test the determine retry method when the retry is at the limit."""
+        candidates = [{self.uuid3: {'ip_addresses': 'value', 'name': 'value'},
+                       'cause': report_slice_processor.FAILED_UPLOAD}]
+        self.report_slice.state = ReportSlice.VALIDATED
+        self.report_slice.retry_count = 4
+        self.report_slice.candidate_hosts = json.dumps(candidates)
+        self.report_slice.failed_hosts = json.dumps([])
+        self.report_slice.save()
+        self.processor.report_or_slice = self.report_slice
+        self.processor.candidate_hosts = candidates
+        self.processor.failed_hosts = []
+        self.processor.determine_retry(ReportSlice.FAILED_HOSTS_UPLOAD,
+                                       ReportSlice.VALIDATED)
+        self.assertEqual(self.report_slice.state, ReportSlice.FAILED_HOSTS_UPLOAD)
+        self.assertEqual(json.loads(self.report_slice.candidate_hosts), [])
+        for host in candidates:
+            self.assertIn(host, json.loads(self.report_slice.failed_hosts))
 
     def test_transition_to_hosts_uploaded(self):
         """Test the transition to hosts being uploaded."""
@@ -231,7 +302,7 @@ class ReportProcessorTests(TestCase):
         self.processor.report_or_slice = faulty_report
         self.processor.account_number = '987'
         self.processor.state = faulty_report.state
-        self.processor.report_id = self.uuid2
+        self.processor.report_platform_id = self.uuid2
         self.processor.report_json = self.report_json
         self.processor.candidate_hosts = {}
         self.processor.transition_to_hosts_uploaded()
@@ -340,8 +411,7 @@ class ReportProcessorTests(TestCase):
         with requests_mock.mock() as mock_req:
             mock_req.post(report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
                           status_code=207, json=bulk_response)
-            retry_time_hosts, retry_commit_hosts = \
-                self.processor._upload_to_host_inventory(hosts)
+            retry_time_hosts, retry_commit_hosts = self.processor._upload_to_host_inventory(hosts)
             self.assertEqual(retry_time_hosts, [])
             self.assertEqual(retry_commit_hosts, [])
             total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
@@ -366,8 +436,7 @@ class ReportProcessorTests(TestCase):
         with requests_mock.mock() as mock_req:
             mock_req.post(report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
                           status_code=207, json=None)
-            retry_time_hosts, retry_commit_hosts = \
-                self.processor._upload_to_host_inventory(hosts)
+            retry_time_hosts, retry_commit_hosts = self.processor._upload_to_host_inventory(hosts)
             for host in expected_hosts:
                 self.assertIn(host, retry_time_hosts)
             self.assertEqual(retry_commit_hosts, [])
@@ -393,8 +462,7 @@ class ReportProcessorTests(TestCase):
         with requests_mock.mock() as mock_req:
             mock_req.post(report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
                           status_code=400, json=None)
-            retry_time_hosts, retry_commit_hosts = \
-                self.processor._upload_to_host_inventory(hosts)
+            retry_time_hosts, retry_commit_hosts = self.processor._upload_to_host_inventory(hosts)
             for host in expected_hosts:
                 self.assertIn(host, retry_commit_hosts)
             self.assertEqual(retry_time_hosts, [])
@@ -420,8 +488,7 @@ class ReportProcessorTests(TestCase):
         with requests_mock.mock() as mock_req:
             mock_req.post(report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
                           status_code=500, json=None)
-            retry_time_hosts, retry_commit_hosts = \
-                self.processor._upload_to_host_inventory(hosts)
+            retry_time_hosts, retry_commit_hosts = self.processor._upload_to_host_inventory(hosts)
             for host in expected_hosts:
                 self.assertIn(host, retry_time_hosts)
             self.assertEqual(retry_commit_hosts, [])
@@ -508,8 +575,7 @@ class ReportProcessorTests(TestCase):
         with requests_mock.mock() as mock_req:
             mock_req.post(report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
                           status_code=207, json=bulk_response)
-            retry_time_hosts, retry_commit_hosts = \
-                self.processor._upload_to_host_inventory(hosts)
+            retry_time_hosts, retry_commit_hosts = self.processor._upload_to_host_inventory(hosts)
             self.assertEqual(retry_time_hosts, [])
             for host in expected_hosts:
                 self.assertIn(host, retry_commit_hosts)
@@ -530,7 +596,7 @@ class ReportProcessorTests(TestCase):
         bad_resp = requests.exceptions.ConnectionError()
         mock_request.side_effect = [good_resp, bad_resp]
         self.processor.account_number = '00001'
-        self.processor.report_id = '0001-kevan'
+        self.processor.report_platform_id = '0001-kevan'
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
         with patch('processor.report_slice_processor.INSIGHTS_HOST_INVENTORY_URL',
@@ -613,3 +679,53 @@ class ReportProcessorTests(TestCase):
         expected_profile['cores_per_socket'] = 1
         system_profile = self.processor.format_system_profile(host)
         self.assertEqual(expected_profile, system_profile)
+
+    def test_archive_report_and_slices(self):
+        """Test the archive method."""
+        self.report_record.ready_to_archive = True
+        self.report_record.report_platform_id = '459'
+        self.report_record.save()
+        self.report_slice.ready_to_archive = True
+        self.report_slice.report_platform_id = '459'
+        self.report_slice.report_slice_id = '25'
+        self.report_slice.save()
+        self.processor.report_or_slice = self.report_slice
+        self.processor.report_platform_id = '459'
+
+        self.processor.archive_report_and_slices()
+        # assert the report doesn't exist
+        with self.assertRaises(Report.DoesNotExist):
+            Report.objects.get(id=self.report_record.id)
+        # assert the report archive does exist
+        archived = ReportArchive.objects.get(rh_account=self.report_record.rh_account)
+        archived_slice = ReportSliceArchive.objects.get(
+            report_slice_id=self.report_slice.report_slice_id)
+        self.assertEqual(archived.report_platform_id, '459')
+        self.assertEqual(archived_slice.report_platform_id, '459')
+        # assert the processor was reset
+        self.check_variables_are_reset()
+
+    def test_archive_report_and_slices_not_ready(self):
+        """Test the archive method with slice not ready."""
+        self.report_record.ready_to_archive = True
+        self.report_record.report_platform_id = '459'
+        self.report_record.save()
+        self.report_slice.ready_to_archive = False
+        self.report_slice.report_platform_id = '459'
+        self.report_slice.report_slice_id = '25'
+        self.report_slice.save()
+        self.processor.report_or_slice = self.report_slice
+        self.processor.report_platform_id = '459'
+
+        self.processor.archive_report_and_slices()
+        # assert the report doesn't exist
+        existing = Report.objects.get(id=self.report_record.id)
+        # assert the report archive does exist
+        with self.assertRaises(ReportArchive.DoesNotExist):
+            ReportArchive.objects.get(rh_account=self.report_record.rh_account)
+        with self.assertRaises(ReportSliceArchive.DoesNotExist):
+            ReportSliceArchive.objects.get(
+                report_slice_id=self.report_slice.report_slice_id)
+        self.assertEqual(existing.report_platform_id, '459')
+        # assert the processor was reset
+        self.check_variables_are_reset()

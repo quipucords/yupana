@@ -28,6 +28,7 @@ from io import BytesIO
 import pytz
 import requests
 from aiokafka import AIOKafkaProducer
+from django.db import transaction
 from kafka.errors import ConnectionError as KafkaConnectionError
 from processor.abstract_processor import (AbstractProcessor,
                                           FAILED_TO_DOWNLOAD, FAILED_TO_VALIDATE,
@@ -112,7 +113,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         self.account_number = self.report_or_slice.rh_account
         self.upload_message = json.loads(self.report_or_slice.upload_srv_kafka_msg)
         if self.report_or_slice.report_platform_id:
-            self.report_id = self.report_or_slice.report_platform_id
+            self.report_platform_id = self.report_or_slice.report_platform_id
         if self.report_or_slice.upload_ack_status:
             self.status = self.report_or_slice.upload_ack_status
 
@@ -134,13 +135,15 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             metadata_json = self._extract_and_create_slices(report_tar_gz)
             report_platform_id = metadata_json.get('report_platform_id')
             report_version = metadata_json.get('report_version')
-            qpc_server_version = metadata_json.get('qpc_server_version')
-            qpc_server_id = metadata_json.get('qpc_server_id')
+            report_type = metadata_json.get('report_type')
+            if not report_type or report_type != 'insights':
+                raise FailExtractException('Missing or invalid report type.')
+            report_id = metadata_json.get('report_id')
             self.next_state = Report.DOWNLOADED
             # update the report or slice with downloaded info
-            self.update_object_state(report_id=report_platform_id,
-                                     qpc_server_version=qpc_server_version,
-                                     qpc_server_id=qpc_server_id,
+            self.update_object_state(report_platform_id=report_platform_id,
+                                     report_type=report_type,
+                                     report_id=report_id,
                                      report_version=report_version)
             self.deduplicate_reports()
         except (FailDownloadException, FailExtractException) as err:
@@ -208,7 +211,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             self.prefix,
             'Uploading validation status "%s". State is "%s".' %
             (self.status, self.state),
-            account_number=self.account_number, report_id=self.report_id))
+            account_number=self.account_number, report_platform_id=self.report_platform_id))
         message_hash = self.upload_message['hash']
         try:
             await self._send_confirmation(message_hash)
@@ -217,13 +220,15 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             LOG.info(format_message(
                 self.prefix,
                 'Status successfully uploaded.',
-                account_number=self.account_number, report_id=self.report_id))
+                account_number=self.account_number, report_platform_id=self.report_platform_id))
             if self.status == FAILURE_CONFIRM_STATUS:
                 self.update_object_state(retry=RETRY.keep_same, ready_to_archive=True)
                 self.archive_report_and_slices()
         except Exception as error:  # pylint: disable=broad-except
-            LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error),
-                                     account_number=self.account_number, report_id=self.report_id))
+            LOG.error(format_message(
+                self.prefix, 'The following error occurred: %s.' % str(error),
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id))
             self.determine_retry(Report.FAILED_VALIDATION_REPORTING, Report.VALIDATED)
 
     def create_report_slice(self, report_json, report_slice_id):
@@ -234,19 +239,19 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         LOG.info(
             format_message(
                 self.prefix, 'Creating report slice %s' % report_slice_id,
-                account_number=self.account_number, report_id=self.report_id))
+                account_number=self.account_number, report_platform_id=self.report_platform_id))
 
         # first we should see if any slices exist with this slice id & report_platform_id
         # if they exist we will not create the slice
         created = False
         existing_report_slices = ReportSlice.objects.filter(
-            report_platform_id=self.report_id).filter(report_slice_id=report_slice_id)
+            report_platform_id=self.report_platform_id).filter(report_slice_id=report_slice_id)
         if existing_report_slices.count() > 0:
             LOG.error(format_message(
                 self.prefix,
                 'a report slice with the report_platform_id %s and report_slice_id %s '
-                'already exists.' % (self.report_id, report_slice_id),
-                account_number=self.account_number, report_id=self.report_id))
+                'already exists.' % (self.report_platform_id, report_slice_id),
+                account_number=self.account_number, report_platform_id=self.report_platform_id))
             return created
 
         # The slice does not exist, so we should create it
@@ -257,7 +262,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             last_update_time=datetime.now(pytz.utc),
             retry_count=0,
             report_json=json.dumps(report_json),
-            report_platform_id=self.report_id,
+            report_platform_id=self.report_platform_id,
             failed_hosts=json.dumps({}),
             candidate_hosts=json.dumps({}),
             report_slice_id=report_slice_id,
@@ -267,7 +272,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         LOG.info(
             format_message(
                 self.prefix, 'Successfully created report slice %s' % report_slice_id,
-                account_number=self.account_number, report_id=self.report_id))
+                account_number=self.account_number, report_platform_id=self.report_platform_id))
         created = True
         return created, report_slice
 
@@ -282,7 +287,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         :param retry_type: <str> either time=retry after time,
             git_commit=retry after new commit
         :param report_json: <dict> dictionary containing the report json
-        :param report_id: <str> string containing report_platform_id
+        :param report_platform_id: <str> string containing report_platform_id
         :param candidate_hosts: <dict> dictionary containing hosts that were
             successfully verified and uploaded
         :param failed_hosts: <dict> dictionary containing hosts that failed
@@ -327,12 +332,12 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 format_message(
                     self.prefix,
                     'Successfully updated report slice %s' % report_slice.report_slice_id,
-                    account_number=self.account_number, report_id=self.report_id))
+                    account_number=self.account_number, report_platform_id=self.report_platform_id))
         except Exception as error:  # pylint: disable=broad-except
             LOG.error(format_message(
                 self.prefix,
                 'Could not update report slice record due to the following error %s.' % str(error),
-                account_number=self.account_number, report_id=self.report_id))
+                account_number=self.account_number, report_platform_id=self.report_platform_id))
 
     def _download_report(self):
         """
@@ -414,7 +419,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     metadata_json = json.loads(metadata_str)
                     # save all of the metadata info to the report record
                     report_slices = metadata_json.get('report_slices', {})
-                    self.report_id = metadata_json.get('report_platform_id')
+                    self.report_platform_id = metadata_json.get('report_platform_id')
                     report_names = {}
                     # loop through the keys in the report_slices dictionary to find the names of the
                     # files that we need to save
@@ -446,7 +451,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                             LOG.warning(
                                 format_message(self.prefix, large_slice_message,
                                                account_number=self.account_number,
-                                               report_id=self.report_id))
+                                               report_platform_id=self.report_platform_id))
 
                     if not report_names:
                         raise FailExtractException(format_message(
@@ -458,7 +463,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                             self.prefix,
                             'successfully extracted & created report slices',
                             account_number=self.account_number,
-                            report_id=self.report_id))
+                            report_platform_id=self.report_platform_id))
                     return metadata_json
                 except ValueError as error:
                     raise FailExtractException(
@@ -505,7 +510,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     self.prefix,
                     'Unable to connect to kafka server.  Closing producer.',
                     account_number=self.account_number,
-                    report_id=self.report_id))
+                    report_platform_id=self.report_platform_id))
         try:
             validation = {
                 'hash': file_hash,
@@ -518,21 +523,22 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     self.prefix,
                     'Send %s validation status to file upload on kafka' % self.status,
                     account_number=self.account_number,
-                    report_id=self.report_id))
+                    report_platform_id=self.report_platform_id))
         finally:
             await producer.stop()
 
+    @transaction.atomic
     def deduplicate_reports(self):
         """If a report with the same id already exists, archive the new report."""
         try:
             existing_reports = Report.objects.filter(
-                report_platform_id=self.report_id)
+                report_platform_id=self.report_platform_id)
             if existing_reports.count() > 1:
                 LOG.error(format_message(
                     self.prefix,
                     'a report with the report_platform_id %s already exists.' %
                     self.report_or_slice.report_platform_id,
-                    account_number=self.account_number, report_id=self.report_id))
+                    account_number=self.account_number, report_platform_id=self.report_platform_id))
                 self.archive_report_and_slices()
         except Report.DoesNotExist:
             pass

@@ -27,8 +27,8 @@ class ReportSerializer(ModelSerializer):
 
     report_platform_id = CharField(required=False)
     report_version = CharField(required=False)
-    qpc_server_version = CharField(required=False)
-    qpc_server_id = CharField(required=False)
+    report_type = CharField(required=False)
+    report_id = IntegerField(null=True)
     rh_account = CharField(required=False)
     upload_ack_status = CharField(required=False)
     upload_srv_kafka_msg = JSONField(read_only=True)

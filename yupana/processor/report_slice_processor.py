@@ -97,7 +97,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         if self.report_or_slice.report_json:
             self.report_json = json.loads(self.report_or_slice.report_json)
         if self.report_or_slice.report_platform_id:
-            self.report_id = self.report_or_slice.report_platform_id
+            self.report_platform_id = self.report_or_slice.report_platform_id
 
     def transition_to_new(self):
         """Revalidate the slice because it is in the failed validation state."""
@@ -105,13 +105,13 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         LOG.info(format_message(
             self.prefix,
             'Uploading hosts to inventory. State is "%s".' % self.report_or_slice.state,
-            account_number=self.account_number, report_id=self.report_id))
+            account_number=self.account_number, report_platform_id=self.report_platform_id))
         try:
             self.report_json = json.loads(self.report_or_slice.report_json)
             self.candidate_hosts, self.failed_hosts = self._validate_report_details()
             INVALID_HOSTS.set(len(self.failed_hosts))
             # Here we want to update the report state of the actual report slice & when finished
-            self.next_state = ReportSlice.NEW
+            self.next_state = ReportSlice.VALIDATED
             self.update_object_state(candidate_hosts=self.candidate_hosts,
                                      failed_hosts=self.failed_hosts)
         except QPCReportException:
@@ -134,7 +134,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         LOG.info(format_message(
             self.prefix,
             'Uploading hosts to inventory. State is "%s".' % self.report_or_slice.state,
-            account_number=self.account_number, report_id=self.report_id))
+            account_number=self.account_number, report_platform_id=self.report_platform_id))
         try:
             if self.candidate_hosts:
                 candidates = self.generate_upload_candidates()
@@ -143,7 +143,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 if not retry_time_candidates and not retry_commit_candidates:
                     LOG.info(format_message(self.prefix, 'All hosts were successfully uploaded.',
                                             account_number=self.account_number,
-                                            report_id=self.report_id))
+                                            report_platform_id=self.report_platform_id))
                     self.next_state = ReportSlice.HOSTS_UPLOADED
                     self.update_object_state(candidate_hosts=[], ready_to_archive=True)
                 else:
@@ -160,7 +160,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                         retry_type = ReportSlice.TIME
                     LOG.info(format_message(self.prefix, 'Hosts were not successfully uploaded',
                                             account_number=self.account_number,
-                                            report_id=self.report_id))
+                                            report_platform_id=self.report_platform_id))
                     self.determine_retry(ReportSlice.FAILED_HOSTS_UPLOAD,
                                          ReportSlice.VALIDATED,
                                          candidate_hosts=candidates,
@@ -169,12 +169,13 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 # need to not upload, but archive bc no hosts were valid
                 LOG.info(format_message(self.prefix, 'There are no valid hosts to upload',
                                         account_number=self.account_number,
-                                        report_id=self.report_id))
+                                        report_platform_id=self.report_platform_id))
                 self.update_object_state(ready_to_archive=True)
                 self.archive_report_and_slices()
         except Exception as error:  # pylint: disable=broad-except
             LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error),
-                                     account_number=self.account_number, report_id=self.report_id))
+                                     account_number=self.account_number,
+                                     report_platform_id=self.report_platform_id))
             self.determine_retry(ReportSlice.FAILED_HOSTS_UPLOAD, ReportSlice.VALIDATED,
                                  retry_type=ReportSlice.GIT_COMMIT)
 
@@ -348,7 +349,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 self.prefix,
                 'Uploading hosts group %s/%s. Group size: %s hosts' %
                 (group_count, len(hosts_lists_to_upload), len(hosts_list)),
-                account_number=self.account_number, report_id=self.report_id))
+                account_number=self.account_number, report_platform_id=self.report_platform_id))
             try:  # pylint: disable=too-many-nested-blocks
                 with HOST_UPLOAD_REQUEST_LATENCY.time():
                     response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
@@ -361,7 +362,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                         # something went wrong
                         raise RetryUploadTimeException(format_message(
                             self.prefix, 'Missing json response',
-                            account_number=self.account_number, report_id=self.report_id))
+                            account_number=self.account_number,
+                            report_platform_id=self.report_platform_id))
                     errors = json_body.get('errors')
                     if errors != 0:
                         all_data = json_body.get('data', [])
@@ -403,23 +405,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     message = 'Attempted to upload the following: %s' % str(hosts_list)
                     LOG.error(format_message(self.prefix, message,
                                              account_number=self.account_number,
-                                             report_id=self.report_id))
-                    try:
-                        LOG.error(response.json())
-                    except ValueError:
-                        LOG.error('No response json')
-                    LOG.error(format_message(
-                        self.prefix,
-                        'Unexpected response code %s' % str(response.status_code),
-                        account_number=self.account_number, report_id=self.report_id))
-                    raise RetryUploadTimeException()
-                else:
-                    # something went wrong possibly on our side (if its a 400)
-                    # and we should regenerate the hosts dictionary and re-upload after a commit
-                    message = 'Attempted to upload the following: %s' % str(hosts_list)
-                    LOG.error(format_message(self.prefix, message,
-                                             account_number=self.account_number,
-                                             report_id=self.report_id))
+                                             report_platform_id=self.report_platform_id))
                     try:
                         LOG.error(response.json())
                     except ValueError:
@@ -428,7 +414,24 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                         self.prefix,
                         'Unexpected response code %s' % str(response.status_code),
                         account_number=self.account_number,
-                        report_id=self.report_id))
+                        report_platform_id=self.report_platform_id))
+                    raise RetryUploadTimeException()
+                else:
+                    # something went wrong possibly on our side (if its a 400)
+                    # and we should regenerate the hosts dictionary and re-upload after a commit
+                    message = 'Attempted to upload the following: %s' % str(hosts_list)
+                    LOG.error(format_message(self.prefix, message,
+                                             account_number=self.account_number,
+                                             report_platform_id=self.report_platform_id))
+                    try:
+                        LOG.error(response.json())
+                    except ValueError:
+                        LOG.error('No response json')
+                    LOG.error(format_message(
+                        self.prefix,
+                        'Unexpected response code %s' % str(response.status_code),
+                        account_number=self.account_number,
+                        report_platform_id=self.report_platform_id))
                     raise RetryUploadCommitException()
 
             except RetryUploadCommitException:
@@ -453,7 +456,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             except requests.exceptions.RequestException as err:
                 LOG.error(format_message(self.prefix, 'An error occurred: %s' % str(err),
                                          account_number=self.account_number,
-                                         report_id=self.report_id))
+                                         report_platform_id=self.report_platform_id))
                 for host_id, host_data in hosts.items():
                     retry_time_hosts.append({host_id: host_data,
                                              'cause': FAILED_UPLOAD})
@@ -473,7 +476,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             self.prefix, '%s/%s hosts uploaded to host inventory' %
             (successful, len(hosts)),
             account_number=self.account_number,
-            report_id=self.report_id
+            report_platform_id=self.report_platform_id
         )
         if successful != len(hosts):
             LOG.warning(upload_msg)
@@ -490,7 +493,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                         failed_info.get('system_platform_id'),
                         failed_info.get('host')),
                     account_number=self.account_number,
-                    report_id=self.report_id
+                    report_platform_id=self.report_platform_id
                 ))
         return retry_time_hosts, retry_commit_hosts
 

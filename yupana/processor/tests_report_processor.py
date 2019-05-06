@@ -28,7 +28,7 @@ import pytz
 import requests
 import requests_mock
 from asynctest import CoroutineMock
-from django.test import TestCase
+from django.test import TransactionTestCase
 from processor import (abstract_processor,
                        kafka_msg_handler as msg_handler,
                        report_processor,
@@ -40,7 +40,7 @@ from api.models import Report, ReportArchive, ReportSlice, Status
 
 # pylint: disable=too-many-public-methods
 # pylint: disable=protected-access,too-many-lines,too-many-instance-attributes
-class ReportProcessorTests(TestCase):
+class ReportProcessorTests(TransactionTestCase):
     """Test Cases for the Message processor."""
 
     def setUp(self):
@@ -94,7 +94,7 @@ class ReportProcessorTests(TestCase):
 
     def check_variables_are_reset(self):
         """Check that report processor members have been cleared."""
-        processor_attributes = [self.processor.report_id,
+        processor_attributes = [self.processor.report_platform_id,
                                 self.processor.report,
                                 self.processor.state,
                                 self.processor.account_number,
@@ -121,7 +121,7 @@ class ReportProcessorTests(TestCase):
         self.processor.account_number = '4321'
         self.processor.upload_message = self.msg
         self.processor.state = report_to_archive.state
-        self.processor.report_id = self.uuid
+        self.processor.report_platform_id = self.uuid
         self.processor.status = report_processor.SUCCESS_CONFIRM_STATUS
 
         self.processor.archive_report_and_slices()
@@ -149,7 +149,7 @@ class ReportProcessorTests(TestCase):
         self.processor.account_number = '4321'
         self.processor.upload_message = self.msg
         self.processor.state = report_to_archive.state
-        self.processor.report_id = self.uuid
+        self.processor.report_platform_id = self.uuid
         self.processor.status = report_processor.SUCCESS_CONFIRM_STATUS
 
         self.processor.archive_report_and_slices()
@@ -180,7 +180,7 @@ class ReportProcessorTests(TestCase):
         self.processor.account_number = '4321'
         self.processor.upload_message = self.msg
         self.processor.state = report_to_dedup.state
-        self.processor.report_id = self.uuid
+        self.processor.report_platform_id = self.uuid
         self.processor.status = report_processor.SUCCESS_CONFIRM_STATUS
 
         self.processor.deduplicate_reports()
@@ -213,7 +213,7 @@ class ReportProcessorTests(TestCase):
         self.processor.report_or_slice = self.report_record
         self.processor.update_object_state(retry=report_processor.RETRY.increment,
                                            retry_type=Report.GIT_COMMIT,
-                                           report_id=self.uuid3)
+                                           report_platform_id=self.uuid3)
         self.assertEqual(self.report_record.retry_count, 1)
         self.assertEqual(self.report_record.retry_type, Report.GIT_COMMIT)
         self.assertEqual(self.report_record.report_platform_id, self.uuid3)
@@ -338,7 +338,8 @@ class ReportProcessorTests(TestCase):
         with patch('processor.report_processor.ReportProcessor.transition_to_downloaded',
                    side_effect=download_side_effect):
             await self.processor.delegate_state()
-            self.assertEqual(self.processor.report_id, self.report_record.report_platform_id)
+            self.assertEqual(self.processor.report_platform_id,
+                             self.report_record.report_platform_id)
             # self.assertEqual(self.processor.report_or_slice.state, Report.DOWNLOADED)
             self.assertEqual(self.processor.status, self.processor.report.upload_ack_status)
 
@@ -390,7 +391,7 @@ class ReportProcessorTests(TestCase):
     def test_reinit_variables(self):
         """Test that reinitting the variables clears the values."""
         # make sure that the variables have values
-        self.processor.report_id = self.uuid
+        self.processor.report_platform_id = self.uuid
         self.processor.report_or_slice = self.report_record
         self.processor.state = Report.NEW
         self.processor.account_number = '1234'
@@ -400,7 +401,7 @@ class ReportProcessorTests(TestCase):
         self.processor.failed_hosts = []
         self.processor.status = report_processor.SUCCESS_CONFIRM_STATUS
         self.assertEqual(self.processor.report_or_slice, self.report_record)
-        self.assertEqual(self.processor.report_id, self.uuid)
+        self.assertEqual(self.processor.report_platform_id, self.uuid)
         self.assertEqual(self.processor.state, Report.NEW)
         self.assertEqual(self.processor.account_number, '1234')
         self.assertEqual(self.processor.upload_message, self.msg)
@@ -474,6 +475,7 @@ class ReportProcessorTests(TestCase):
     def test_transition_to_validated(self):
         """Test that the transition to validated is successful."""
         self.processor.report_or_slice = self.report_record
+        self.report_slice.state_info = json.dumps([ReportSlice.PENDING])
         self.processor.transition_to_validated()
         invalid_hosts = REGISTRY.get_sample_value('invalid_hosts_per_report')
         self.assertEqual(self.report_record.state, Report.VALIDATED)
@@ -582,7 +584,7 @@ class ReportProcessorTests(TestCase):
         report_to_archive.upload_ack_status = report_processor.FAILURE_CONFIRM_STATUS
         report_to_archive.save()
         self.processor.report_or_slice = report_to_archive
-        self.processor.report_id = self.uuid2
+        self.processor.report_platform_id = self.uuid2
         self.processor.account_number = '43214'
         self.processor.state = Report.VALIDATED
         self.processor.status = report_processor.FAILURE_CONFIRM_STATUS
@@ -834,7 +836,7 @@ class ReportProcessorTests(TestCase):
         self.report_slice.report_platform_id = self.uuid
         self.report_slice.report_slice_id = self.uuid2
         self.report_slice.save()
-        self.processor.report_id = self.uuid
+        self.processor.report_platform_id = self.uuid
         metadata_json = {
             'report_id': 1,
             'report_type': 'insights',
