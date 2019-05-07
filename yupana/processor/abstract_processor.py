@@ -151,85 +151,104 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
 
         return objects_count
 
-    def get_oldest_object_retry(self):
-        """Grab the oldest report or report slice object.
+    @staticmethod
+    def return_queryset_object(queryset):
+        """Return the earliest object in a queryset.
 
-        returns: boolean and oldest report or report slice object.
+        param queryset: the queryset we care about
+        returns: the earliest object in the queryset or None.
         """
-        assign = False
-        current_time = datetime.now(pytz.utc)
+        try:
+            report_or_slice = queryset.earliest('last_update_time')
+            return report_or_slice
+        except (Report.DoesNotExist, ReportSlice.DoesNotExist):
+            return None
+
+    def get_oldest_object_to_retry(self):
+        """Grab the oldest report or report slice object to retry.
+
+        returns: object to retry or None.
+        """
         status_info = Status()
+        current_time = datetime.now(pytz.utc)
         objects_count = self.calculate_queued_objects(current_time, status_info)
         QUEUED_OBJECTS.set(objects_count)
         LOG.info(format_message(
             self.prefix,
             'Number of %s waiting to be processed: %s' %
             (self.object_prefix.lower() + 's', objects_count)))
-        # look for the oldest object in the db
-        oldest_object = self.object_class.objects.earliest('last_update_time')
-        same_commit = oldest_object.git_commit == status_info.git_commit
-        minutes_passed = int(
-            (current_time - oldest_object.last_update_time).total_seconds() / 60)
-        # if the oldest object is a retry based on time and the retry time has
-        # passed, then we want to assign the current object
-        if oldest_object.retry_type == self.object_class.TIME and minutes_passed >= RETRY_TIME:
-            assign = True
-        # or if the oldest object is a retry based on code change and the code
-        # has changed, then we want to assign the current object
-        elif oldest_object.retry_type == self.object_class.GIT_COMMIT and not same_commit:
-            assign = True
-        return assign, oldest_object
+        # first we have to query for all objects with commit retries
+        commit_retry_query = self.object_class.objects.filter(
+            retry_type=self.object_class.GIT_COMMIT)
+        # then we grab the oldest object from the query
+        oldest_commit_object = self.return_queryset_object(queryset=commit_retry_query)
+        if oldest_commit_object:
+            same_commit = oldest_commit_object.git_commit == status_info.git_commit
+            if not same_commit:
+                return oldest_commit_object
+        # If the above doesn't return, we should query for all time retries
+        time_retry_query = self.object_class.objects.filter(
+            retry_type=self.object_class.TIME)
+        oldest_time_object = self.return_queryset_object(queryset=time_retry_query)
+        if oldest_time_object:
+            minutes_passed = int(
+                (current_time - oldest_time_object.last_update_time).total_seconds() / 60)
+            if minutes_passed >= RETRY_TIME:
+                return oldest_time_object
+        # if we haven't returned a retry object, return None
+        return None
 
     def get_new_record(self):
         """Grab the newest report or report slice object."""
-        # look for the oldest report in the new state
-        self.report_or_slice = self.object_class.objects.filter(
-            state=self.object_class.NEW).earliest('last_update_time')
-        object_found_message = 'Starting %s processor. State is "%s".' % \
-                               (self.object_prefix.lower(), self.report_or_slice.state)
-        LOG.info(
-            format_message(
-                self.prefix, object_found_message,
-                account_number=self.account_number, report_platform_id=self.report_platform_id))
-        self.transition_to_started()
+        # Get the queryset for all of the objects in the NEW state
+        new_object_query = self.object_class.objects.filter(
+            state=self.object_class.NEW)
+        oldest_new_object = self.return_queryset_object(queryset=new_object_query)
+        return oldest_new_object
 
     @transaction.atomic
     def assign_object(self):
         """Assign the object processor objects that are saved in the db.
 
         First priority is the oldest object in any state. We check to see if an
-        appropriate amount of time has passed before we retry this object.
+        appropriate amount of time has passed  or code has changed before we retry this object.
 
         If none of the above qualify, we look for the oldest objects that are in the new state.
         """
         self.prefix = 'ASSIGNING %s' % self.object_prefix
+        object_found_message = 'Starting %s processor. State is "%s".'
         if self.report_or_slice is None:
-            try:
-                assign, oldest_object = self.get_oldest_object_retry()
-                if assign:
-                    self.report_or_slice = oldest_object
-                    self.next_state = oldest_object.state
-                    object_found_message = 'Starting %s processor. State is "%s".' % \
-                                           (self.object_prefix.lower(), self.report_or_slice.state)
-                    LOG.info(format_message(
-                        self.prefix, object_found_message,
-                        account_number=self.account_number,
-                        report_platform_id=self.report_platform_id))
-                    self.update_object_state(retry=RETRY.keep_same)
-                else:
-                    # else we want to raise an exception to look for objects in the
-                    # new state
-                    raise QPCReportException()
-            except (Report.DoesNotExist, ReportSlice.DoesNotExist,
-                    QPCReportException):
-                try:
-                    self.get_new_record()
-                except (Report.DoesNotExist, ReportSlice.DoesNotExist):
-                    object_not_found_message = \
-                        'No %s to be processed at this time. '\
-                        'Checking again in %s seconds.' \
-                        % (self.object_prefix.lower() + 's', str(EMPTY_QUEUE_SLEEP))
-                    LOG.info(format_message(self.prefix, object_not_found_message))
+            assigned = False
+            oldest_object_to_retry = self.get_oldest_object_to_retry()
+            if oldest_object_to_retry:
+                assigned = True
+                self.report_or_slice = oldest_object_to_retry
+                self.next_state = oldest_object_to_retry.state
+                LOG.info(format_message(
+                    self.prefix, object_found_message % (self.object_prefix.lower(),
+                                                         self.report_or_slice.state),
+                    account_number=self.account_number,
+                    report_platform_id=self.report_or_slice.report_platform_id))
+                options = {'retry': RETRY.keep_same}
+                self.update_object_state(options=options)
+            else:
+                new_object = self.get_new_record()
+                if new_object:
+                    assigned = True
+                    self.report_or_slice = new_object
+                    LOG.info(
+                        format_message(
+                            self.prefix, object_found_message % (self.object_prefix.lower(),
+                                                                 self.report_or_slice.state),
+                            account_number=self.account_number,
+                            report_platform_id=self.report_or_slice.report_platform_id))
+                    self.transition_to_started()
+            if not assigned:
+                object_not_found_message = \
+                    'No %s to be processed at this time. '\
+                    'Checking again in %s seconds.' \
+                    % (self.object_prefix.lower() + 's', str(EMPTY_QUEUE_SLEEP))
+                LOG.info(format_message(self.prefix, object_not_found_message))
 
     async def delegate_state(self):
         """Call the correct function based on report state.
@@ -249,32 +268,28 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
     def transition_to_started(self):
         """Attempt to change the state to started."""
         self.next_state = self.object_class.STARTED
-        self.update_object_state()
+        self.update_object_state(options={})
 
-    #  pylint: disable=too-many-locals, too-many-branches
-    def update_object_state(self, retry=RETRY.clear,   # noqa: C901 (too-complex)
-                            retry_type=None, report_json=None,
-                            report_platform_id=None, candidate_hosts=None,
-                            failed_hosts=None, status=None,
-                            report_type=None, report_id=None,
-                            report_version=None, ready_to_archive=None):
+    #  pylint: disable=too-many-locals, too-many-branches, too-many-statements
+    def update_object_state(self, options):  # noqa: C901 (too-complex)
         """
         Update the report processor state and save.
 
-        :param retry: <enum> Retry.clear=clear count, RETRY.increment=increase count
-        :param retry_type: <str> either time=retry after time,
-            git_commit=retry after new commit
-        :param report_json: <dict> dictionary containing the report json
-        :param report_platform_id: <str> string containing report_platform_id
-        :param candidate_hosts: <dict> dictionary containing hosts that were
-            successfully verified and uploaded
-        :param failed_hosts: <dict> dictionary containing hosts that failed
-            verification or upload
-        :param status: <str> either success or failure based on the report
-        :param report_type: <str> the type of the report
-        :param report_id: <int> the report id
-        :param report_version: <str> the report version
-        :param ready_to_archive: <bool> bool regarding archive
+        :param options: <dict> containing potentially containing the following:
+            retry: <enum> Retry.clear=clear count, RETRY.increment=increase count
+            retry_type: <str> either time=retry after time,
+                git_commit=retry after new commit
+            report_json: <dict> dictionary containing the report json
+            report_platform_id: <str> string containing report_platform_id
+            candidate_hosts: <dict> dictionary containing hosts that were
+                successfully verified and uploaded
+            failed_hosts: <dict> dictionary containing hosts that failed
+                verification or upload
+            status: <str> either success or failure based on the report
+            report_type: <str> the type of the report
+            report_id: <int> the report id
+            report_version: <str> the report version
+            ready_to_archive: <bool> bool regarding archive
         """
         try:
             status_info = Status()
@@ -282,10 +297,24 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             self.report_or_slice.last_update_time = datetime.now(pytz.utc)
             self.report_or_slice.state = self.next_state
             self.report_or_slice.git_commit = status_info.git_commit
+            retry_type = options.get('retry_type')
             if not retry_type:
                 retry_type = self.object_class.TIME
+            # grab all of the potential options
+            retry = options.get('retry', RETRY.clear)
+            report_json = options.get('report_json')
+            report_platform_id = options.get('report_platform_id')
+            candidate_hosts = options.get('candidate_hosts')
+            failed_hosts = options.get('failed_hosts')
+            status = options.get('status')
+            report_type = options.get('report_type')
+            report_id = options.get('report_id')
+            report_version = options.get('report_version')
+            ready_to_archive = options.get('ready_to_archive')
             if retry == RETRY.clear:
-                # reset the count to 0 (default behavior)
+                # After a successful transaction when we have reached the update
+                # point, we want to set the Retry count back to 0 because
+                # any future failures should be unrelated
                 self.report_or_slice.retry_count = 0
                 self.report_or_slice.retry_type = self.object_class.TIME
             elif retry == RETRY.increment:
@@ -358,9 +387,10 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 self.move_candidates_to_failed()
                 candidates = self.candidate_hosts
                 failed = self.failed_hosts
-            self.update_object_state(retry=RETRY.increment, retry_type=retry_type,
-                                     candidate_hosts=candidates,
-                                     failed_hosts=failed, ready_to_archive=True)
+            options = {'retry': RETRY.increment, 'retry_type': retry_type,
+                       'candidate_hosts': candidates, 'failed_hosts': failed,
+                       'ready_to_archive': True}
+            self.update_object_state(options=options)
         else:
             self.next_state = current_state
             if retry_type == self.object_class.GIT_COMMIT:
@@ -381,9 +411,9 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 log_message,
                 account_number=self.account_number, report_platform_id=self.report_platform_id))
 
-            self.update_object_state(retry=RETRY.increment,
-                                     retry_type=retry_type,
-                                     candidate_hosts=candidate_hosts)
+            options = {'retry': RETRY.increment, 'retry_type': retry_type,
+                       'candidate_hosts': candidate_hosts}
+            self.update_object_state(options=options)
             self.reset_variables()
 
     def record_failed_state_metrics(self):
@@ -410,34 +440,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             pass
 
         if report.ready_to_archive and all_slices_ready:
-            for report_slice in all_report_slices:
-                archived = ReportSliceArchive(
-                    rh_account=report_slice.rh_account,
-                    retry_count=report_slice.retry_count,
-                    retry_type=report_slice.retry_type,
-                    candidate_hosts=report_slice.candidate_hosts,
-                    failed_hosts=report_slice.failed_hosts,
-                    state=report_slice.state,
-                    ready_to_archive=report_slice.ready_to_archive,
-                    state_info=report_slice.state_info,
-                    last_update_time=report_slice.last_update_time,
-                    report_slice_id=report_slice.report_slice_id)
-                if report_slice.report_platform_id:
-                    archived.report_platform_id = report_slice.report_platform_id
-                if report_slice.report_json:
-                    archived.report_json = report_slice.report_json
-                archived.save()
-                failed_states = [ReportSlice.FAILED_VALIDATION, ReportSlice.FAILED_HOSTS_UPLOAD]
-                if report_slice.state in failed_states:
-                    ARCHIVED_FAIL.inc()
-                else:
-                    ARCHIVED_SUCCESS.inc()
-                LOG.info(format_message(
-                    self.prefix,
-                    'Archiving report slice %s.' % report_slice.report_slice_id,
-                    account_number=self.account_number,
-                    report_platform_id=self.report_platform_id))
-
+            # archive the report object
             failed = False
             LOG.info(format_message(self.prefix, 'Archiving report.',
                                     account_number=self.account_number,
@@ -460,6 +463,9 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             if report.report_platform_id:
                 archived_rep.report_platform_id = report.report_platform_id
             archived_rep.save()
+            LOG.info(format_message(self.prefix, 'Report slices successfully archived.',
+                                    account_number=self.account_number,
+                                    report_platform_id=self.report_platform_id))
 
             failed_states = [Report.FAILED_DOWNLOAD, Report.FAILED_VALIDATION,
                              Report.FAILED_VALIDATION_REPORTING]
@@ -467,12 +473,45 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 ARCHIVED_FAIL.inc()
             else:
                 ARCHIVED_SUCCESS.inc()
+
+            # loop through the associated reports & archive them
+            for report_slice in all_report_slices:
+                archived = ReportSliceArchive(
+                    rh_account=report_slice.rh_account,
+                    retry_count=report_slice.retry_count,
+                    retry_type=report_slice.retry_type,
+                    candidate_hosts=report_slice.candidate_hosts,
+                    failed_hosts=report_slice.failed_hosts,
+                    state=report_slice.state,
+                    ready_to_archive=report_slice.ready_to_archive,
+                    state_info=report_slice.state_info,
+                    last_update_time=report_slice.last_update_time,
+                    report_slice_id=report_slice.report_slice_id,
+                    report=archived_rep)
+                if report_slice.report_platform_id:
+                    archived.report_platform_id = report_slice.report_platform_id
+                if report_slice.report_json:
+                    archived.report_json = report_slice.report_json
+                archived.save()
+                failed_states = [ReportSlice.FAILED_VALIDATION, ReportSlice.FAILED_HOSTS_UPLOAD]
+                if report_slice.state in failed_states:
+                    ARCHIVED_FAIL.inc()
+                else:
+                    ARCHIVED_SUCCESS.inc()
+                LOG.info(format_message(
+                    self.prefix,
+                    'Archiving report slice %s.' % report_slice.report_slice_id,
+                    account_number=self.account_number,
+                    report_platform_id=self.report_platform_id))
             self.record_failed_state_metrics()
+            # now delete the report object and it will delete all of the associated
+            # report slices
             try:
                 Report.objects.get(id=report.id).delete()
             except Report.DoesNotExist:
                 pass
-            LOG.info(format_message(self.prefix, 'Report slice successfully archived.',
+
+            LOG.info(format_message(self.prefix, 'Report slices successfully archived.',
                                     account_number=self.account_number,
                                     report_platform_id=self.report_platform_id))
             self.reset_variables()

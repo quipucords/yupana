@@ -13,7 +13,7 @@
 
 from django.db import models
 
-from api.report.model import Report
+from api.report.model import Report, ReportArchive
 
 
 class AbstractReportSlice(models.Model):
@@ -21,11 +21,10 @@ class AbstractReportSlice(models.Model):
 
     report_platform_id = models.CharField(max_length=50, null=True)
     report_slice_id = models.CharField(max_length=50, null=True)
-    rh_account = models.TextField(null=True)
+    rh_account = models.CharField(max_length=50, null=True)
     report_json = models.TextField(null=True)
-    git_commit = models.TextField(null=True)
+    git_commit = models.CharField(max_length=50, null=True)
     ready_to_archive = models.BooleanField(null=False, default=False)
-    report = models.ForeignKey(Report, null=True, on_delete=models.CASCADE)
 
     PENDING = 'pending'
     NEW = 'new'
@@ -103,10 +102,10 @@ class AbstractReportSlice(models.Model):
 class ReportSlice(AbstractReportSlice):  # pylint: disable=too-many-instance-attributes
     """Represents report slice records."""
 
-    pass
+    report = models.ForeignKey(Report, null=True, on_delete=models.CASCADE)
 
 
 class ReportSliceArchive(AbstractReportSlice):
     """Represents report slice archives."""
 
-    pass
+    report = models.ForeignKey(ReportArchive, null=True, on_delete=models.CASCADE)

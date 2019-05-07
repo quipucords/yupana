@@ -65,7 +65,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
     def __init__(self):
         """Create a report slice state machine."""
         state_functions = {
-            ReportSlice.RETRY_VALIDATION: self.transition_to_new,
+            ReportSlice.RETRY_VALIDATION: self.transition_to_validated,
             ReportSlice.NEW: self.transition_to_started,
             ReportSlice.STARTED: self.transition_to_hosts_uploaded,
             ReportSlice.VALIDATED: self.transition_to_hosts_uploaded,
@@ -99,7 +99,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         if self.report_or_slice.report_platform_id:
             self.report_platform_id = self.report_or_slice.report_platform_id
 
-    def transition_to_new(self):
+    def transition_to_validated(self):
         """Revalidate the slice because it is in the failed validation state."""
         self.prefix = 'ATTEMPTING VALIDATION'
         LOG.info(format_message(
@@ -112,14 +112,15 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             INVALID_HOSTS.set(len(self.failed_hosts))
             # Here we want to update the report state of the actual report slice & when finished
             self.next_state = ReportSlice.VALIDATED
-            self.update_object_state(candidate_hosts=self.candidate_hosts,
-                                     failed_hosts=self.failed_hosts)
+            options = {'candidate_hosts': self.candidate_hosts,
+                       'failed_hosts': self.failed_hosts}
+            self.update_object_state(options=options)
         except QPCReportException:
             # if any QPCReportExceptions occur, we know that the report is not valid but has been
             # successfully validated
             # that means that this slice is invalid and only awaits being archived
             self.next_state = ReportSlice.FAILED_VALIDATION
-            self.update_object_state()
+            self.update_object_state(options={})
         except Exception as error:  # pylint: disable=broad-except
             # This slice blew up validation - we want to retry it later,
             # which means it enters our odd state
@@ -145,7 +146,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                                             account_number=self.account_number,
                                             report_platform_id=self.report_platform_id))
                     self.next_state = ReportSlice.HOSTS_UPLOADED
-                    self.update_object_state(candidate_hosts=[], ready_to_archive=True)
+                    options = {'candidate_hosts': [], 'ready_to_archive': True}
+                    self.update_object_state(options=options)
                 else:
                     candidates = []
                     # if both retry_commit_candidates and retry_time_candidates are returned
@@ -170,7 +172,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 LOG.info(format_message(self.prefix, 'There are no valid hosts to upload',
                                         account_number=self.account_number,
                                         report_platform_id=self.report_platform_id))
-                self.update_object_state(ready_to_archive=True)
+                options = {'ready_to_archive': True}
+                self.update_object_state(options=options)
                 self.archive_report_and_slices()
         except Exception as error:  # pylint: disable=broad-except
             LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error),

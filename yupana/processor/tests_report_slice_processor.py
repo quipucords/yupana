@@ -130,9 +130,6 @@ class ReportProcessorTests(TestCase):
                 side_effect=upload_side_effect):
             await self.processor.delegate_state()
             self.check_variables_are_reset()
-            # self.assertEqual(self.processor.report_or_slice.report_platform_id,
-            #                  self.report_slice.report_platform_id)
-            # self.assertEqual(self.processor.report_or_slice.state, ReportSlice.HOSTS_UPLOADED)
 
         # test pending state for delegate
         self.report_slice.state = ReportSlice.PENDING
@@ -162,8 +159,9 @@ class ReportProcessorTests(TestCase):
         failed_hosts = [{self.uuid6: {'etc_machine_id': 'value'}},
                         {self.uuid7: {'subscription_manager_id': 'value'}}]
         self.processor.report_or_slice = self.report_slice
-        self.processor.update_object_state(report_json=report_json,
-                                           failed_hosts=failed_hosts)
+        options = {'report_json': report_json,
+                   'failed_hosts': failed_hosts}
+        self.processor.update_object_state(options=options)
         self.assertEqual(json.loads(self.report_slice.report_json), report_json)
         self.assertEqual(json.loads(self.report_slice.failed_hosts), failed_hosts)
 
@@ -179,7 +177,7 @@ class ReportProcessorTests(TestCase):
 
         with patch('processor.report_slice_processor.ReportSliceProcessor._validate_report_details',
                    side_effect=validate_side_effect):
-            self.processor.transition_to_new()
+            self.processor.transition_to_validated()
             self.assertEqual(self.report_slice.state, ReportSlice.RETRY_VALIDATION)
             self.assertEqual(self.report_slice.retry_count, 1)
 
@@ -197,9 +195,27 @@ class ReportProcessorTests(TestCase):
         self.report_slice.report_json = json.dumps(report_json)
         self.report_slice.save()
         self.processor.report_or_slice = self.report_slice
-        self.processor.transition_to_new()
+        self.processor.transition_to_validated()
         self.assertEqual(self.report_slice.state, ReportSlice.VALIDATED)
         self.assertEqual(self.report_slice.retry_count, 0)
+
+    def test_transition_to_validated_failed(self):
+        """Test report missing slice id."""
+        self.report_slice.state = ReportSlice.RETRY_VALIDATION
+        report_json = {
+            'report_id': 1,
+            'report_type': 'insights',
+            'report_version': '1.0.0.1b025b8',
+            'status': 'completed',
+            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'hosts': {self.uuid: {'ip_addresses': 'value'}}}
+        self.report_slice.report_json = json.dumps(report_json)
+        self.report_slice.save()
+        self.processor.report_or_slice = self.report_slice
+        self.processor.transition_to_validated()
+        self.assertEqual(self.report_slice.state, ReportSlice.FAILED_VALIDATION)
+        self.assertEqual(self.report_slice.retry_count, 0)
+        self.assertEqual(self.report_slice.ready_to_archive, True)
 
     def test_moved_candidates_to_failed(self):
         """Test that we reset candidates after moving them to failed."""
@@ -308,11 +324,6 @@ class ReportProcessorTests(TestCase):
         self.processor.transition_to_hosts_uploaded()
         # assert the processor was reset
         self.check_variables_are_reset()
-        # with self.assertRaises(ReportSlice.DoesNotExist):
-        #     ReportSlice.objects.get(id=faulty_report.id)
-        # archived = ReportSliceArchive.objects.get(rh_account='987')
-        # self.assertEqual(json.loads(archived.state_info),
-        #                  [Report.PENDING, Report.NEW, Report.STARTED])
 
     def test_transition_to_hosts_uploaded_exception(self):
         """Test the transition to hosts being uploaded."""

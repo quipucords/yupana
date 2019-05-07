@@ -25,10 +25,11 @@ from api.models import AbstractReportSlice
 class ReportSliceSerializer(ModelSerializer):
     """Serializer for the ReportSlice model."""
 
-    report_platform_id = CharField(required=False)
-    rh_account = CharField(required=False)
+    report_platform_id = CharField(max_length=50, required=False)
+    report_slice_id = CharField(max_length=50, required=False)
+    rh_account = CharField(max_length=50, required=False)
     report_json = JSONField(null=True)
-    git_commit = CharField(required=False)
+    git_commit = CharField(max_length=50, required=False)
     state = ChoiceField(read_only=True, choices=AbstractReportSlice.STATE_CHOICES)
     retry_type = ChoiceField(read_only=True, choices=AbstractReportSlice.RETRY_CHOICES)
     state_info = JSONField(null=True)

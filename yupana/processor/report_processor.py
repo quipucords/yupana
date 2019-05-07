@@ -136,15 +136,14 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             report_platform_id = metadata_json.get('report_platform_id')
             report_version = metadata_json.get('report_version')
             report_type = metadata_json.get('report_type')
-            if not report_type or report_type != 'insights':
-                raise FailExtractException('Missing or invalid report type.')
             report_id = metadata_json.get('report_id')
             self.next_state = Report.DOWNLOADED
             # update the report or slice with downloaded info
-            self.update_object_state(report_platform_id=report_platform_id,
-                                     report_type=report_type,
-                                     report_id=report_id,
-                                     report_version=report_version)
+            options = {'report_platform_id': report_platform_id,
+                       'report_type': report_type,
+                       'report_id': report_id,
+                       'report_version': report_version}
+            self.update_object_state(options=options)
             self.deduplicate_reports()
         except (FailDownloadException, FailExtractException) as err:
             LOG.error(format_message(
@@ -152,7 +151,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 report_download_failed_msg % err,
                 account_number=self.account_number))
             self.next_state = Report.FAILED_DOWNLOAD
-            self.update_object_state(ready_to_archive=True)
+            options = {'ready_to_archive': True}
+            self.update_object_state(options=options)
         except (RetryDownloadException, RetryExtractException) as err:
             LOG.error(format_message(
                 self.prefix,
@@ -178,23 +178,23 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     self.status = SUCCESS_CONFIRM_STATUS
                 INVALID_HOSTS.set(len(failed_hosts))
                 # Here we want to update the report state of the actual report slice
-                self.update_slice_state(state=ReportSlice.NEW, report_slice=report_slice,
-                                        candidate_hosts=candidate_hosts,
-                                        failed_hosts=failed_hosts)
+                options = {'state': ReportSlice.NEW,
+                           'candidate_hosts': candidate_hosts, 'failed_hosts': failed_hosts}
+                self.update_slice_state(options=options, report_slice=report_slice)
             except QPCReportException:
                 # if any QPCReportExceptions occur, we know that the report is not valid
                 # but has been successfully validated
                 # that means that this slice is invalid and only awaits being archived
-                self.update_slice_state(state=ReportSlice.FAILED_VALIDATION,
-                                        report_slice=report_slice,
-                                        ready_to_archive=True)
+                options = {'state': ReportSlice.FAILED_VALIDATION, 'ready_to_archive': True}
+                self.update_slice_state(options=options, report_slice=report_slice)
             except Exception as error:  # pylint: disable=broad-except
                 # This slice blew up validation - we want to retry it later,
                 # which means it enters our odd state of retrying validation
                 LOG.error(format_message(self.prefix,
                                          'The following error occurred: %s.' % str(error)))
-                self.update_slice_state(state=ReportSlice.RETRY_VALIDATION,
-                                        report_slice=report_slice, retry=RETRY.increment)
+                options = {'state': ReportSlice.RETRY_VALIDATION,
+                           'retry': RETRY.increment}
+                self.update_slice_state(options=options, report_slice=report_slice)
         if self.status == 'failure':
             LOG.warning(
                 format_message(
@@ -202,7 +202,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     'The uploaded report was invalid. Status set to "%s".' % self.status,
                     account_number=self.account_number))
         self.next_state = Report.VALIDATED
-        self.update_object_state(status=self.status)
+        options = {'status': self.status}
+        self.update_object_state(options=options)
 
     async def transition_to_validation_reported(self):
         """Upload the validation status & move to validation reported state."""
@@ -216,13 +217,15 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         try:
             await self._send_confirmation(message_hash)
             self.next_state = Report.VALIDATION_REPORTED
-            self.update_object_state(ready_to_archive=True)
+            options = {'ready_to_archive': True}
+            self.update_object_state(options=options)
             LOG.info(format_message(
                 self.prefix,
                 'Status successfully uploaded.',
                 account_number=self.account_number, report_platform_id=self.report_platform_id))
             if self.status == FAILURE_CONFIRM_STATUS:
-                self.update_object_state(retry=RETRY.keep_same, ready_to_archive=True)
+                options = {'retry': RETRY.keep_same, 'ready_to_archive': True}
+                self.update_object_state(options=options)
                 self.archive_report_and_slices()
         except Exception as error:  # pylint: disable=broad-except
             LOG.error(format_message(
@@ -277,24 +280,32 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         return created, report_slice
 
     # pylint: disable=too-many-arguments
-    def update_slice_state(self, state, report_slice, retry=RETRY.clear,
-                           retry_type=None, candidate_hosts=None,   # noqa: C901 (too-complex)
-                           failed_hosts=None, ready_to_archive=None):
+    def update_slice_state(self, options, report_slice):
         """
         Update the report processor state and save.
 
-        :param retry: <enum> Retry.clear=clear count, RETRY.increment=increase count
-        :param retry_type: <str> either time=retry after time,
-            git_commit=retry after new commit
-        :param report_json: <dict> dictionary containing the report json
-        :param report_platform_id: <str> string containing report_platform_id
-        :param candidate_hosts: <dict> dictionary containing hosts that were
-            successfully verified and uploaded
-        :param failed_hosts: <dict> dictionary containing hosts that failed
-            verification or upload
-        :param status: <str> either success or failure based on the report
+        :param options: <dict> dictionary potentially containing the following:
+            report_slice: <ReportSlice> the report slice to update
+            state: <str> the state to update to
+            retry: <enum> Retry.clear=clear count, RETRY.increment=increase count
+            retry_type: <str> either time=retry after time,
+                git_commit=retry after new commit
+            report_json: <dict> dictionary containing the report json
+            report_platform_id: <str> string containing report_platform_id
+            candidate_hosts: <dict> dictionary containing hosts that were
+                successfully verified and uploaded
+            failed_hosts: <dict> dictionary containing hosts that failed
+                verification or upload
+            ready_to_archive: <bool> boolean on whether or not to archive
         """
         try:
+            # report_slice = options.get('report_slice')
+            state = options.get('state')
+            retry_type = options.get('retry_type')
+            retry = options.get('retry', RETRY.clear)
+            candidate_hosts = options.get('candidate_hosts')
+            failed_hosts = options.get('failed_hosts')
+            ready_to_archive = options.get('ready_to_archive')
             status_info = Status()
             report_slice.last_update_time = datetime.now(pytz.utc)
             report_slice.state = state
@@ -417,6 +428,9 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 try:
                     metadata_str = metadata_file.read().decode('utf-8')
                     metadata_json = json.loads(metadata_str)
+                    report_type = metadata_json.get('report_type')
+                    if not report_type or report_type != 'insights':
+                        raise FailExtractException('Missing or invalid report type.')
                     # save all of the metadata info to the report record
                     report_slices = metadata_json.get('report_slices', {})
                     self.report_platform_id = metadata_json.get('report_platform_id')
@@ -472,7 +486,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                                        account_number=self.account_number))
             raise FailExtractException(
                 format_message(self.prefix,
-                               'Tar does not contain JSON metadata & report files.',
+                               'Tar does not contain valid JSON metadata & report files.',
                                account_number=self.account_number))
         except FailExtractException as qpc_err:
             raise qpc_err

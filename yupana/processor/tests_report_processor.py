@@ -80,7 +80,7 @@ class ReportProcessorTests(TransactionTestCase):
             rh_account='13423',
             report_json=json.dumps(self.report_json),
             state=ReportSlice.NEW,
-            state_info=[ReportSlice.NEW],
+            state_info=json.dumps([ReportSlice.NEW]),
             retry_count=0,
             last_update_time=datetime.now(pytz.utc),
             failed_hosts=[],
@@ -211,9 +211,10 @@ class ReportProcessorTests(TransactionTestCase):
         self.report_record.save()
         # set the values we will update with
         self.processor.report_or_slice = self.report_record
-        self.processor.update_object_state(retry=report_processor.RETRY.increment,
-                                           retry_type=Report.GIT_COMMIT,
-                                           report_platform_id=self.uuid3)
+        options = {'retry': report_processor.RETRY.increment,
+                   'retry_type': Report.GIT_COMMIT,
+                   'report_platform_id': self.uuid3}
+        self.processor.update_object_state(options=options)
         self.assertEqual(self.report_record.retry_count, 1)
         self.assertEqual(self.report_record.retry_type, Report.GIT_COMMIT)
         self.assertEqual(self.report_record.report_platform_id, self.uuid3)
@@ -903,7 +904,28 @@ class ReportProcessorTests(TransactionTestCase):
         with self.assertRaises(report_processor.FailExtractException):
             self.processor._extract_and_create_slices(buffer_content)
 
-    def test_e_extract_and_create_slices_failure_no_metadata(self):
+    def test_extract_and_create_slices_failure_invalid_metadata(self):
+        """Testing the extract method failure no valid metadata."""
+        metadata_json = {
+            'report_id': 1,
+            'report_type': 'deployments',
+            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'report_version': '1.0.0.1b025b8',
+            'report_slices': {'2345322': {'number_hosts': 1}}
+        }
+        report_json = {
+            'report_slice_id': '2345322',
+            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'hosts': {self.uuid: {'key': 'value'}}}
+        report_files = {
+            'metadata.json': metadata_json,
+            '2345322.json': report_json
+        }
+        buffer_content = test_handler.create_tar_buffer(report_files)
+        with self.assertRaises(report_processor.FailExtractException):
+            self.processor._extract_and_create_slices(buffer_content)
+
+    def test_extract_and_create_slices_failure_no_metadata(self):
         """Testing the extract method failure no json file."""
         report_json = {
             'report_slice_id': '2345322',

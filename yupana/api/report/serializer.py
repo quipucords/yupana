@@ -25,14 +25,14 @@ from api.models import AbstractReport
 class ReportSerializer(ModelSerializer):
     """Serializer for the Report model."""
 
-    report_platform_id = CharField(required=False)
-    report_version = CharField(required=False)
-    report_type = CharField(required=False)
+    report_platform_id = CharField(max_length=50, required=False)
+    report_version = CharField(max_length=50, required=False)
+    report_type = CharField(max_length=20, required=False)
     report_id = IntegerField(null=True)
-    rh_account = CharField(required=False)
-    upload_ack_status = CharField(required=False)
+    rh_account = CharField(max_length=50, required=False)
+    upload_ack_status = CharField(max_length=10, required=False)
     upload_srv_kafka_msg = JSONField(read_only=True)
-    git_commit = CharField(required=False)
+    git_commit = CharField(max_length=50, required=False)
     state = ChoiceField(read_only=True, choices=AbstractReport.STATE_CHOICES)
     retry_type = ChoiceField(read_only=True, choices=AbstractReport.RETRY_CHOICES)
     state_info = JSONField(null=True)

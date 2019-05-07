@@ -18,13 +18,13 @@ class AbstractReport(models.Model):
     """Represents report information."""
 
     report_platform_id = models.CharField(max_length=50, null=True)
-    report_version = models.TextField(null=True)
-    report_type = models.TextField(null=True)
+    report_version = models.CharField(max_length=50, null=True)
+    report_type = models.CharField(max_length=20, null=True)
     report_id = models.IntegerField(null=True)
-    rh_account = models.TextField(null=True)
-    upload_ack_status = models.TextField(null=True)
+    rh_account = models.CharField(max_length=50, null=True)
+    upload_ack_status = models.CharField(max_length=10, null=True)
     upload_srv_kafka_msg = models.TextField(null=True)
-    git_commit = models.TextField(null=True)
+    git_commit = models.CharField(max_length=50, null=True)
     ready_to_archive = models.BooleanField(null=False, default=False)
 
     NEW = 'new'
