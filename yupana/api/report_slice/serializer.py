@@ -9,7 +9,7 @@
 # https://www.gnu.org/licenses/gpl-3.0.txt.
 #
 
-"""Serializer for report progress."""
+"""Serializer for report slice progress."""
 
 from rest_framework.serializers import (BooleanField,
                                         CharField,
@@ -19,29 +19,28 @@ from rest_framework.serializers import (BooleanField,
                                         JSONField,
                                         ModelSerializer)
 
-from api.models import AbstractReport
+from api.models import AbstractReportSlice
 
 
-class ReportSerializer(ModelSerializer):
-    """Serializer for the Report model."""
+class ReportSliceSerializer(ModelSerializer):
+    """Serializer for the ReportSlice model."""
 
     report_platform_id = CharField(max_length=50, required=False)
-    report_version = CharField(max_length=50, required=False)
-    report_type = CharField(max_length=20, required=False)
-    report_id = IntegerField(null=True)
+    report_slice_id = CharField(max_length=50, required=False)
     rh_account = CharField(max_length=50, required=False)
-    upload_ack_status = CharField(max_length=10, required=False)
-    upload_srv_kafka_msg = JSONField(read_only=True)
+    report_json = JSONField(null=True)
     git_commit = CharField(max_length=50, required=False)
-    state = ChoiceField(read_only=True, choices=AbstractReport.STATE_CHOICES)
-    retry_type = ChoiceField(read_only=True, choices=AbstractReport.RETRY_CHOICES)
+    state = ChoiceField(read_only=True, choices=AbstractReportSlice.STATE_CHOICES)
+    retry_type = ChoiceField(read_only=True, choices=AbstractReportSlice.RETRY_CHOICES)
     state_info = JSONField(null=True)
     retry_count = IntegerField(null=True)
     last_update_time = DateField(null=True)
+    failed_hosts = JSONField(null=True)
+    candidate_hosts = JSONField(null=True)
     ready_to_archive = BooleanField(required=True)
 
     class Meta:
-        """Meta class for ReportSerializer."""
+        """Meta class for ReportSliceSerializer."""
 
-        model = AbstractReport
+        model = AbstractReportSlice
         fields = '__all__'

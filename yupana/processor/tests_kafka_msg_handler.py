@@ -59,7 +59,7 @@ class KafkaMsg:  # pylint:disable=too-few-public-methods
     def __init__(self, topic, url):
         """Initialize the message."""
         self.topic = topic
-        value_dict = {'url': url, 'rh_account': '1234'}
+        value_dict = {'url': url, 'rh_account': '1234', 'hash': '234332'}
         value_str = json.dumps(value_dict)
         self.value = value_str.encode('utf-8')
 
@@ -84,7 +84,8 @@ class KafkaMsgHandlerTest(TestCase):
         """Test format message without account or report id."""
         fake_record = KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
         msg = msg_handler.unpack_consumer_record(fake_record)
-        self.assertEqual(msg, {'url': 'http://internet.com', 'rh_account': '1234'})
+        self.assertEqual(msg, {'url': 'http://internet.com', 'rh_account': '1234',
+                               'hash': '234332'})
 
     def test_unpack_consumer_record_not_json(self):
         """Test format message without account or report id."""

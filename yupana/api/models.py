@@ -20,3 +20,4 @@
 # pylint: disable=unused-import
 from api.status.model import Status
 from api.report.model import AbstractReport, Report, ReportArchive
+from api.report_slice.model import AbstractReportSlice, ReportSlice, ReportSliceArchive
