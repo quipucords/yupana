@@ -463,7 +463,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             if report.report_platform_id:
                 archived_rep.report_platform_id = report.report_platform_id
             archived_rep.save()
-            LOG.info(format_message(self.prefix, 'Report slices successfully archived.',
+            LOG.info(format_message(self.prefix, 'Report successfully archived.',
                                     account_number=self.account_number,
                                     report_platform_id=self.report_platform_id))
 
