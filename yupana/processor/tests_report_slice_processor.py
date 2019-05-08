@@ -614,6 +614,16 @@ class ReportProcessorTests(TestCase):
                    value='not none'):
             self.processor._upload_to_host_inventory(hosts)
 
+    @patch('processor.report_processor.requests.post')
+    def test_host_url_request_exceptions(self, mock_request):
+        """Testing a request exception raised during host inventory upload."""
+        mock_request.side_effect = requests.exceptions.RequestException()
+        self.processor.account_number = '00001'
+        self.processor.report_platform_id = '0001-kevan'
+        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
+        self.processor._upload_to_host_inventory(hosts)
+
     def test_format_certs(self):
         """Testing the format_certs function."""
         certs = ['69.pem', '67.pem', '']
