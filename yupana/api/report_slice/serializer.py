@@ -14,33 +14,53 @@
 from rest_framework.serializers import (BooleanField,
                                         CharField,
                                         ChoiceField,
-                                        DateField,
+                                        DateTimeField,
                                         IntegerField,
                                         JSONField,
                                         ModelSerializer)
 
-from api.models import AbstractReportSlice
+from api.models import ReportSlice, ReportSliceArchive
 
 
-class ReportSliceSerializer(ModelSerializer):
-    """Serializer for the ReportSlice model."""
+class AbstractReportSliceSerializer(ModelSerializer):
+    """Abstract serializer for the ReportSlice models."""
 
     report_platform_id = CharField(max_length=50, required=False)
     report_slice_id = CharField(max_length=50, required=False)
     rh_account = CharField(max_length=50, required=False)
-    report_json = JSONField(null=True)
+    report_json = JSONField(allow_null=False)
     git_commit = CharField(max_length=50, required=False)
-    state = ChoiceField(read_only=True, choices=AbstractReportSlice.STATE_CHOICES)
-    retry_type = ChoiceField(read_only=True, choices=AbstractReportSlice.RETRY_CHOICES)
-    state_info = JSONField(null=True)
-    retry_count = IntegerField(null=True)
-    last_update_time = DateField(null=True)
-    failed_hosts = JSONField(null=True)
-    candidate_hosts = JSONField(null=True)
-    ready_to_archive = BooleanField(required=True)
+    state = ChoiceField(choices=ReportSlice.STATE_CHOICES)
+    retry_type = ChoiceField(choices=ReportSlice.RETRY_CHOICES, default=ReportSlice.TIME)
+    state_info = JSONField(allow_null=False)
+    retry_count = IntegerField(default=0)
+    last_update_time = DateTimeField(allow_null=False)
+    failed_hosts = JSONField(allow_null=True)
+    candidate_hosts = JSONField(allow_null=True)
+    ready_to_archive = BooleanField(default=False)
 
     class Meta:
-        """Meta class for ReportSliceSerializer."""
+        """Meta class for AbstractReportSliceSerializer."""
 
-        model = AbstractReportSlice
+        abstract = True
+        fields = '__all__'
+
+
+class ReportSliceSerializer(AbstractReportSliceSerializer):
+    """Serializer for the ReportSlice Model."""
+
+    class Meta:
+        """Meta class for the ReportSliceSerializer."""
+
+        model = ReportSlice
+        fields = '__all__'
+
+
+class ReportSliceArchiveSerializer(AbstractReportSliceSerializer):
+    """Serializer for the ReportSliceArchive Model."""
+
+    class Meta:
+        """Meta class for the ReportSliceArchiveSerializer."""
+
+        model = ReportSliceArchive
         fields = '__all__'

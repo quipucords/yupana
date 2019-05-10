@@ -209,9 +209,10 @@ class ReportProcessorTests(TransactionTestCase):
         # set the base line values
         self.report_record.retry_count = 0
         self.report_record.save()
+        self.processor.next_state = Report.STARTED
         # set the values we will update with
         self.processor.report_or_slice = self.report_record
-        options = {'retry': report_processor.RETRY.increment,
+        options = {'retry': abstract_processor.RETRY.increment,
                    'retry_type': Report.GIT_COMMIT,
                    'report_platform_id': self.uuid3}
         self.processor.update_object_state(options=options)
@@ -439,6 +440,7 @@ class ReportProcessorTests(TransactionTestCase):
         }
         self.processor.upload_message = {'url': self.payload_url, 'rh_account': '00001'}
         self.processor.report_or_slice = self.report_record
+        self.processor.account_number = '0001'
         buffer_content = test_handler.create_tar_buffer(report_files)
         with requests_mock.mock() as mock_req:
             mock_req.get(self.payload_url, content=buffer_content)
@@ -827,6 +829,7 @@ class ReportProcessorTests(TransactionTestCase):
             '2345322.json': report_json
         }
         self.processor.report_or_slice = self.report_record
+        self.processor.account_number = '0001'
         buffer_content = test_handler.create_tar_buffer(report_files)
         result = self.processor._extract_and_create_slices(buffer_content)
         self.assertEqual(result, metadata_json)
@@ -860,6 +863,7 @@ class ReportProcessorTests(TransactionTestCase):
             '%s.json' % self.uuid2: report_json2
         }
         self.processor.report_or_slice = self.report_record
+        self.processor.account_number = '000001'
         buffer_content = test_handler.create_tar_buffer(report_files)
         result = self.processor._extract_and_create_slices(buffer_content)
         self.assertEqual(result, metadata_json)
@@ -884,6 +888,7 @@ class ReportProcessorTests(TransactionTestCase):
             '2345322.json': report_json
         }
         self.processor.report_or_slice = self.report_record
+        self.processor.account_number = '0001'
         buffer_content = test_handler.create_tar_buffer(report_files)
         result = self.processor._extract_and_create_slices(buffer_content)
         self.assertEqual(result, metadata_json)

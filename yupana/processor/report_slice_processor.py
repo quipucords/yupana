@@ -33,6 +33,7 @@ from processor.kafka_msg_handler import (QPCReportException,
                                          format_message)
 
 from api.models import ReportSlice
+from api.serializers import ReportSliceSerializer
 from config.settings.base import (INSIGHTS_HOST_INVENTORY_URL,
                                   RETRIES_ALLOWED,
                                   RETRY_TIME)
@@ -80,7 +81,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                          state_metrics=state_metrics,
                          async_states=[],
                          object_prefix='REPORT SLICE',
-                         object_class=ReportSlice
+                         object_class=ReportSlice,
+                         object_serializer=ReportSliceSerializer
                          )
 
     def pre_delegate(self):

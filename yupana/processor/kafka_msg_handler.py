@@ -28,6 +28,7 @@ from kafka.errors import ConnectionError as KafkaConnectionError
 from prometheus_client import Counter
 
 from api.models import Report
+from api.serializers import ReportSerializer
 from config.settings.base import INSIGHTS_KAFKA_ADDRESS
 
 LOG = logging.getLogger(__name__)
@@ -122,14 +123,31 @@ async def save_message_and_ack(consumer, consumer_record):
                         prefix,
                         'Message missing rh_account.'))
             try:
-                uploaded_report = Report(
-                    upload_srv_kafka_msg=json.dumps(upload_service_message),
-                    rh_account=rh_account,
-                    state=Report.NEW,
-                    state_info=json.dumps([Report.NEW]),
-                    last_update_time=datetime.now(pytz.utc),
-                    retry_count=0)
-                uploaded_report.save()
+                uploaded_report = {
+                    'upload_srv_kafka_msg': json.dumps(upload_service_message),
+                    'rh_account': rh_account,
+                    'state': Report.NEW,
+                    'state_info': json.dumps([Report.NEW]),
+                    'last_update_time': datetime.now(pytz.utc),
+                    'retry_count': 0
+                }
+                message = uploaded_report.get('upload_srv_kafka_msg')
+                print(message)
+                # uploaded_report = Report(
+                #     upload_srv_kafka_msg=json.dumps(upload_service_message),
+                #     rh_account=rh_account,
+                #     state=Report.NEW,
+                #     state_info=json.dumps([Report.NEW]),
+                #     last_update_time=datetime.now(pytz.utc),
+                #     retry_count=0)
+                report_serializer = ReportSerializer(data=uploaded_report)
+                report_serializer.is_valid(raise_exception=True)
+                print(report_serializer.is_valid())
+                print(report_serializer.errors)
+                if report_serializer.is_valid():
+                    print('is valid! ')
+                    report_serializer.save()
+                    # uploaded_report.save()
                 MSG_UPLOADS.inc()
                 LOG.info(format_message(
                     prefix, 'Upload service message saved. Ready for processing.'))
@@ -138,7 +156,7 @@ async def save_message_and_ack(consumer, consumer_record):
                 LOG.error(format_message(
                     prefix,
                     'The following error occurred while trying to save and '
-                    'commit the message: %s', error))
+                    'commit the message: %s' % error))
         except QPCKafkaMsgException as message_error:
             LOG.error(format_message(
                 prefix, 'Error processing records.  Message: %s, Error: %s',
