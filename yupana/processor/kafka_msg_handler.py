@@ -132,8 +132,8 @@ async def save_message_and_ack(consumer, consumer_record):
                     'retry_count': 0
                 }
                 report_serializer = ReportSerializer(data=uploaded_report)
-                if report_serializer.is_valid(raise_exception=True):
-                    report_serializer.save()
+                report_serializer.is_valid(raise_exception=True)
+                report_serializer.save()
                 MSG_UPLOADS.inc()
                 LOG.info(format_message(
                     prefix, 'Upload service message saved. Ready for processing.'))

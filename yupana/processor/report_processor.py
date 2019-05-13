@@ -356,14 +356,14 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 instance=report_slice,
                 data=report_slice_data,
                 partial=True)
-            if serializer.is_valid(raise_exception=True):
-                serializer.save()
-                LOG.info(
-                    format_message(
-                        self.prefix,
-                        'Successfully updated report slice %s' % report_slice.report_slice_id,
-                        account_number=self.account_number,
-                        report_platform_id=self.report_platform_id))
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            LOG.info(
+                format_message(
+                    self.prefix,
+                    'Successfully updated report slice %s' % report_slice.report_slice_id,
+                    account_number=self.account_number,
+                    report_platform_id=self.report_platform_id))
         except Exception as error:  # pylint: disable=broad-except
             LOG.error(format_message(
                 self.prefix,

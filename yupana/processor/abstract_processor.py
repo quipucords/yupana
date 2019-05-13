@@ -367,8 +367,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 data=update_data,
                 partial=True)
 
-            if serializer.is_valid(raise_exception=True):
-                serializer.save()
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
 
         except Exception as error:
             LOG.error(format_message(
@@ -482,11 +482,11 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             if report.report_platform_id:
                 archived_rep_data['report_platform_id'] = report.report_platform_id
             rep_serializer = ReportArchiveSerializer(data=archived_rep_data)
-            if rep_serializer.is_valid(raise_exception=True):
-                archived_rep = rep_serializer.save()
-                LOG.info(format_message(self.prefix, 'Report successfully archived.',
-                                        account_number=self.account_number,
-                                        report_platform_id=self.report_platform_id))
+            rep_serializer.is_valid(raise_exception=True)
+            archived_rep = rep_serializer.save()
+            LOG.info(format_message(self.prefix, 'Report successfully archived.',
+                                    account_number=self.account_number,
+                                    report_platform_id=self.report_platform_id))
 
             failed_states = [Report.FAILED_DOWNLOAD, Report.FAILED_VALIDATION,
                              Report.FAILED_VALIDATION_REPORTING]
@@ -515,8 +515,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 if report_slice.report_json:
                     archived_slice_data['report_json'] = report_slice.report_json
                 slice_serializer = ReportSliceArchiveSerializer(data=archived_slice_data)
-                if slice_serializer.is_valid(raise_exception=True):
-                    slice_serializer.save()
+                slice_serializer.is_valid(raise_exception=True)
+                slice_serializer.save()
                 failed_states = [ReportSlice.FAILED_VALIDATION, ReportSlice.FAILED_HOSTS_UPLOAD]
                 if report_slice.state in failed_states:
                     ARCHIVED_FAIL.inc()
