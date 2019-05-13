@@ -34,14 +34,14 @@ class AbstractReportSlice(models.Model):
     STARTED = 'started'
     HOSTS_UPLOADED = 'hosts uploaded'
     FAILED_HOSTS_UPLOAD = 'failed to upload hosts'
-    STATE_CHOICES = (('PENDING', PENDING),
-                     ('NEW', NEW),
-                     ('RETRY_VALIDATION', RETRY_VALIDATION),
-                     ('FAILED_VALIDATION', FAILED_VALIDATION),
-                     ('VALIDATED', VALIDATED),
-                     ('STARTED', STARTED),
-                     ('HOSTS_UPLOADED', HOSTS_UPLOADED),
-                     ('FAILED_HOSTS_UPLOAD', FAILED_HOSTS_UPLOAD))
+    STATE_CHOICES = ((PENDING, PENDING),
+                     (NEW, NEW),
+                     (RETRY_VALIDATION, RETRY_VALIDATION),
+                     (FAILED_VALIDATION, FAILED_VALIDATION),
+                     (VALIDATED, VALIDATED),
+                     (STARTED, STARTED),
+                     (HOSTS_UPLOADED, HOSTS_UPLOADED),
+                     (FAILED_HOSTS_UPLOAD, FAILED_HOSTS_UPLOAD))
 
     state = models.CharField(
         max_length=28,
@@ -51,8 +51,8 @@ class AbstractReportSlice(models.Model):
 
     TIME = 'time'
     GIT_COMMIT = 'git commit'
-    RETRY_CHOICES = (('TIME', TIME),
-                     ('GIT_COMMIT', GIT_COMMIT))
+    RETRY_CHOICES = ((TIME, TIME),
+                     (GIT_COMMIT, GIT_COMMIT))
 
     retry_type = models.CharField(
         max_length=10,

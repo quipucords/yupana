@@ -35,14 +35,14 @@ class AbstractReport(models.Model):
     FAILED_VALIDATION = 'failed validation'
     VALIDATION_REPORTED = 'validation reported'
     FAILED_VALIDATION_REPORTING = 'failed to report validation'
-    STATE_CHOICES = (('NEW', NEW),
-                     ('STARTED', STARTED),
-                     ('DOWNLOADED', DOWNLOADED),
-                     ('FAILED_DOWNLOAD', FAILED_DOWNLOAD),
-                     ('VALIDATED', VALIDATED),
-                     ('FAILED_VALIDATION', FAILED_VALIDATION),
-                     ('VALIDATION_REPORTED', VALIDATION_REPORTED),
-                     ('FAILED_VALIDATION_REPORTING', FAILED_VALIDATION_REPORTING))
+    STATE_CHOICES = ((NEW, NEW),
+                     (STARTED, STARTED),
+                     (DOWNLOADED, DOWNLOADED),
+                     (FAILED_DOWNLOAD, FAILED_DOWNLOAD),
+                     (VALIDATED, VALIDATED),
+                     (FAILED_VALIDATION, FAILED_VALIDATION),
+                     (VALIDATION_REPORTED, VALIDATION_REPORTED),
+                     (FAILED_VALIDATION_REPORTING, FAILED_VALIDATION_REPORTING))
 
     state = models.CharField(
         max_length=28,
@@ -52,8 +52,8 @@ class AbstractReport(models.Model):
 
     TIME = 'time'
     GIT_COMMIT = 'git commit'
-    RETRY_CHOICES = (('TIME', TIME),
-                     ('GIT_COMMIT', GIT_COMMIT))
+    RETRY_CHOICES = ((TIME, TIME),
+                     (GIT_COMMIT, GIT_COMMIT))
 
     retry_type = models.CharField(
         max_length=10,

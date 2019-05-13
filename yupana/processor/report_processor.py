@@ -38,6 +38,7 @@ from processor.kafka_msg_handler import (KafkaMsgHandlerError,
                                          format_message)
 
 from api.models import (Report, ReportSlice, Status)
+from api.serializers import ReportSerializer, ReportSliceSerializer
 from config.settings.base import (INSIGHTS_KAFKA_ADDRESS,
                                   RETRIES_ALLOWED,
                                   RETRY_TIME)
@@ -101,7 +102,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                          state_metrics=state_metrics,
                          async_states=self.async_states,
                          object_prefix='REPORT',
-                         object_class=Report
+                         object_class=Report,
+                         object_serializer=ReportSerializer
                          )
 
     def pre_delegate(self):
@@ -237,7 +239,9 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
     def create_report_slice(self, report_json, report_slice_id):
         """Create report slice.
 
-        Returns a boolean regarding whether or not the slice was created.
+        :param report_json: <dict> the report info in json format
+        :param report_slice_id: <str> the report slice id
+        :returns boolean regarding whether or not the slice was created.
         """
         LOG.info(
             format_message(
@@ -257,30 +261,33 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 account_number=self.account_number, report_platform_id=self.report_platform_id))
             return created
 
-        # The slice does not exist, so we should create it
-        report_slice = ReportSlice(
-            state=ReportSlice.PENDING,
-            rh_account=self.account_number,
-            state_info=json.dumps([ReportSlice.PENDING]),
-            last_update_time=datetime.now(pytz.utc),
-            retry_count=0,
-            report_json=json.dumps(report_json),
-            report_platform_id=self.report_platform_id,
-            failed_hosts=json.dumps({}),
-            candidate_hosts=json.dumps({}),
-            report_slice_id=report_slice_id,
-            report=self.report_or_slice
-        )
-        report_slice.save()
-        LOG.info(
-            format_message(
-                self.prefix, 'Successfully created report slice %s' % report_slice_id,
-                account_number=self.account_number, report_platform_id=self.report_platform_id))
+        report_slice = {
+            'state': ReportSlice.PENDING,
+            'rh_account': self.account_number,
+            'state_info': json.dumps([ReportSlice.PENDING]),
+            'last_update_time': datetime.now(pytz.utc),
+            'retry_count': 0,
+            'report_json': json.dumps(report_json),
+            'report_platform_id': self.report_platform_id,
+            'failed_hosts': json.dumps({}),
+            'candidate_hosts': json.dumps({}),
+            'report_slice_id': report_slice_id,
+            'report': self.report_or_slice.id
+        }
+        slice_serializer = ReportSliceSerializer(data=report_slice)
+        if slice_serializer.is_valid(raise_exception=True):
+            slice_serializer.save()
+            LOG.info(
+                format_message(
+                    self.prefix,
+                    'Successfully created report slice %s' % report_slice_id,
+                    account_number=self.account_number,
+                    report_platform_id=self.report_platform_id))
         created = True
-        return created, report_slice
+        return created
 
-    # pylint: disable=too-many-arguments
-    def update_slice_state(self, options, report_slice):
+    # pylint: disable=too-many-arguments,too-many-locals
+    def update_slice_state(self, options, report_slice):  # noqa: C901 (too-complex)
         """
         Update the report processor state and save.
 
@@ -299,7 +306,6 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             ready_to_archive: <bool> boolean on whether or not to archive
         """
         try:
-            # report_slice = options.get('report_slice')
             state = options.get('state')
             retry_type = options.get('retry_type')
             retry = options.get('retry', RETRY.clear)
@@ -310,40 +316,54 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             report_slice.last_update_time = datetime.now(pytz.utc)
             report_slice.state = state
             report_slice.git_commit = status_info.git_commit
+            report_slice_data = {
+                'last_update_time': datetime.now(pytz.utc),
+                'state': state,
+                'git_commit': status_info.git_commit
+            }
             if not retry_type:
                 retry_type = ReportSlice.TIME
             if retry == RETRY.clear:
-                # reset the count to 0 (default behavior)
-                report_slice.retry_count = 0
-                report_slice.retry_type = ReportSlice.TIME
+                # After a successful transaction when we have reached the update
+                # point, we want to set the retry count back to 0 because
+                # any future failures should be unrelated
+                report_slice_data['retry_count'] = 0
+                report_slice_data['retry_type'] = ReportSlice.TIME
             elif retry == RETRY.increment:
-                report_slice.retry_count += 1
-                report_slice.retry_type = retry_type
+                current_count = report_slice.retry_count
+                report_slice_data['retry_count'] = current_count + 1
+                report_slice_data['retry_type'] = ReportSlice.TIME
             # the other choice for retry is RETRY.keep_same in which case we don't
             # want to do anything to the retry count bc we want to preserve as is
             if candidate_hosts is not None:
                 # candidate_hosts will get smaller and smaller until it hopefully
                 # is empty because we have taken care of all ofthe candidates so
                 # we rewrite this each time
-                report_slice.candidate_hosts = json.dumps(candidate_hosts)
+                report_slice_data['candidate_hosts'] = json.dumps(candidate_hosts)
             if failed_hosts:
                 # for failed hosts this list can keep growing, so we add the
                 # newly failed hosts to the previous value
                 failed = json.loads(report_slice.failed_hosts)
                 for host in failed_hosts:
                     failed.append(host)
-                report_slice.failed_hosts = json.dumps(failed)
+                report_slice_data['failed_hosts'] = json.dumps(failed)
             if ready_to_archive:
-                report_slice.ready_to_archive = ready_to_archive
+                report_slice_data['ready_to_archive'] = ready_to_archive
             state_info = json.loads(report_slice.state_info)
             state_info.append(state)
-            report_slice.state_info = json.dumps(state_info)
-            report_slice.save()
+            report_slice_data['state_info'] = json.dumps(state_info)
+            serializer = ReportSliceSerializer(
+                instance=report_slice,
+                data=report_slice_data,
+                partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
             LOG.info(
                 format_message(
                     self.prefix,
                     'Successfully updated report slice %s' % report_slice.report_slice_id,
-                    account_number=self.account_number, report_platform_id=self.report_platform_id))
+                    account_number=self.account_number,
+                    report_platform_id=self.report_platform_id))
         except Exception as error:  # pylint: disable=broad-except
             LOG.error(format_message(
                 self.prefix,
