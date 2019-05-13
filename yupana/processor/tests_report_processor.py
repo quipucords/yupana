@@ -811,6 +811,16 @@ class ReportProcessorTests(TransactionTestCase):
         valid_hosts, _ = self.processor._validate_report_hosts()
         self.assertEqual([], valid_hosts)
 
+    def test_update_slice_exception(self):
+        """Test udpating the slice with invalid data."""
+        # test that not providing a state inside options causes
+        # an exception to be raised and slice is not updated
+        self.report_slice.state = ReportSlice.PENDING
+        self.report_slice.save()
+        self.processor.update_slice_state({}, self.report_slice)
+        self.report_slice.refresh_from_db()
+        self.assertEqual(self.report_slice.state, ReportSlice.PENDING)
+
     def test_extract_and_create_slices_success(self):
         """Testing the extract method with valid buffer content."""
         metadata_json = {
@@ -833,6 +843,13 @@ class ReportProcessorTests(TransactionTestCase):
         buffer_content = test_handler.create_tar_buffer(report_files)
         result = self.processor._extract_and_create_slices(buffer_content)
         self.assertEqual(result, metadata_json)
+
+    def test_create_slice_invalid(self):
+        """Test the create slice method with an invalid slice."""
+        report_json = None
+        slice_id = '1234556'
+        with self.assertRaises(Exception):
+            self.processor.create_report_slice(report_json, slice_id)
 
     def test_extract_and_create_slices_two_reps_copy(self):
         """Testing the extract method with valid buffer content."""
