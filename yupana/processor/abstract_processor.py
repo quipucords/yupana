@@ -124,7 +124,6 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 self.assign_object()
             if self.report_or_slice:
                 try:
-                    print('delegating the state now!!!')
                     await self.delegate_state()
                 except Exception as error:
                     LOG.error(format_message(
@@ -262,8 +261,6 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         """
         self.run_before_delegate()
         # if the function is async, we must await it
-        print('state')
-        print(self.state)
         if self.state_functions.get(self.state):
             if self.state in self.async_states:
                 await self.state_functions.get(self.state)()
@@ -301,10 +298,6 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         try:
             status_info = Status()
             self.state = self.next_state
-            self.report_or_slice.refresh_from_db()
-            # self.report_or_slice.last_update_time = datetime.now(pytz.utc)
-            # self.report_or_slice.state = self.next_state
-            # self.report_or_slice.git_commit = status_info.git_commit
 
             # grab all of the potential options
             retry_type = options.get('retry_type', self.object_class.TIME)
@@ -331,30 +324,22 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 # any future failures should be unrelated
                 update_data['retry_count'] = 0
                 update_data['retry_type'] = self.object_class.TIME
-                # self.report_or_slice.retry_count = 0
-                # self.report_or_slice.retry_type = self.object_class.TIME
             elif retry == RETRY.increment:
                 retry_count = self.report_or_slice.retry_count
                 update_data['retry_count'] = retry_count + 1
-                print('here is the retry count: ')
-                print(update_data)
                 update_data['retry_type'] = retry_type
-                # self.report_or_slice.retry_count += 1
-                # self.report_or_slice.retry_type = retry_type
+
             # the other choice for retry is RETRY.keep_same in which case we don't
             # want to do anything to the retry count bc we want to preserve as is
             if report_json:
                 update_data['report_json'] = json.dumps(report_json)
-                # self.report_or_slice.report_json = json.dumps(report_json)
             if report_platform_id:
                 update_data['report_platform_id'] = report_platform_id
-                # self.report_or_slice.report_platform_id = report_platform_id
             if candidate_hosts is not None:
                 # candidate_hosts will get smaller and smaller until it hopefully
                 # is empty because we have taken care of all ofthe candidates so
                 # we rewrite this each time
                 update_data['candidate_hosts'] = json.dumps(candidate_hosts)
-                # self.report_or_slice.candidate_hosts = json.dumps(candidate_hosts)
             if failed_hosts:
                 # for failed hosts this list can keep growing, so we add the
                 # newly failed hosts to the previous value
@@ -362,41 +347,29 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 for host in failed_hosts:
                     failed.append(host)
                 update_data['failed_hosts'] = json.dumps(failed)
-                # self.report_or_slice.failed_hosts = json.dumps(failed)
             if status:
                 update_data['upload_ack_status'] = status
-                # self.report_or_slice.upload_ack_status = status
             if report_type:
                 update_data['report_type'] = report_type
-                # self.report_or_slice.report_type = report_type
             if report_id:
                 update_data['report_id'] = report_id
-                # self.report_or_slice.report_id = report_id
             if report_version:
                 update_data['report_version'] = report_version
-                # self.report_or_slice.report_version = report_version
             if ready_to_archive:
                 update_data['ready_to_archive'] = ready_to_archive
-                # self.report_or_slice.ready_to_archive = ready_to_archive
+
             state_info = json.loads(self.report_or_slice.state_info)
             state_info.append(self.next_state)
             update_data['state_info'] = json.dumps(state_info)
-            # self.report_or_slice.state_info = json.dumps(state_info)
 
             serializer = self.object_serializer(
                 instance=self.report_or_slice,
                 data=update_data,
                 partial=True)
-            print(serializer.is_valid())
-            print('Errors : ')
-            print(serializer.errors)
+
             if serializer.is_valid(raise_exception=True):
                 serializer.save()
-                print('Was definitely valid!')
-            print('Errors : ')
-            print(serializer.errors)
 
-            # self.report_or_slice.save()
         except Exception as error:
             LOG.error(format_message(
                 self.prefix,
@@ -491,16 +464,6 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             LOG.info(format_message(self.prefix, 'Archiving report.',
                                     account_number=self.account_number,
                                     report_platform_id=self.report_platform_id))
-            # archived_rep = ReportArchive(
-            #     rh_account=report.rh_account,
-            #     retry_count=report.retry_count,
-            #     retry_type=report.retry_type,
-            #     state=report.state,
-            #     state_info=report.state_info,
-            #     ready_to_archive=report.ready_to_archive,
-            #     last_update_time=report.last_update_time,
-            #     upload_srv_kafka_msg=report.upload_srv_kafka_msg
-            # )
             archived_rep_data = {
                 'rh_account': report.rh_account,
                 'retry_count': report.retry_count,
@@ -516,17 +479,11 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     failed = True
                     INVALID_REPORTS.inc()
                 archived_rep_data['upload_ack_status'] = report.upload_ack_status
-                # archived_rep.upload_ack_status = report.upload_ack_status
             if report.report_platform_id:
                 archived_rep_data['report_platform_id'] = report.report_platform_id
-                # archived_rep.report_platform_id = report.report_platform_id
-            # archived_rep.save()
             rep_serializer = ReportArchiveSerializer(data=archived_rep_data)
             if rep_serializer.is_valid(raise_exception=True):
-                print('is valid! ')
                 archived_rep = rep_serializer.save()
-                print('\n\n\n\n\nREPORT ID: ')
-                print(archived_rep.id)
                 LOG.info(format_message(self.prefix, 'Report successfully archived.',
                                         account_number=self.account_number,
                                         report_platform_id=self.report_platform_id))
@@ -540,18 +497,6 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
 
             # loop through the associated reports & archive them
             for report_slice in all_report_slices:
-                # archived = ReportSliceArchive(
-                #     rh_account=report_slice.rh_account,
-                #     retry_count=report_slice.retry_count,
-                #     retry_type=report_slice.retry_type,
-                #     candidate_hosts=report_slice.candidate_hosts,
-                #     failed_hosts=report_slice.failed_hosts,
-                #     state=report_slice.state,
-                #     ready_to_archive=report_slice.ready_to_archive,
-                #     state_info=report_slice.state_info,
-                #     last_update_time=report_slice.last_update_time,
-                #     report_slice_id=report_slice.report_slice_id,
-                #     report=archived_rep)
                 archived_slice_data = {
                     'rh_account': report_slice.rh_account,
                     'retry_count': report_slice.retry_count,
@@ -567,14 +512,11 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 }
                 if report_slice.report_platform_id:
                     archived_slice_data['report_platform_id'] = report_slice.report_platform_id
-                    # archived.report_platform_id = report_slice.report_platform_id
                 if report_slice.report_json:
                     archived_slice_data['report_json'] = report_slice.report_json
-                    # archived.report_json = report_slice.report_json
                 slice_serializer = ReportSliceArchiveSerializer(data=archived_slice_data)
                 if slice_serializer.is_valid(raise_exception=True):
                     slice_serializer.save()
-                # archived.save()
                 failed_states = [ReportSlice.FAILED_VALIDATION, ReportSlice.FAILED_HOSTS_UPLOAD]
                 if report_slice.state in failed_states:
                     ARCHIVED_FAIL.inc()
@@ -592,10 +534,10 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 Report.objects.get(id=report.id).delete()
             except Report.DoesNotExist:
                 pass
-
-            LOG.info(format_message(self.prefix, 'Report slices successfully archived.',
-                                    account_number=self.account_number,
-                                    report_platform_id=self.report_platform_id))
+            if all_report_slices:
+                LOG.info(format_message(self.prefix, 'Report slices successfully archived.',
+                                        account_number=self.account_number,
+                                        report_platform_id=self.report_platform_id))
             self.reset_variables()
 
         else:

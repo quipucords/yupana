@@ -79,7 +79,7 @@ class ReportProcessorTests(TestCase):
             rh_account='13423',
             report_json=json.dumps(self.report_json),
             state=ReportSlice.NEW,
-            state_info=[ReportSlice.NEW],
+            state_info=json.dumps([ReportSlice.NEW]),
             retry_count=0,
             last_update_time=datetime.now(pytz.utc),
             failed_hosts=[],
@@ -159,6 +159,7 @@ class ReportProcessorTests(TestCase):
         failed_hosts = [{self.uuid6: {'etc_machine_id': 'value'}},
                         {self.uuid7: {'subscription_manager_id': 'value'}}]
         self.processor.report_or_slice = self.report_slice
+        self.processor.next_state = ReportSlice.VALIDATED
         options = {'report_json': report_json,
                    'failed_hosts': failed_hosts}
         self.processor.update_object_state(options=options)

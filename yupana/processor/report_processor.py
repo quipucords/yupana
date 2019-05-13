@@ -140,7 +140,6 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             report_type = metadata_json.get('report_type')
             report_id = metadata_json.get('report_id')
             self.next_state = Report.DOWNLOADED
-            print('\n\n\n\nInside fo transition in correct place')
             # update the report or slice with downloaded info
             options = {'report_platform_id': report_platform_id,
                        'report_type': report_type,
@@ -157,7 +156,6 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             options = {'ready_to_archive': True}
             self.update_object_state(options=options)
         except (RetryDownloadException, RetryExtractException) as err:
-            print('\n\n\nSomething weird happened')
             LOG.error(format_message(
                 self.prefix,
                 report_download_failed_msg % err,
@@ -184,7 +182,6 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 # Here we want to update the report state of the actual report slice
                 options = {'state': ReportSlice.NEW,
                            'candidate_hosts': candidate_hosts, 'failed_hosts': failed_hosts}
-                print('getting to the slice update state')
                 self.update_slice_state(options=options, report_slice=report_slice)
             except QPCReportException:
                 # if any QPCReportExceptions occur, we know that the report is not valid
@@ -242,7 +239,9 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
     def create_report_slice(self, report_json, report_slice_id):
         """Create report slice.
 
-        Returns a boolean regarding whether or not the slice was created.
+        :param report_json: <dict> the report info in json format
+        :param report_slice_id: <str> the report slice id
+        :returns boolean regarding whether or not the slice was created.
         """
         LOG.info(
             format_message(
@@ -251,11 +250,9 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
 
         # first we should see if any slices exist with this slice id & report_platform_id
         # if they exist we will not create the slice
-        print('\n\n\nAttempting to create the slice! ')
         created = False
         existing_report_slices = ReportSlice.objects.filter(
             report_platform_id=self.report_platform_id).filter(report_slice_id=report_slice_id)
-        print('after count!')
         if existing_report_slices.count() > 0:
             LOG.error(format_message(
                 self.prefix,
@@ -279,17 +276,15 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         }
         slice_serializer = ReportSliceSerializer(data=report_slice)
         if slice_serializer.is_valid(raise_exception=True):
-            print('is valid! ')
             slice_serializer.save()
-        print('Errors in slice; ')
-        print(slice_serializer.errors)
-        # report_slice.save()
-        LOG.info(
-            format_message(
-                self.prefix, 'Successfully created report slice %s' % report_slice_id,
-                account_number=self.account_number, report_platform_id=self.report_platform_id))
+            LOG.info(
+                format_message(
+                    self.prefix,
+                    'Successfully created report slice %s' % report_slice_id,
+                    account_number=self.account_number,
+                    report_platform_id=self.report_platform_id))
         created = True
-        return created, report_slice
+        return created
 
     # pylint: disable=too-many-arguments,too-many-locals
     def update_slice_state(self, options, report_slice):  # noqa: C901 (too-complex)
@@ -311,7 +306,6 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             ready_to_archive: <bool> boolean on whether or not to archive
         """
         try:
-            print('inside of update slice state! ')
             state = options.get('state')
             retry_type = options.get('retry_type')
             retry = options.get('retry', RETRY.clear)
@@ -330,18 +324,15 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             if not retry_type:
                 retry_type = ReportSlice.TIME
             if retry == RETRY.clear:
-                # reset the count to 0 (default behavior)
+                # After a successful transaction when we have reached the update
+                # point, we want to set the retry count back to 0 because
+                # any future failures should be unrelated
                 report_slice_data['retry_count'] = 0
                 report_slice_data['retry_type'] = ReportSlice.TIME
-                # report_slice.retry_count = 0
-                # report_slice.retry_type = ReportSlice.TIME
             elif retry == RETRY.increment:
-                print('actually incrementing the count')
                 current_count = report_slice.retry_count
                 report_slice_data['retry_count'] = current_count + 1
                 report_slice_data['retry_type'] = ReportSlice.TIME
-                # report_slice.retry_count += 1
-                # report_slice.retry_type = retry_type
             # the other choice for retry is RETRY.keep_same in which case we don't
             # want to do anything to the retry count bc we want to preserve as is
             if candidate_hosts is not None:
@@ -349,34 +340,23 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 # is empty because we have taken care of all ofthe candidates so
                 # we rewrite this each time
                 report_slice_data['candidate_hosts'] = json.dumps(candidate_hosts)
-                # report_slice.candidate_hosts = json.dumps(candidate_hosts)
             if failed_hosts:
                 # for failed hosts this list can keep growing, so we add the
                 # newly failed hosts to the previous value
                 failed = json.loads(report_slice.failed_hosts)
                 for host in failed_hosts:
                     failed.append(host)
-                # report_slice.failed_hosts = json.dumps(failed)
                 report_slice_data['failed_hosts'] = json.dumps(failed)
             if ready_to_archive:
                 report_slice_data['ready_to_archive'] = ready_to_archive
-                # report_slice.ready_to_archive = ready_to_archive
             state_info = json.loads(report_slice.state_info)
             state_info.append(state)
             report_slice_data['state_info'] = json.dumps(state_info)
-            # report_slice.state_info = json.dumps(state_info)
-            # report_slice.save()
-            print('\n\n\nThis is updating! line 369')
-            print(report_slice_data)
             serializer = ReportSliceSerializer(
                 instance=report_slice,
                 data=report_slice_data,
                 partial=True)
-            print(serializer.is_valid())
-            print(serializer.errors)
-            print(serializer.data)
             if serializer.is_valid(raise_exception=True):
-                print('\n\n\nSlice updated: ')
                 serializer.save()
                 LOG.info(
                     format_message(
@@ -384,7 +364,6 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                         'Successfully updated report slice %s' % report_slice.report_slice_id,
                         account_number=self.account_number,
                         report_platform_id=self.report_platform_id))
-            print(serializer.errors)
         except Exception as error:  # pylint: disable=broad-except
             LOG.error(format_message(
                 self.prefix,
