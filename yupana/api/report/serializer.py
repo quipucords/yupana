@@ -14,34 +14,54 @@
 from rest_framework.serializers import (BooleanField,
                                         CharField,
                                         ChoiceField,
-                                        DateField,
+                                        DateTimeField,
                                         IntegerField,
                                         JSONField,
                                         ModelSerializer)
 
-from api.models import AbstractReport
+from api.models import Report, ReportArchive
 
 
-class ReportSerializer(ModelSerializer):
-    """Serializer for the Report model."""
+class AbstractReportSerializer(ModelSerializer):
+    """Abstract serializer for the Report models."""
 
     report_platform_id = CharField(max_length=50, required=False)
     report_version = CharField(max_length=50, required=False)
     report_type = CharField(max_length=20, required=False)
-    report_id = IntegerField(null=True)
+    report_id = IntegerField(allow_null=True, required=False)
     rh_account = CharField(max_length=50, required=False)
     upload_ack_status = CharField(max_length=10, required=False)
-    upload_srv_kafka_msg = JSONField(read_only=True)
+    upload_srv_kafka_msg = JSONField(required=True)
     git_commit = CharField(max_length=50, required=False)
-    state = ChoiceField(read_only=True, choices=AbstractReport.STATE_CHOICES)
-    retry_type = ChoiceField(read_only=True, choices=AbstractReport.RETRY_CHOICES)
-    state_info = JSONField(null=True)
-    retry_count = IntegerField(null=True)
-    last_update_time = DateField(null=True)
-    ready_to_archive = BooleanField(required=True)
+    state = ChoiceField(choices=Report.STATE_CHOICES)
+    retry_type = ChoiceField(choices=Report.RETRY_CHOICES, default=Report.TIME)
+    state_info = JSONField(allow_null=True)
+    retry_count = IntegerField(default=0)
+    last_update_time = DateTimeField(allow_null=True)
+    ready_to_archive = BooleanField(default=False)
 
     class Meta:
         """Meta class for ReportSerializer."""
 
-        model = AbstractReport
+        abstract = True
+        fields = '__all__'
+
+
+class ReportSerializer(AbstractReportSerializer):
+    """Serializer for the Report model."""
+
+    class Meta:
+        """Meta class for the ReportSerializer."""
+
+        model = Report
+        fields = '__all__'
+
+
+class ReportArchiveSerializer(AbstractReportSerializer):
+    """Serializer for the ReportArchive model."""
+
+    class Meta:
+        """Meta class for the ReportArchiveSerializer."""
+
+        model = ReportArchive
         fields = '__all__'
