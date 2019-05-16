@@ -18,6 +18,7 @@
 
 import asyncio
 import base64
+import concurrent.futures
 import json
 import logging
 import math
@@ -79,7 +80,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         super().__init__(pre_delegate=self.pre_delegate,
                          state_functions=state_functions,
                          state_metrics=state_metrics,
-                         async_states=[],
+                         async_states=[ReportSlice.STARTED, ReportSlice.VALIDATED],
                          object_prefix='REPORT SLICE',
                          object_class=ReportSlice,
                          object_serializer=ReportSliceSerializer
@@ -131,7 +132,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             self.determine_retry(ReportSlice.FAILED_VALIDATION, ReportSlice.RETRY_VALIDATION,
                                  retry_type=ReportSlice.GIT_COMMIT)
 
-    def transition_to_hosts_uploaded(self):
+    async def transition_to_hosts_uploaded(self):
         """Upload the host candidates to inventory & move to hosts_uploaded state."""
         self.prefix = 'ATTEMPTING HOST UPLOAD'
         LOG.info(format_message(
@@ -142,7 +143,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             if self.candidate_hosts:
                 candidates = self.generate_upload_candidates()
                 retry_time_candidates, retry_commit_candidates = \
-                    self._upload_to_host_inventory(candidates)
+                    await self._upload_to_host_inventory(candidates)
                 if not retry_time_candidates and not retry_commit_candidates:
                     LOG.info(format_message(self.prefix, 'All hosts were successfully uploaded.',
                                             account_number=self.account_number,
@@ -325,152 +326,168 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         hosts_lists_to_upload = \
             [list_of_all_hosts[i:i + hosts_per_request]
              for i in range(0, len(list_of_all_hosts), hosts_per_request)]
-        return hosts_lists_to_upload
+        # hosts list to upload is a list containing lists of however many hosts can be
+        # uploaded at one time (aka. 1000). We now need to break this into a list
+        # of lists that have the same number of lists as we do threads
+        # for example, if the max number of hosts per req is 100, and our max number of threads
+        # is 3, our final list would look like this:
+        # [[[100 hosts], [100 hosts], [100 hosts]], [[100 hosts], [100 hosts], [100 hosts]]]
+        thread_lists_to_upload = \
+            [hosts_lists_to_upload[i:i + 10] for i in range(0, len(hosts_lists_to_upload), 10)]
+        return thread_lists_to_upload
 
-        # pylint: disable=too-many-branches, too-many-statements
-    def _upload_to_host_inventory(self, hosts):  # noqa: C901 (too-complex) pylint: disable=too-many-locals
-        """
-        Verify that the report contents are a valid Insights report.
-
-        :param hosts: a list of dictionaries that have been validated.
-        :returns None
-        """
-        self.prefix = 'UPLOAD TO HOST INVENTORY'
+    # pylint: disable=too-many-locals, too-many-nested-blocks, too-many-branches
+    # pylint: disable=too-many-statements
+    def execute_request(self, hosts_tuple):  # noqa: C901 (too-complex)
+        """Execute the http requests for posting to inventory service."""
+        hosts_list, hosts = hosts_tuple
         identity_string = '{"identity": {"account_number": "%s"}}' % str(self.account_number)
         bytes_string = identity_string.encode()
         x_rh_identity_value = base64.b64encode(bytes_string).decode()
         identity_header = {'x-rh-identity': x_rh_identity_value,
                            'Content-Type': 'application/json'}
-        list_of_all_hosts = self.generate_bulk_upload_list(hosts)
-        hosts_lists_to_upload = self.split_hosts(list_of_all_hosts)
-        failed_hosts = []  # this is purely for counts and logging
-        retry_time_hosts = []  # storing hosts to retry after time
-        retry_commit_hosts = []  # storing hosts to retry after commit change
-        group_count = 0
-        for hosts_list in hosts_lists_to_upload:  # pylint: disable=too-many-nested-blocks
-            UPLOAD_GROUP_SIZE.set(len(hosts_list))
-            group_count += 1
-            LOG.info(format_message(
-                self.prefix,
-                'Uploading hosts group %s/%s. Group size: %s hosts' %
-                (group_count, len(hosts_lists_to_upload), len(hosts_list)),
-                account_number=self.account_number, report_platform_id=self.report_platform_id))
-            try:  # pylint: disable=too-many-nested-blocks
-                with HOST_UPLOAD_REQUEST_LATENCY.time():
-                    response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
-                                             data=json.dumps(hosts_list),
-                                             headers=identity_header)
-                if response.status_code in [HTTPStatus.MULTI_STATUS]:
-                    try:
-                        json_body = response.json()
-                    except ValueError:
-                        # something went wrong
-                        raise RetryUploadTimeException(format_message(
-                            self.prefix, 'Missing json response',
-                            account_number=self.account_number,
-                            report_platform_id=self.report_platform_id))
-                    errors = json_body.get('errors')
-                    if errors != 0:
-                        all_data = json_body.get('data', [])
-                        host_index = 0
-                        for host_data in all_data:
-                            host_status = host_data.get('status')
-                            if host_status not in [HTTPStatus.OK, HTTPStatus.CREATED]:
-                                upload_host = hosts_list[host_index]
-                                host_facts = upload_host.get('facts')
-                                for namespace_facts in host_facts:
-                                    if namespace_facts.get('namespace') == 'qpc':
-                                        qpc_facts = namespace_facts.get('facts')
-                                        host_id = qpc_facts.get('system_platform_id')
-                                        original_host = hosts.get(host_id, {})
-                                failed_hosts.append({
-                                    'status_code': host_status,
-                                    'display_name': original_host.get('name'),
-                                    'system_platform_id': host_id,
-                                    'host': original_host})
+        failed_hosts = []
+        retry_time_candidates = []  # storing hosts to retry after time
+        retry_commit_candidates = []  # storing hosts to retry after commit change
+        error_messages = []
+        retry_exception = False
+        UPLOAD_GROUP_SIZE.set(len(hosts_list))
+        try:
+            with HOST_UPLOAD_REQUEST_LATENCY.time():
+                response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
+                                         data=json.dumps(hosts_list),
+                                         headers=identity_header)
 
-                                # if the response code is a 500, then something on
-                                # host inventory side blew up and we want to retry
-                                # after a certain amount of time
-                                if str(host_status).startswith('5'):
-                                    retry_time_hosts.append({host_id: original_host,
-                                                             'cause': FAILED_UPLOAD,
-                                                             'status_code': host_status})
-                                else:
-                                    # else, if we recieved a 400 status code, the problem is
-                                    # likely on our side so we should retry after a code change
-                                    retry_commit_hosts.append({host_id: original_host,
-                                                               'cause': FAILED_UPLOAD,
-                                                               'status_code': host_status})
-                            host_index += 1
+            if response.status_code in [HTTPStatus.MULTI_STATUS]:
+                try:
+                    json_body = response.json()
+                except ValueError:
+                    # something went wrong
+                    error_messages.append('Missing json response')
+                    raise RetryUploadTimeException()
 
-                elif str(response.status_code).startswith('5'):
+                errors = json_body.get('errors')
+                if errors != 0:
+                    all_data = json_body.get('data', [])
+                    host_index = 0
+                    for host_data in all_data:
+                        host_status = host_data.get('status')
+                        if host_status not in [HTTPStatus.OK, HTTPStatus.CREATED]:
+                            upload_host = hosts_list[host_index]
+                            host_facts = upload_host.get('facts')
+                            for namespace_facts in host_facts:
+                                if namespace_facts.get('namespace') == 'qpc':
+                                    qpc_facts = namespace_facts.get('facts')
+                                    host_id = qpc_facts.get('system_platform_id')
+                                    original_host = hosts.get(host_id, {})
+                            failed_hosts.append({
+                                'status_code': host_status,
+                                'display_name': original_host.get('name'),
+                                'system_platform_id': host_id,
+                                'host': original_host})
+
+                            # if the response code is a 500, then something on
+                            # host inventory side blew up and we want to retry
+                            # after a certain amount of time
+                            if str(host_status).startswith('5'):
+                                retry_time_candidates.append({host_id: original_host,
+                                                              'cause': FAILED_UPLOAD,
+                                                              'status_code': host_status})
+                            else:
+                                # else, if we recieved a 400 status code, the problem is
+                                # likely on our side so we should retry after a code change
+                                retry_commit_candidates.append({host_id: original_host,
+                                                                'cause': FAILED_UPLOAD,
+                                                                'status_code': host_status})
+                        host_index += 1
+            else:
+                # something unexpected happened
+                error_messages.append('Attempted to upload the following: %s' % str(hosts_list))
+                try:
+                    message = response.json()
+                    error_messages.append(message)
+                except ValueError:
+                    error_messages.append('No response json')
+                    error_messages.append('Unexpected response code %s' % str(response.status_code))
+                if str(response.status_code).startswith('5'):
                     # something went wrong on host inventory side and we should regenerate after
                     # some time has passed
-                    message = 'Attempted to upload the following: %s' % str(hosts_list)
-                    LOG.error(format_message(self.prefix, message,
-                                             account_number=self.account_number,
-                                             report_platform_id=self.report_platform_id))
-                    try:
-                        LOG.error(response.json())
-                    except ValueError:
-                        LOG.error('No response json')
-                    LOG.error(format_message(
-                        self.prefix,
-                        'Unexpected response code %s' % str(response.status_code),
-                        account_number=self.account_number,
-                        report_platform_id=self.report_platform_id))
                     raise RetryUploadTimeException()
-                else:
-                    # something went wrong possibly on our side (if its a 400)
-                    # and we should regenerate the hosts dictionary and re-upload after a commit
-                    message = 'Attempted to upload the following: %s' % str(hosts_list)
-                    LOG.error(format_message(self.prefix, message,
-                                             account_number=self.account_number,
-                                             report_platform_id=self.report_platform_id))
-                    try:
-                        LOG.error(response.json())
-                    except ValueError:
-                        LOG.error('No response json')
-                    LOG.error(format_message(
-                        self.prefix,
-                        'Unexpected response code %s' % str(response.status_code),
-                        account_number=self.account_number,
-                        report_platform_id=self.report_platform_id))
-                    raise RetryUploadCommitException()
+                # else something went wrong possibly on our side (if its a 400)
+                # and we should regenerate the hosts dictionary and re-upload after a commit
+                raise RetryUploadCommitException()
 
-            except RetryUploadCommitException:
-                for host_id, host_data in hosts.items():
-                    retry_commit_hosts.append({host_id: host_data,
-                                               'cause': FAILED_UPLOAD})
-                    failed_hosts.append({
-                        'status_code': 'unknown',
-                        'display_name': host_data.get('name'),
-                        'system_platform_id': host_id,
-                        'host': host_data})
-            except RetryUploadTimeException:
-                for host_id, host_data in hosts.items():
-                    retry_time_hosts.append({host_id: host_data,
-                                             'cause': FAILED_UPLOAD})
-                    failed_hosts.append({
-                        'status_code': 'unknown',
-                        'display_name': host_data.get('name'),
-                        'system_platform_id': host_id,
-                        'host': host_data})
+        except RetryUploadCommitException:
+            retry_exception = True
+            retry_list = retry_commit_candidates
+        except RetryUploadTimeException:
+            retry_exception = True
+            retry_list = retry_time_candidates
+        except requests.exceptions.RequestException as err:
+            error_messages.append('An error occurred: %s' % str(err))
+            retry_exception = True
+            retry_list = retry_time_candidates
 
-            except requests.exceptions.RequestException as err:
-                LOG.error(format_message(self.prefix, 'An error occurred: %s' % str(err),
-                                         account_number=self.account_number,
-                                         report_platform_id=self.report_platform_id))
-                for host_id, host_data in hosts.items():
-                    retry_time_hosts.append({host_id: host_data,
-                                             'cause': FAILED_UPLOAD})
-                    failed_hosts.append({
-                        'status_code': 'unknown',
-                        'display_name': host_data.get('name'),
-                        'system_platform_id': host_id,
-                        'host': host_data})
+        if retry_exception:
+            # we are going to have to look up the original host, and map it to the
+            # one we are trying to upload so that we can retry it.
+            for upload_host in hosts_list:
+                host_facts = upload_host.get('facts')
+                for namespace_facts in host_facts:
+                    if namespace_facts.get('namespace') == 'qpc':
+                        qpc_facts = namespace_facts.get('facts')
+                        host_id = qpc_facts.get('system_platform_id')
+                        original_host = hosts.get(host_id, {})
+                failed_hosts.append({
+                    'status_code': 'unknown',
+                    'display_name': original_host.get('name'),
+                    'system_platform_id': host_id,
+                    'host': original_host})
+                retry_list.append({host_id: original_host,
+                                   'cause': FAILED_UPLOAD})
 
+        response = {
+            'retry_time_candidates': retry_time_candidates,
+            'retry_commit_candidates': retry_commit_candidates,
+            'failed_hosts': failed_hosts,
+            'error_messages': error_messages
+        }
+        return response
+
+    async def _upload_to_host_inventory(self, hosts):
+        """Create bulk upload threads for post requests to inventory."""
+        self.prefix = 'UPLOAD TO HOST INVENTORY'
+        failed_hosts = []
+        all_error_messages = []
+        retry_time_hosts = []  # storing hosts to retry after time
+        retry_commit_hosts = []  # storing hosts to retry after commit change
+        list_of_all_hosts = self.generate_bulk_upload_list(hosts)
+        hosts_lists_to_upload = self.split_hosts(list_of_all_hosts)
+        for split_list in hosts_lists_to_upload:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+                futures = [
+                    SLICE_PROCESSING_LOOP.run_in_executor(
+                        executor,
+                        self.execute_request,
+                        (hosts_list, hosts)
+                    )
+                    for hosts_list in split_list
+                ]
+                for response in await asyncio.gather(*futures):
+                    retry_time_candidates = response.get('retry_time_candidates', [])
+                    retry_commit_candidates = response.get('retry_commit_candidates', [])
+                    failed_candidates = response.get('failed_hosts', [])
+                    error_messages = response.get('error_messages', [])
+                    retry_time_hosts += retry_time_candidates
+                    retry_commit_hosts += retry_commit_candidates
+                    failed_hosts += failed_candidates
+                    all_error_messages += error_messages
+
+        for error in error_messages:
+            LOG.error(format_message(self.prefix, error,
+                                     account_number=self.account_number,
+                                     report_platform_id=self.report_platform_id
+                                     ))
         total_hosts_count = len(hosts)
         failed_hosts_count = len(failed_hosts)
         successful = total_hosts_count - failed_hosts_count
