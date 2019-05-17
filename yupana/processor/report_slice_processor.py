@@ -45,7 +45,8 @@ SLICE_PROCESSING_LOOP = asyncio.new_event_loop()
 FAILED_UPLOAD = 'UPLOAD'
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
-HOSTS_PER_REQ = 1000
+HOSTS_PER_REQ = 100
+MAX_THREADS = 25
 MAX_HOSTS_PER_REP = 10000
 
 
@@ -175,6 +176,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 LOG.info(format_message(self.prefix, 'There are no valid hosts to upload',
                                         account_number=self.account_number,
                                         report_platform_id=self.report_platform_id))
+                self.next_state = ReportSlice.VALIDATED
                 options = {'ready_to_archive': True}
                 self.update_object_state(options=options)
                 self.archive_report_and_slices()
@@ -322,10 +324,9 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
     @staticmethod
     def split_hosts(list_of_all_hosts):
         """Split up the hosts into lists of 1000 or less."""
-        hosts_per_request = HOSTS_PER_REQ
         hosts_lists_to_upload = \
-            [list_of_all_hosts[i:i + hosts_per_request]
-             for i in range(0, len(list_of_all_hosts), hosts_per_request)]
+            [list_of_all_hosts[i:i + HOSTS_PER_REQ]
+             for i in range(0, len(list_of_all_hosts), HOSTS_PER_REQ)]
         # hosts list to upload is a list containing lists of however many hosts can be
         # uploaded at one time (aka. 1000). We now need to break this into a list
         # of lists that have the same number of lists as we do threads
@@ -333,7 +334,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         # is 3, our final list would look like this:
         # [[[100 hosts], [100 hosts], [100 hosts]], [[100 hosts], [100 hosts], [100 hosts]]]
         thread_lists_to_upload = \
-            [hosts_lists_to_upload[i:i + 10] for i in range(0, len(hosts_lists_to_upload), 10)]
+            [hosts_lists_to_upload[i:i + MAX_THREADS]
+             for i in range(0, len(hosts_lists_to_upload), MAX_THREADS)]
         return thread_lists_to_upload
 
     # pylint: disable=too-many-locals, too-many-nested-blocks, too-many-branches
@@ -463,10 +465,14 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         retry_commit_hosts = []  # storing hosts to retry after commit change
         list_of_all_hosts = self.generate_bulk_upload_list(hosts)
         hosts_lists_to_upload = self.split_hosts(list_of_all_hosts)
+        LOG.info(format_message(self.prefix, 'Spawning threads to upload hosts.',
+                                account_number=self.account_number,
+                                report_platform_id=self.report_platform_id))
+        my_loop = asyncio.get_event_loop()
         for split_list in hosts_lists_to_upload:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
                 futures = [
-                    SLICE_PROCESSING_LOOP.run_in_executor(
+                    my_loop.run_in_executor(
                         executor,
                         self.execute_request,
                         (hosts_list, hosts)
