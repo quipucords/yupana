@@ -34,7 +34,7 @@ requests-mock = "==1.6.0"
 sphinx-rtd-theme = "==0.4.3"
 sphinx = "==2.0.1"
 sphinx-autobuild = "==0.7.1"
-tox = "==3.10.0"
+tox = "==3.11.1"
 
 
 [requires]
