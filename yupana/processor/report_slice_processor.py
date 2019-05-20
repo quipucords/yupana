@@ -35,7 +35,9 @@ from processor.kafka_msg_handler import (QPCReportException,
 
 from api.models import ReportSlice
 from api.serializers import ReportSliceSerializer
-from config.settings.base import (INSIGHTS_HOST_INVENTORY_URL,
+from config.settings.base import (HOSTS_PER_REQ,
+                                  INSIGHTS_HOST_INVENTORY_URL,
+                                  MAX_THREADS,
                                   RETRIES_ALLOWED,
                                   RETRY_TIME)
 
@@ -45,8 +47,8 @@ SLICE_PROCESSING_LOOP = asyncio.new_event_loop()
 FAILED_UPLOAD = 'UPLOAD'
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
-HOSTS_PER_REQ = 100
-MAX_THREADS = 25
+HOSTS_PER_REQ = int(HOSTS_PER_REQ)
+MAX_THREADS = int(MAX_THREADS)
 MAX_HOSTS_PER_REP = 10000
 
 
@@ -343,6 +345,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
     def execute_request(self, hosts_tuple):  # noqa: C901 (too-complex)
         """Execute the http requests for posting to inventory service."""
         hosts_list, hosts = hosts_tuple
+        print('Inside of thread %s, attempting to upload %s hosts' %
+              (threading.current_thread().name, len(hosts_list)))
         identity_string = '{"identity": {"account_number": "%s"}}' % str(self.account_number)
         bytes_string = identity_string.encode()
         x_rh_identity_value = base64.b64encode(bytes_string).decode()
@@ -468,11 +472,11 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         LOG.info(format_message(self.prefix, 'Spawning threads to upload hosts.',
                                 account_number=self.account_number,
                                 report_platform_id=self.report_platform_id))
-        my_loop = asyncio.get_event_loop()
         for split_list in hosts_lists_to_upload:
             with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
+                process_loop = asyncio.get_event_loop()
                 futures = [
-                    my_loop.run_in_executor(
+                    process_loop.run_in_executor(
                         executor,
                         self.execute_request,
                         (hosts_list, hosts)
