@@ -408,6 +408,9 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                         host_index += 1
             else:
                 # something unexpected happened
+                error_messages.append(
+                    'Post request recieved the following response code: %s' %
+                    str(response.status_code))
                 error_messages.append('Attempted to upload the following: %s' % str(hosts_list))
                 try:
                     message = response.json()
@@ -424,12 +427,15 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 raise RetryUploadCommitException()
 
         except RetryUploadCommitException:
+            print('Retry upload commit exception')
             retry_exception = True
             retry_list = retry_commit_candidates
         except RetryUploadTimeException:
+            print('Retry upload time exception')
             retry_exception = True
             retry_list = retry_time_candidates
         except requests.exceptions.RequestException as err:
+            print('Request exception')
             error_messages.append('An error occurred: %s' % str(err))
             retry_exception = True
             retry_list = retry_time_candidates
