@@ -499,7 +499,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     failed_hosts += failed_candidates
                     all_error_messages += error_messages
 
-        for error in error_messages:
+        for error in all_error_messages:
             LOG.error(format_message(self.prefix, error,
                                      account_number=self.account_number,
                                      report_platform_id=self.report_platform_id
