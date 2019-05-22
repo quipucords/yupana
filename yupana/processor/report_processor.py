@@ -217,7 +217,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             account_number=self.account_number, report_platform_id=self.report_platform_id))
         try:
             print('The upload message is: %s' % str(self.upload_message))
-            message_hash = self.upload_message['hash']
+            message_hash = self.upload_message['request_id']
             await self._send_confirmation(message_hash)
             self.next_state = Report.VALIDATION_REPORTED
             options = {'ready_to_archive': True}
