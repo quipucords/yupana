@@ -13,7 +13,7 @@ Django = "==2.2.1"
 django-environ = "==0.4.5"
 gunicorn = "==19.9.0"
 psycopg2-binary = "==2.8.2"
-requests = "==2.21.0"
+requests = "==2.22.0"
 sqlparse = "==0.3.0"
 whitenoise = "==4.1.2"
 django-prometheus = "==1.0.15"
@@ -22,7 +22,7 @@ prometheus-client = "==0.6.0"
 
 [dev-packages]
 
-asynctest = "==0.12.4"
+asynctest = "==0.13.0"
 autopep8 = "==1.4.4"
 flake8 = "==3.7.7"
 coverage = "==4.5.3"
@@ -34,7 +34,7 @@ requests-mock = "==1.6.0"
 sphinx-rtd-theme = "==0.4.3"
 sphinx = "==2.0.1"
 sphinx-autobuild = "==0.7.1"
-tox = "==3.10.0"
+tox = "==3.11.1"
 
 
 [requires]
