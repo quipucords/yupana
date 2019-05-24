@@ -178,7 +178,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 LOG.info(format_message(self.prefix, 'There are no valid hosts to upload',
                                         account_number=self.account_number,
                                         report_platform_id=self.report_platform_id))
-                self.next_state = ReportSlice.VALIDATED
+                self.next_state = ReportSlice.FAILED_VALIDATION
                 options = {'ready_to_archive': True}
                 self.update_object_state(options=options)
                 self.archive_report_and_slices()
