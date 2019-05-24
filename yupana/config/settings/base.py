@@ -57,11 +57,11 @@ RETRIES_ALLOWED = ENVIRONMENT.get_value('RETRIES_ALLOWED', default=5)
 
 # this is the max number of hosts that we want to upload at a time for bulk
 # requests (default is 100)
-HOSTS_PER_REQ = ENVIRONMENT.get_value('HOSTS_PER_REQ', default=100)
+HOSTS_PER_REQ = ENVIRONMENT.get_value('HOSTS_PER_REQ', default=250)
 
 # this is the max number of threads that we want to allow per pod
 # default is 25
-MAX_THREADS = ENVIRONMENT.get_value('MAX_THREADS', default=25)
+MAX_THREADS = ENVIRONMENT.get_value('MAX_THREADS', default=10)
 
 
 # Logging

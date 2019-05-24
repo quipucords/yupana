@@ -823,14 +823,41 @@ class ReportProcessorTests(TestCase):
         system_profile = self.processor.format_system_profile(host)
         self.assertEqual(expected_profile, system_profile)
 
-    def test_archive_report_and_slices(self):
-        """Test the archive method."""
+    def test_archive_report_and_slices_in_failed_state(self):
+        """Test the archive method in a failed state."""
         self.report_record.ready_to_archive = True
         self.report_record.report_platform_id = '459'
         self.report_record.save()
         self.report_slice.ready_to_archive = True
         self.report_slice.report_platform_id = '459'
         self.report_slice.report_slice_id = '25'
+        self.report_slice.state = ReportSlice.FAILED_HOSTS_UPLOAD
+        self.report_slice.save()
+        self.processor.report_or_slice = self.report_slice
+        self.processor.report_platform_id = '459'
+
+        self.processor.archive_report_and_slices()
+        # assert the report doesn't exist
+        with self.assertRaises(Report.DoesNotExist):
+            Report.objects.get(id=self.report_record.id)
+        # assert the report archive does exist
+        archived = ReportArchive.objects.get(rh_account=self.report_record.rh_account)
+        archived_slice = ReportSliceArchive.objects.get(
+            report_slice_id=self.report_slice.report_slice_id)
+        self.assertEqual(archived.report_platform_id, '459')
+        self.assertEqual(archived_slice.report_platform_id, '459')
+        # assert the processor was reset
+        self.check_variables_are_reset()
+
+    def test_archive_report_and_slices_in_success_state(self):
+        """Test the archive method in a failed state."""
+        self.report_record.ready_to_archive = True
+        self.report_record.report_platform_id = '459'
+        self.report_record.save()
+        self.report_slice.ready_to_archive = True
+        self.report_slice.report_platform_id = '459'
+        self.report_slice.report_slice_id = '25'
+        self.report_slice.state = ReportSlice.HOSTS_UPLOADED
         self.report_slice.save()
         self.processor.report_or_slice = self.report_slice
         self.processor.report_platform_id = '459'

@@ -345,8 +345,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
     def execute_request(self, hosts_tuple):  # noqa: C901 (too-complex)
         """Execute the http requests for posting to inventory service."""
         hosts_list, hosts = hosts_tuple
-        print('Inside of thread %s, attempting to upload %s hosts' %
-              (threading.current_thread().name, len(hosts_list)))
+        LOG.info('Thread %s spawned, attempting to upload %s hosts',
+                 threading.current_thread().name, len(hosts_list))
         identity_string = '{"identity": {"account_number": "%s"}}' % str(self.account_number)
         bytes_string = identity_string.encode()
         x_rh_identity_value = base64.b64encode(bytes_string).decode()
@@ -427,16 +427,14 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 raise RetryUploadCommitException()
 
         except RetryUploadCommitException:
-            print('Retry upload commit exception')
             retry_exception = True
             retry_list = retry_commit_candidates
         except RetryUploadTimeException:
-            print('Retry upload time exception')
             retry_exception = True
             retry_list = retry_time_candidates
         except requests.exceptions.RequestException as err:
-            print('Request exception')
-            error_messages.append('An error occurred: %s' % str(err))
+            error_messages.append('A request exception occurred: %s' % str(err))
+            error_messages.append('Attempted to upload the following: %s' % str(hosts_list))
             retry_exception = True
             retry_list = retry_time_candidates
 
