@@ -529,7 +529,7 @@ class ReportProcessorTests(TransactionTestCase):
         self.report_record.save()
         self.processor.report_or_slice = self.report_record
         self.processor.status = report_processor.SUCCESS_CONFIRM_STATUS
-        self.processor.upload_message = {'hash': self.uuid}
+        self.processor.upload_message = {'request_id': self.uuid}
 
         self.processor._send_confirmation = CoroutineMock()
         await self.processor.transition_to_validation_reported()
@@ -591,7 +591,7 @@ class ReportProcessorTests(TransactionTestCase):
         self.processor.account_number = '43214'
         self.processor.state = Report.VALIDATED
         self.processor.status = report_processor.FAILURE_CONFIRM_STATUS
-        self.processor.upload_message = {'hash': self.uuid}
+        self.processor.upload_message = {'request_id': self.uuid}
         self.processor._send_confirmation = CoroutineMock()
         await self.processor.transition_to_validation_reported()
         with self.assertRaises(Report.DoesNotExist):

@@ -93,6 +93,8 @@ objects:
     insights-host-inventory-url: ${INSIGHTS_HOST_INVENTORY_URL}
     retries-allowed: ${RETRIES_ALLOWED}
     retry-time: ${RETRY_TIME}
+    hosts-per-req: ${HOSTS_PER_REQ}
+    max-threads: ${MAX_THREADS}
     minimum-replicas: ${MINIMUM_REPLICAS}
     maximum-replicas: ${MAXIMUM_REPLICAS}
     target-cpu-utilization: ${TARGET_CPU_UTILIZATION}
@@ -314,6 +316,18 @@ objects:
                 configMapKeyRef:
                   name: yupana-env
                   key: retry-time
+                  optional: true
+            - name: HOSTS_PER_REQ
+              valueFrom:
+                configMapKeyRef:
+                  name: yupana-env
+                  key: hosts-per-req
+                  optional: true
+            - name: MAX_THREADS
+              valueFrom:
+                configMapKeyRef:
+                  name: yupana-env
+                  key: max-threads
                   optional: true
             - name: MINIMUM_REPLICAS
               valueFrom:
@@ -658,6 +672,14 @@ parameters:
   name: RETRIES_ALLOWED
   required: true
   value: "5"
+- description: Hosts to upload per bulk request
+  displayName: Hosts per request
+  name: HOSTS_PER_REQ
+  required: true
+- description: Max number of threads per pod
+  displayName: Max threads
+  name: MAX_THREADS
+  required: true
 - description: Minimum Replicas for Autoscaling
   displayName: Minimum Replicas
   name: MINIMUM_REPLICAS

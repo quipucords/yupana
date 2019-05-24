@@ -51,8 +51,19 @@ INSIGHTS_HOST_INVENTORY_URL = ENVIRONMENT.get_value(
 # this is the time in minutes that we want to wait to retry a report
 # default is 8 hours
 RETRY_TIME = ENVIRONMENT.get_value('RETRY_TIME', default=480)
+
 # this is the number of retries that we want to allow before failing a report
 RETRIES_ALLOWED = ENVIRONMENT.get_value('RETRIES_ALLOWED', default=5)
+
+# this is the max number of hosts that we want to upload at a time for bulk
+# requests (default is 100)
+HOSTS_PER_REQ = ENVIRONMENT.get_value('HOSTS_PER_REQ', default=250)
+
+# this is the max number of threads that we want to allow per pod
+# default is 25
+MAX_THREADS = ENVIRONMENT.get_value('MAX_THREADS', default=10)
+
+
 # Logging
 # https://docs.djangoproject.com/en/dev/topics/logging/
 # https://docs.python.org/3.6/library/logging.html
