@@ -25,6 +25,7 @@ from unittest.mock import patch
 import pytz
 import requests
 import requests_mock
+from asynctest import CoroutineMock
 from django.test import TestCase
 from processor import (abstract_processor,
                        kafka_msg_handler as msg_handler,
@@ -249,29 +250,42 @@ class ReportProcessorTests(TestCase):
         for host in candidates:
             self.assertIn(host, json.loads(self.report_slice.failed_hosts))
 
-    def test_transition_to_hosts_uploaded(self):
+    async def async_test_transition_to_hosts_uploaded(self):
         """Test the transition to hosts being uploaded."""
-        hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'}},
-                 {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}},
-                 {self.uuid3: {'ip_addresses': 'value', 'name': 'foo'}},
-                 {self.uuid4: {'mac_addresses': 'value', 'name': 'foo'}},
-                 {self.uuid5: {'vm_uuid': 'value', 'name': 'foo'}},
-                 {self.uuid6: {'etc_machine_id': 'value'}},
-                 {self.uuid7: {'subscription_manager_id': 'value'}}]
+        hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
+                              'system_platform_id': self.uuid}},
+                 {self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
+                               'system_platform_id': self.uuid2}},
+                 {self.uuid3: {'ip_addresses': 'value', 'name': 'foo',
+                               'system_platform_id': self.uuid3}},
+                 {self.uuid4: {'mac_addresses': 'value', 'name': 'foo',
+                               'system_platform_id': self.uuid4}},
+                 {self.uuid5: {'vm_uuid': 'value', 'name': 'foo',
+                               'system_platform_id': self.uuid5}},
+                 {self.uuid6: {'etc_machine_id': 'value',
+                               'system_platform_id': self.uuid6}},
+                 {self.uuid7: {'subscription_manager_id': 'value',
+                               'system_platform_id': self.uuid7}}]
         self.report_slice.failed_hosts = []
         self.report_slice.candidate_hosts = json.dumps(hosts)
         self.report_slice.save()
         self.processor.report_or_slice = self.report_slice
         self.processor.candidate_hosts = hosts
-        with patch(
-                'processor.report_slice_processor.'
-                'ReportSliceProcessor._upload_to_host_inventory',
-                return_value=([], [])):
-            self.processor.transition_to_hosts_uploaded()
-            self.assertEqual(json.loads(self.report_slice.candidate_hosts), [])
-            self.assertEqual(self.report_slice.state, ReportSlice.HOSTS_UPLOADED)
+        self.processor._upload_to_host_inventory = CoroutineMock(
+            return_value=([], []))
+        await self.processor.transition_to_hosts_uploaded()
+        self.assertEqual(json.loads(self.report_slice.candidate_hosts), [])
+        self.assertEqual(self.report_slice.state, ReportSlice.HOSTS_UPLOADED)
 
-    def test_transition_to_hosts_uploaded_unsuccessful(self):
+    def test_transition_to_hosts_uploaded(self):
+        """Test the async hosts uploaded successful."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.async_test_transition_to_hosts_uploaded)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
+
+    async def async_test_transition_to_hosts_uploaded_unsuccessful(self):
         """Test the transition to hosts being uploaded."""
         hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                   'cause': report_slice_processor.FAILED_UPLOAD,
@@ -289,18 +303,25 @@ class ReportProcessorTests(TestCase):
         self.report_slice.save()
         self.processor.report_or_slice = self.report_slice
         self.processor.candidate_hosts = hosts
-        with patch(
-                'processor.report_slice_processor.'
-                'ReportSliceProcessor._upload_to_host_inventory',
-                return_value=(hosts, retry_commit_hosts)):
-            self.processor.transition_to_hosts_uploaded()
-            total_hosts = hosts + retry_commit_hosts
-            for host in total_hosts:
-                self.assertIn(host, json.loads(self.report_slice.candidate_hosts))
-            self.assertEqual(self.report_slice.state, ReportSlice.VALIDATED)
-            self.assertEqual(self.report_slice.retry_count, 1)
+        self.processor._upload_to_host_inventory = CoroutineMock(
+            return_value=(hosts, retry_commit_hosts))
+        await self.processor.transition_to_hosts_uploaded()
+        total_hosts = hosts + retry_commit_hosts
+        for host in total_hosts:
+            self.assertIn(host,
+                          json.loads(self.report_slice.candidate_hosts))
+        self.assertEqual(self.report_slice.state, ReportSlice.VALIDATED)
+        self.assertEqual(self.report_slice.retry_count, 1)
 
-    def test_transition_to_hosts_uploaded_no_candidates(self):
+    def test_transition_to_hosts_uploaded_unsuccessful(self):
+        """Test the async hosts uploaded unsuccessful."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.async_test_transition_to_hosts_uploaded_unsuccessful)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
+
+    async def async_test_transition_to_hosts_uploaded_no_candidates(self):
         """Test the transition to hosts being uploaded."""
         self.report_record.ready_to_archive = True
         self.report_record.save()
@@ -322,11 +343,19 @@ class ReportProcessorTests(TestCase):
         self.processor.report_platform_id = self.uuid2
         self.processor.report_json = self.report_json
         self.processor.candidate_hosts = {}
-        self.processor.transition_to_hosts_uploaded()
+        await self.processor.transition_to_hosts_uploaded()
         # assert the processor was reset
         self.check_variables_are_reset()
 
-    def test_transition_to_hosts_uploaded_exception(self):
+    def test_test_transition_to_hosts_uploaded_no_candidates(self):
+        """Test the async hosts uploaded no candidates."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.async_test_transition_to_hosts_uploaded_no_candidates)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
+
+    async def async_test_transition_to_hosts_uploaded_exception(self):
         """Test the transition to hosts being uploaded."""
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
@@ -345,9 +374,17 @@ class ReportProcessorTests(TestCase):
                 'processor.report_slice_processor.'
                 'ReportSliceProcessor._upload_to_host_inventory',
                 side_effect=hosts_upload_side_effect):
-            self.processor.transition_to_hosts_uploaded()
+            await self.processor.transition_to_hosts_uploaded()
             self.assertEqual(self.report_slice.state, Report.VALIDATED)
             self.assertEqual(self.report_slice.retry_count, 1)
+
+    def test_test_transition_to_hosts_uploaded_exception(self):
+        """Test the async hosts uploaded exception."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.async_test_transition_to_hosts_uploaded_exception)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
 
     def test_generate_bulk_upload_list(self):
         """Test generating a list of all hosts for upload."""
@@ -383,10 +420,10 @@ class ReportProcessorTests(TestCase):
                           'namespace': 'qpc',
                           'facts': {'insights_client_id': 'value', 'name': 'foo'}}]}]
         split_hosts = self.processor.split_hosts(all_hosts)
-        self.assertEqual(split_hosts, [all_hosts])
+        self.assertEqual(split_hosts, [[all_hosts]])
 
-    def test_no_account_number_inventory_upload(self):
-        """Testing no account number present when uploading to inventory."""
+    async def async_test_no_account_number_inventory_upload(self):
+        """Test the no account number present when uploading to inventory."""
         self.processor.account_number = None
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
@@ -395,10 +432,18 @@ class ReportProcessorTests(TestCase):
                  self.uuid5: {'vm_uuid': 'value', 'name': 'foo'},
                  self.uuid6: {'etc_machine_id': 'value'},
                  self.uuid7: {'subscription_manager_id': 'value'}}
-        self.processor._upload_to_host_inventory(hosts)
+        await self.processor._upload_to_host_inventory(hosts)
 
-    def test_successful_host_inventory_upload(self):
-        """Testing successful upload to host inventory."""
+    def test_no_account_number_inventory_upload(self):
+        """Test the async upload function with a 400 error."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.async_test_no_account_number_inventory_upload)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
+
+    async def async_test_successful_host_inventory_upload(self):
+        """Test successful upload to host inventory."""
         self.processor.account_number = self.uuid
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value',
                              'infrastructure_type': 'virtualized',
@@ -423,7 +468,8 @@ class ReportProcessorTests(TestCase):
         with requests_mock.mock() as mock_req:
             mock_req.post(report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
                           status_code=207, json=bulk_response)
-            retry_time_hosts, retry_commit_hosts = self.processor._upload_to_host_inventory(hosts)
+            retry_time_hosts, retry_commit_hosts = \
+                await self.processor._upload_to_host_inventory(hosts)
             self.assertEqual(retry_time_hosts, [])
             self.assertEqual(retry_commit_hosts, [])
             total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
@@ -435,20 +481,33 @@ class ReportProcessorTests(TestCase):
             self.assertEqual(failed_hosts, 0)
             self.assertEqual(upload_group_size, 7)
 
-    def test_no_json_resp_host_inventory_upload(self):
-        """Testing unsuccessful upload to host inventory."""
-        self.processor.account_number = self.uuid
-        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
-                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
+    def test_successful_host_inventory_upload(self):
+        """Test the async upload function with a 400 error."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.async_test_successful_host_inventory_upload)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
 
-        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+    async def async_test_no_json_resp_host_inventory_upload(self):
+        """Test unsuccessful upload to host inventory."""
+        self.processor.account_number = self.uuid
+        hosts = {self.uuid: {'bios_uuid': 'value', 'name':
+                             'value', 'system_platform_id': self.uuid},
+                 self.uuid2: {'insights_client_id':
+                              'value', 'name': 'foo', 'system_platform_id': self.uuid2}}
+
+        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
+                                       'system_platform_id': self.uuid},
                            'cause': report_slice_processor.FAILED_UPLOAD},
-                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
+                                        'system_platform_id': self.uuid2},
                            'cause': report_slice_processor.FAILED_UPLOAD}]
         with requests_mock.mock() as mock_req:
             mock_req.post(report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
                           status_code=207, json=None)
-            retry_time_hosts, retry_commit_hosts = self.processor._upload_to_host_inventory(hosts)
+            retry_time_hosts, retry_commit_hosts = \
+                await self.processor._upload_to_host_inventory(hosts)
             for host in expected_hosts:
                 self.assertIn(host, retry_time_hosts)
             self.assertEqual(retry_commit_hosts, [])
@@ -461,20 +520,33 @@ class ReportProcessorTests(TestCase):
             self.assertEqual(failed_hosts, 2)
             self.assertEqual(upload_group_size, 2)
 
-    def test_400_resp_host_inventory_upload(self):
-        """Testing unsuccessful upload to host inventory."""
-        self.processor.account_number = self.uuid
-        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
-                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
+    def test_no_json_resp_host_inventory_upload(self):
+        """Test the async upload function with a 400 error."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.async_test_no_json_resp_host_inventory_upload)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
 
-        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+    async def async_test_400_resp_host_inventory_upload(self):
+        """Test 400 response when uploading to host inventory."""
+        self.processor.account_number = self.uuid
+        hosts = {self.uuid:
+                 {'bios_uuid': 'value', 'name': 'value', 'system_platform_id': self.uuid},
+                 self.uuid2:
+                 {'insights_client_id': 'value', 'name': 'foo', 'system_platform_id': self.uuid2}}
+
+        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
+                                       'system_platform_id': self.uuid},
                            'cause': report_slice_processor.FAILED_UPLOAD},
-                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
+                                        'system_platform_id': self.uuid2},
                            'cause': report_slice_processor.FAILED_UPLOAD}]
         with requests_mock.mock() as mock_req:
             mock_req.post(report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
                           status_code=400, json=None)
-            retry_time_hosts, retry_commit_hosts = self.processor._upload_to_host_inventory(hosts)
+            retry_time_hosts, retry_commit_hosts = \
+                await self.processor._upload_to_host_inventory(hosts)
             for host in expected_hosts:
                 self.assertIn(host, retry_commit_hosts)
             self.assertEqual(retry_time_hosts, [])
@@ -487,20 +559,33 @@ class ReportProcessorTests(TestCase):
             self.assertEqual(failed_hosts, 2)
             self.assertEqual(upload_group_size, 2)
 
-    def test_500_resp_host_inventory_upload(self):
-        """Testing unsuccessful upload to host inventory."""
-        self.processor.account_number = self.uuid
-        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
-                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
+    def test_400_resp_host_inventory_upload(self):
+        """Test the async upload function with a 400 error."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.async_test_400_resp_host_inventory_upload)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
 
-        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'},
+    async def async_test_500_resp_host_inventory_upload(self):
+        """Test 500 response when uploading to host inventory."""
+        self.processor.account_number = self.uuid
+        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value',
+                             'system_platform_id': self.uuid},
+                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
+                              'system_platform_id': self.uuid2}}
+
+        expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
+                                       'system_platform_id': self.uuid},
                            'cause': report_slice_processor.FAILED_UPLOAD},
-                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
+                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
+                                        'system_platform_id': self.uuid2},
                            'cause': report_slice_processor.FAILED_UPLOAD}]
         with requests_mock.mock() as mock_req:
             mock_req.post(report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
                           status_code=500, json=None)
-            retry_time_hosts, retry_commit_hosts = self.processor._upload_to_host_inventory(hosts)
+            retry_time_hosts, retry_commit_hosts = \
+                await self.processor._upload_to_host_inventory(hosts)
             for host in expected_hosts:
                 self.assertIn(host, retry_time_hosts)
             self.assertEqual(retry_commit_hosts, [])
@@ -513,8 +598,16 @@ class ReportProcessorTests(TestCase):
             self.assertEqual(failed_hosts, 2)
             self.assertEqual(upload_group_size, 2)
 
-    def test_host_inventory_upload_500(self):
-        """Testing successful upload to host inventory with 500 errors."""
+    def test_500_resp_host_inventory_upload(self):
+        """Test the async upload function with a 400 error."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.async_test_500_resp_host_inventory_upload)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
+
+    async def async_test_host_inventory_upload_500(self):
+        """Test unsuccessful upload to host inventory with 500 errors."""
         self.processor.account_number = self.uuid
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value',
                              'system_platform_id': self.uuid},
@@ -541,7 +634,7 @@ class ReportProcessorTests(TestCase):
         with requests_mock.mock() as mock_req:
             mock_req.post(report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
                           status_code=207, json=bulk_response)
-            retry_time, retry_commit = self.processor._upload_to_host_inventory(hosts)
+            retry_time, retry_commit = await self.processor._upload_to_host_inventory(hosts)
             self.assertEqual(retry_commit, [])
             for host in expected_hosts:
                 self.assertIn(host, retry_time)
@@ -554,18 +647,29 @@ class ReportProcessorTests(TestCase):
             self.assertEqual(failed_hosts, 2)
             self.assertEqual(upload_group_size, 2)
 
-    def test_host_inventory_upload_400(self):
-        """Testing successful upload to host inventory with 500 errors."""
+    def test_host_inventory_upload_500(self):
+        """Test the async upload function with a 400 error."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.async_test_host_inventory_upload_500)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
+
+    async def async_test_host_inventory_upload_400(self):
+        """Test upload to host inventory with 400 errors."""
         self.processor.account_number = self.uuid
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value',
                              'system_platform_id': self.uuid},
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo',
                               'system_platform_id': self.uuid2},
-                 self.uuid3: {'ip_addresses': 'value', 'name': 'foo'},
-                 self.uuid4: {'mac_addresses': 'value', 'name': 'foo'},
-                 self.uuid5: {'vm_uuid': 'value', 'name': 'foo'},
-                 self.uuid6: {'etc_machine_id': 'value'},
-                 self.uuid7: {'subscription_manager_id': 'value'}}
+                 self.uuid3: {'ip_addresses': 'value', 'name': 'foo',
+                              'system_platform_id': self.uuid3},
+                 self.uuid4: {'mac_addresses': 'value', 'name': 'foo',
+                              'system_platform_id': self.uuid4},
+                 self.uuid5: {'vm_uuid': 'value', 'name': 'foo',
+                              'system_platform_id': self.uuid5},
+                 self.uuid6: {'etc_machine_id': 'value', 'system_platform_id': self.uuid6},
+                 self.uuid7: {'subscription_manager_id': 'value', 'system_platform_id': self.uuid7}}
         expected_hosts = [{self.uuid: {'bios_uuid': 'value', 'name': 'value',
                                        'system_platform_id': self.uuid},
                            'cause': report_slice_processor.FAILED_UPLOAD,
@@ -587,7 +691,8 @@ class ReportProcessorTests(TestCase):
         with requests_mock.mock() as mock_req:
             mock_req.post(report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
                           status_code=207, json=bulk_response)
-            retry_time_hosts, retry_commit_hosts = self.processor._upload_to_host_inventory(hosts)
+            retry_time_hosts, retry_commit_hosts = \
+                await self.processor._upload_to_host_inventory(hosts)
             self.assertEqual(retry_time_hosts, [])
             for host in expected_hosts:
                 self.assertIn(host, retry_commit_hosts)
@@ -600,9 +705,17 @@ class ReportProcessorTests(TestCase):
             self.assertEqual(failed_hosts, 2)
             self.assertEqual(upload_group_size, 7)
 
+    def test_upload_400(self):
+        """Test the async upload function with a 400 error."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.async_test_host_inventory_upload_400)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
+
     @patch('processor.report_processor.requests.post')
-    def test_host_url_exceptions(self, mock_request):
-        """Testing an exception being raised during host inventory upload."""
+    async def async_test_host_url_exceptions(self, mock_request):
+        """Test an exception being raised during host inventory upload."""
         good_resp = requests.Response()
         good_resp.status_code = 200
         bad_resp = requests.exceptions.ConnectionError()
@@ -613,7 +726,15 @@ class ReportProcessorTests(TestCase):
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}}
         with patch('processor.report_slice_processor.INSIGHTS_HOST_INVENTORY_URL',
                    value='not none'):
-            self.processor._upload_to_host_inventory(hosts)
+            await self.processor._upload_to_host_inventory(hosts)
+
+    def test_upload_host_url_exceptions(self):
+        """Test the async upload function with url exceptions."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.async_test_host_url_exceptions)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
 
     @patch('processor.report_processor.requests.post')
     def test_host_url_request_exceptions(self, mock_request):
@@ -702,14 +823,41 @@ class ReportProcessorTests(TestCase):
         system_profile = self.processor.format_system_profile(host)
         self.assertEqual(expected_profile, system_profile)
 
-    def test_archive_report_and_slices(self):
-        """Test the archive method."""
+    def test_archive_report_and_slices_in_failed_state(self):
+        """Test the archive method in a failed state."""
         self.report_record.ready_to_archive = True
         self.report_record.report_platform_id = '459'
         self.report_record.save()
         self.report_slice.ready_to_archive = True
         self.report_slice.report_platform_id = '459'
         self.report_slice.report_slice_id = '25'
+        self.report_slice.state = ReportSlice.FAILED_HOSTS_UPLOAD
+        self.report_slice.save()
+        self.processor.report_or_slice = self.report_slice
+        self.processor.report_platform_id = '459'
+
+        self.processor.archive_report_and_slices()
+        # assert the report doesn't exist
+        with self.assertRaises(Report.DoesNotExist):
+            Report.objects.get(id=self.report_record.id)
+        # assert the report archive does exist
+        archived = ReportArchive.objects.get(rh_account=self.report_record.rh_account)
+        archived_slice = ReportSliceArchive.objects.get(
+            report_slice_id=self.report_slice.report_slice_id)
+        self.assertEqual(archived.report_platform_id, '459')
+        self.assertEqual(archived_slice.report_platform_id, '459')
+        # assert the processor was reset
+        self.check_variables_are_reset()
+
+    def test_archive_report_and_slices_in_success_state(self):
+        """Test the archive method in a failed state."""
+        self.report_record.ready_to_archive = True
+        self.report_record.report_platform_id = '459'
+        self.report_record.save()
+        self.report_slice.ready_to_archive = True
+        self.report_slice.report_platform_id = '459'
+        self.report_slice.report_slice_id = '25'
+        self.report_slice.state = ReportSlice.HOSTS_UPLOADED
         self.report_slice.save()
         self.processor.report_or_slice = self.report_slice
         self.processor.report_platform_id = '459'
