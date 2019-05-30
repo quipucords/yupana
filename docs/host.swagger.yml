@@ -91,10 +91,4 @@ components:
           format: "int64"
           description: "The number of hosts in this slice"
           example: 116
-
-
-
-
-
-
-
+          
