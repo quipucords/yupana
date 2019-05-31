@@ -1,0 +1,94 @@
+openapi: "3.0.0"
+info:
+  description: "Host object of host inventory used for the Quipucords and Satellite servers."
+  version: 1.0.0
+  title: Swagger Host
+  contact:
+    email: "quipucords@redhat.com"
+  license:
+    name: "GPL 3.0"
+    url: "https://www.gnu.org/licenses/gpl-3.0.txt"
+
+securityDefinitions:
+  Token:
+    type: apiKey
+    name: Authorization
+    in: header
+security:
+  - Token: []
+  
+components:
+  schemas:
+    InsightsReport:
+      properties:
+        metadata_tar_path:
+          type: object
+          properties:
+            report_id:
+              type: "string"
+              description: "Globally unique uuid for report"
+              example: "be3075ac-84d3-4b62-9f5c-a418a36f802d"
+            host_inventory_api_version:
+              type: "string"
+              description: "Host inventory API version"
+              example: "1.0"
+            source:
+              type: "string"
+              description: "Source where the report is generated"
+              example: "qpc"
+            source_metadata:
+              type: object
+              properties:
+                report_platform_id:
+                  type: "string"
+                  description: "Globally unique uuid for report"
+                  example: "be3075ac-84d3-4b62-9f5c-a418a36f802d"
+                report_type:
+                  type: "string"
+                  description: "The report type"
+                  example: "insights"
+                report_version:
+                  type: "string"
+                  description: "The report version"
+                  example: "1.0.0.afdsgev"
+                qpc_server_report_id:
+                  type: "integer"
+                  format: "int64"
+                  description: "Globally unique id for a report generated from QPC"
+                  example: 1
+                qpc_server_version:
+                  type: "string"
+                  description: "The version of QPC server"
+                  example: "1.0.0.4d07092"
+                qpc_server_id:
+                  type: "string"
+                  description: "ID for the QPC server"
+                  example: "66592153-a307-420c-9662-3a810c53655f"
+            report_slices:
+              type: object
+              properties:
+                report_slice_id:
+                  $ref: "#/components/schemas/InsightsReportSliceMetadata"
+              description: "Metadata for each report slice"
+          description: "Metadata describing report contents"
+        report_slice_tar_path:
+          type: object
+          properties:
+            report_slice_id:
+              type: "string"
+              description: "The Insights report slice identifier"
+              example: "abc075ac-84d3-4b62-9f5c-a418a36f802d"
+            hosts:
+              type: "array"
+              items:
+                $ref: "https://raw.githubusercontent.com/RedHatInsights/insights-host-inventory/system_profile_changes/swagger/api.spec.yaml#components/schemas/CreateHostIn"
+              description: "List of the hosts scanned (refers to Host object in Insights' api.spec.yaml file)"
+          description: "Slices of the Insights report"
+    InsightsReportSliceMetadata:
+      properties:
+        number_hosts:
+          type: "integer"
+          format: "int64"
+          description: "The number of hosts in this slice"
+          example: 116
+          
