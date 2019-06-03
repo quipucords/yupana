@@ -1,0 +1,39 @@
+openapi: "3.0.0"
+info:
+  description: "Report slices of host inventory used for the Quipucords and Satellite servers."
+  version: 1.0.0
+  title: Swagger Report Slices
+  contact:
+    email: "quipucords@redhat.com"
+  license:
+    name: "GPL 3.0"
+    url: "https://www.gnu.org/licenses/gpl-3.0.txt"
+
+paths:
+  /hosts:
+    get:
+      operationId: api.host.get_host_list
+      tags:
+        - hosts
+      summary: Read the entire list of hosts
+      description: Fake path created to avoid validation errors
+      responses:
+        '200':
+          description: Successfully read the hosts list.
+
+components:
+  schemas:
+    ReportSliceTarPath:
+      type: object
+      properties:
+        report_slice_id:
+          type: "string"
+          description: "The Insights report slice identifier"
+          example: "abc075ac-84d3-4b62-9f5c-a418a36f802d"
+        hosts:
+          type: "array"
+          items:
+            $ref: "https://raw.githubusercontent.com/RedHatInsights/insights-host-inventory/system_profile_changes/swagger/api.spec.yaml#components/schemas/CreateHostIn"
+          description: "List of the hosts scanned (refers to Host object in Insights' api.spec.yaml file)"
+      description: "Slices of the Insights report"
+          

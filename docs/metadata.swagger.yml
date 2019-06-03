@@ -1,0 +1,58 @@
+openapi: "3.0.0"
+info:
+  description: "Metadata section of host inventory used for the Quipucords and Satellite servers."
+  version: 1.0.0
+  title: Swagger Metadata
+  contact:
+    email: "quipucords@redhat.com"
+  license:
+    name: "GPL 3.0"
+    url: "https://www.gnu.org/licenses/gpl-3.0.txt"
+
+paths:
+  /hosts:
+    get:
+      operationId: api.host.get_host_list
+      tags:
+        - hosts
+      summary: Read the entire list of hosts
+      description: Fake path created to avoid validation errors
+      responses:
+        '200':
+          description: Successfully read the hosts list.
+
+components:
+  schemas:
+    MetadataTarPath:
+      type: object
+      properties:
+        report_id:
+          type: "string"
+          description: "Globally unique uuid for report"
+          example: "be3075ac-84d3-4b62-9f5c-a418a36f802d"
+        host_inventory_api_version:
+          type: "string"
+          description: "Host inventory API version"
+          example: "1.0"
+        source:
+          type: "string"
+          description: "Source where the report is generated"
+          example: "qpc"
+        source_metadata:
+          type: object
+          description: "This object is intended to allow the sender to include any data they find useful for tracking. The service will log the contents of this object. No validation is performed on the contents of source_metadata."
+        report_slices:
+          type: object
+          properties:
+            report_slice_id:
+              $ref: "#/components/schemas/InsightsReportSliceMetadata"
+          description: "Metadata for each report slice"
+      description: "Metadata describing report contents"
+    InsightsReportSliceMetadata:
+      properties:
+        number_hosts:
+          type: "integer"
+          format: "int64"
+          description: "The number of hosts in this slice"
+          example: 116
+          

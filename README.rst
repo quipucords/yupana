@@ -132,8 +132,97 @@ To lint the code base ::
 
     tox -e lint
 
+Formatting Data for Yupana
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+Data sent to Yupana should include the following sections in given format (JSON):
+    1. Metadata. Data should include metadata section which contains metadata information about the report and sources, like an example below: ::
+       
+        {
+            "report_id": "05f373dd-e20e-4866-b2a4-9b523acfeb6d",
+            "host_inventory_api_version": "1.0",
+            "source": "qpc",
+            "source_metadata": {
+                "report_platform_id": "05f373dd-e20e-4866-b2a4-9b523acfeb6d",
+                "report_type": "insights",
+                "report_version": "1.0.0.7858056",
+                "qpc_server_report_id": 2,
+                "qpc_server_version": "1.0.0.7858056",
+                "qpc_server_id": "56deb667-8ddd-4647-b1b7-e36e614871d0"
+            },
+            "report_slices": {
+                "2dd60c11-ee5b-4ddc-8b75-d8d34de86a34": {
+                    "number_hosts": 1
+                },
+                "eb45725b-165a-44d9-ad28-c531e3a1d9ac": {
+                    "number_hosts": 1
+                }
+            }
+        }
+    
+       An API specification of the metadata can be found `here`_.
+
+    2. Report Slices. Report slices section of the data contains the general information about servers and hosts 
+       generated during a scan. The report is separated into slices where the data is too large. Following is an example 
+       of how each report slice should be formatted: ::
+
+        {
+            "report_slice_id": "2dd60c11-ee5b-4ddc-8b75-d8d34de86a34",
+            "hosts": [
+                {
+                    "display_name": "7cent.cfoo.example.com",
+                    "fqdn": "7cent.cfoo.example.com",
+                    "facts": [
+                        {
+                            "namespace": "qpc",
+                            "facts": {
+                                "ip_addresses": [
+                                    "192.168.121.50"
+                                ],
+                                "mac_addresses": [
+                                    "52:54:00:ad:c3:c9"
+                                ],
+                                "subscription_manager_id": "f14ea675-7292-4bcd-9bc7-62197dd98e1b",
+                                "name": "7cent.cfoo.example.com",
+                                "os_release": "RHEL Server 7.3",
+                                "os_version": 7.3,
+                                "infrastructure_type": "virtualized",
+                                "cpu_count": 2,
+                                "architecture": "x86_64",
+                                "is_redhat": True,
+                                "cpu_socket_count": 2,
+                                "cpu_core_count": 2
+                            },
+                            "rh_product_certs": [],
+                            "rh_products_installed": [
+                                "RHEL"
+                            ]
+                        }
+                    ],
+                    "system_profile": {
+                        "infrastructure_type": "virtualized",
+                        "architecture": "x86_64",
+                        "os_release": "RHEL Server 7.3",
+                        "os_kernel_version": "7.3",
+                        "number_of_cpus": 2,
+                        "number_of_sockets": 2,
+                        "cores_per_socket": 1
+                    }
+                }
+            ]
+        }
+       
+       An API specification of the report slices can be found `here.`_
+
+Tar.gz format of the data
+^^^^^^^^^^^^^^^^^^^^^^^^^
+Besides data being formatted in JSON, it can also be stored as a tar.gz file. In the tar.gz file, metadata and report slices 
+are stored in separate .json files. The file that contains metadata information is named 'metadata.json', while the files containing 
+report slices data are named with their uniquely generated 'report_slice_id' keys with .json extension. An example of such tar.gz file can be `found here`_.
 
 .. _readthedocs: https://yupana.readthedocs.io/en/latest/
+.. _here: docs/metadata.swagger.yml
+.. _`here.`: docs/reportslices.swagger.yml
+.. _`found here`: sample.tar.gz
 .. |license| image:: https://img.shields.io/github/license/quipucords/yupana.svg
 .. |Updates| image:: https://pyup.io/repos/github/quipucords/yupana/shield.svg
    :target: https://pyup.io/repos/github/quipucords/yupana/
