@@ -213,7 +213,7 @@ Data sent to Yupana should include the following sections in given format (JSON)
        
        An API specification of the report slices can be found `here.`_
 
-Tar.gz format of the data
+Tar.gz Format of the Data
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 Besides data being formatted in JSON, it can also be stored as a tar.gz file. In the tar.gz file, metadata and report slices 
 are stored in separate .json files. The file that contains metadata information is named 'metadata.json', while the files containing 
