@@ -38,7 +38,7 @@ components:
               example: "qpc"
             source_metadata:
               type: object
-              description: "The content is not validated for this object and can be anything the sender wishes to send for tracking. The contents will be logged."
+              description: "This object is intended to allow the sender to include any data they find useful for tracking. The service will log the contents of this object. No validation is performed on the contents of source_metadata."
               example: {
                   "report_platform_id": "afc1a6e4-2c44-496c-96e0-b6f94c5b9cd2",
                   "report_type": "insights",
