@@ -132,10 +132,19 @@ To lint the code base ::
 
     tox -e lint
 
+
+Tar.gz Format of the Data
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Besides data being formatted in JSON, it can also be stored as a tar.gz file. In the tar.gz file, metadata and report slices 
+are stored in separate .json files. The file that contains metadata information is named 'metadata.json', while the files containing 
+report slices data are named with their uniquely generated 'report_slice_id' keys with .json extension. An example of such tar.gz file can be `found here`_.
+
 Formatting Data for Yupana
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Data sent to Yupana should include the following sections in given format (JSON):
-    1. Metadata. Data should include metadata section which contains metadata information about the report and sources, like an example below: ::
+
+Data sent to Yupana should be a set of JSON files compressed in a tar.gz file. The tar.gz file should contain 1 metadata JSON file and 1 to many report slice JSON files. Below we describe the metadata and report slice JSON:
+    1. Metadata. Metadata should include information about the sender of the data, Host Inventory API version, and the report slices included in the tar.gz file. Below is a sample metadata section: ::
        
         {
             "report_id": "05f373dd-e20e-4866-b2a4-9b523acfeb6d",
@@ -161,36 +170,45 @@ Data sent to Yupana should include the following sections in given format (JSON)
     
        An API specification of the metadata can be found `here`_.
 
-    2. Report Slices. Report slices section of the data contains the general information about servers and hosts 
-       generated during a scan. The report is separated into slices where the data is too large. Following is an example 
-       of how each report slice should be formatted: ::
+    2. Report Slices. Report slices are a section of the host inventory data. They are limited to a maximum size of 10K hosts. Slices with more than 10K hosts will be discarded as a validation error. Below is a sample report slice generated during a scan. The report is separated into slices when the data is too large: ::
 
         {
             "report_slice_id": "2dd60c11-ee5b-4ddc-8b75-d8d34de86a34",
             "hosts": [
                 {
-                    "display_name": "7cent.cfoo.example.com",
-                    "fqdn": "7cent.cfoo.example.com",
+                    "display_name": "dhcp181-3.gsslab.rdu2.redhat.com",
+                    "fqdn": "dhcp181-3.gsslab.rdu2.redhat.com",
+                    "bios_uuid": "848F1E42-51ED-8D58-9FA4-E0B433EEC7E3",
+                    "ip_addresses": [
+                        "10.10.182.241"
+                    ],
+                    "mac_addresses": [
+                        "00:50:56:9e:f7:d6"
+                    ],
+                    "subscription_manager_id": "848F1E42-51ED-8D58-9FA4-E0B433EEC7E3",
                     "facts": [
                         {
                             "namespace": "qpc",
                             "facts": {
+                                "bios_uuid": "848F1E42-51ED-8D58-9FA4-E0B433EEC7E3",
                                 "ip_addresses": [
-                                    "192.168.121.50"
+                                    "10.10.182.241"
                                 ],
                                 "mac_addresses": [
-                                    "52:54:00:ad:c3:c9"
+                                    "00:50:56:9e:f7:d6"
                                 ],
-                                "subscription_manager_id": "f14ea675-7292-4bcd-9bc7-62197dd98e1b",
-                                "name": "7cent.cfoo.example.com",
-                                "os_release": "RHEL Server 7.3",
-                                "os_version": 7.3,
+                                "subscription_manager_id": "848F1E42-51ED-8D58-9FA4-E0B433EEC7E3",
+                                "name": "dhcp181-3.gsslab.rdu2.redhat.com",
+                                "os_release": "Red Hat Enterprise Linux Server release 6.9 (Santiago)",
+                                "os_version": "6.9 (Santiago)",
                                 "infrastructure_type": "virtualized",
-                                "cpu_count": 2,
+                                "cpu_count": 1,
                                 "architecture": "x86_64",
-                                "is_redhat": True,
-                                "cpu_socket_count": 2,
-                                "cpu_core_count": 2
+                                "is_redhat": true,
+                                "redhat_certs": "69.pem",
+                                "cpu_core_per_socket": 1,
+                                "cpu_socket_count": 1,
+                                "cpu_core_count": 1
                             },
                             "rh_product_certs": [],
                             "rh_products_installed": [
@@ -201,10 +219,10 @@ Data sent to Yupana should include the following sections in given format (JSON)
                     "system_profile": {
                         "infrastructure_type": "virtualized",
                         "architecture": "x86_64",
-                        "os_release": "RHEL Server 7.3",
-                        "os_kernel_version": "7.3",
-                        "number_of_cpus": 2,
-                        "number_of_sockets": 2,
+                        "os_release": "Red Hat Enterprise Linux Server release 6.9 (Santiago)",
+                        "os_kernel_version": "6.9 (Santiago)",
+                        "number_of_cpus": 1,
+                        "number_of_sockets": 1,
                         "cores_per_socket": 1
                     }
                 }
@@ -213,16 +231,10 @@ Data sent to Yupana should include the following sections in given format (JSON)
        
        An API specification of the report slices can be found `here.`_
 
-Tar.gz Format of the Data
-^^^^^^^^^^^^^^^^^^^^^^^^^
-Besides data being formatted in JSON, it can also be stored as a tar.gz file. In the tar.gz file, metadata and report slices 
-are stored in separate .json files. The file that contains metadata information is named 'metadata.json', while the files containing 
-report slices data are named with their uniquely generated 'report_slice_id' keys with .json extension. An example of such tar.gz file can be `found here`_.
-
 .. _readthedocs: https://yupana.readthedocs.io/en/latest/
-.. _here: docs/metadata.swagger.yml
-.. _`here.`: docs/reportslices.swagger.yml
-.. _`found here`: sample.tar.gz
+.. _here: https://github.com/quipucords/yupana/docs/metadata.yml
+.. _`here.`: https://github.com/quipucords/yupana/docs/report_slices.yml
+.. _`found here`: https://github.com/quipucords/yupana/sample.tar.gz
 .. |license| image:: https://img.shields.io/github/license/quipucords/yupana.svg
 .. |Updates| image:: https://pyup.io/repos/github/quipucords/yupana/shield.svg
    :target: https://pyup.io/repos/github/quipucords/yupana/

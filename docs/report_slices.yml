@@ -10,16 +10,16 @@ info:
     url: "https://www.gnu.org/licenses/gpl-3.0.txt"
 
 paths:
-  /hosts:
+  /dummy:
     get:
-      operationId: api.host.get_host_list
+      operationId: api.dummy
       tags:
-        - hosts
-      summary: Read the entire list of hosts
-      description: Fake path created to avoid validation errors
+        - dummy
+      summary: Does not do anything
+      description: This path does not work. It is fake path created to avoid validation errors in swagger file
       responses:
         '200':
-          description: Successfully read the hosts list.
+          description: Just a dummy path
 
 components:
   schemas:
