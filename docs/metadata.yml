@@ -23,7 +23,7 @@ paths:
 
 components:
   schemas:
-    MetadataTarPath:
+    Metadata:
       type: object
       properties:
         report_id:

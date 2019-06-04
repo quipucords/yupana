@@ -23,7 +23,7 @@ paths:
 
 components:
   schemas:
-    ReportSliceTarPath:
+    ReportSlice:
       type: object
       properties:
         report_slice_id:
