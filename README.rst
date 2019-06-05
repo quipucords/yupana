@@ -134,7 +134,7 @@ To lint the code base ::
 
 
 Formatting Data for Yupana (without QPC)
-=======================================
+========================================
 
 Yupana tar.gz File Format Overview
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
