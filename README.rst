@@ -233,6 +233,9 @@ Report slices are a slice of the host inventory data for a given report. A slice
     }
 
 An API specification of the report slices can be found `here.`_
+The host based inventory api specification includes a mandatory ``account`` field.  
+Yupana will extract the ``account`` number from the kafka message it receives from the Insights platform 
+file upload service and populate the ``account`` field of each host.
 
 .. _readthedocs: https://yupana.readthedocs.io/en/latest/
 .. _here: https://github.com/quipucords/yupana/docs/metadata.yml
