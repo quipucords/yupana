@@ -65,7 +65,7 @@ Assuming the default .env file values are used, to access the database directly 
 There is a known limitation with docker-compose and Linux environments with SELinux enabled. You may see the following error during the postgres container deployment::
 
     "mkdir: cannot create directory '/var/lib/pgsql/data/userdata': Permission denied" can be resolved by granting ./pg_data ownership permissions to uid:26 (postgres user in centos/postgresql-96-centos7)
-  
+
 If this error is encountered, the following command can be used to grant ``pg_data`` ownership permissions to uid:26 as the error suggests ::
 
   setfacl -m u:26:-wx ./pg_data/
@@ -133,103 +133,106 @@ To lint the code base ::
     tox -e lint
 
 
-Tar.gz Format of the Data
-^^^^^^^^^^^^^^^^^^^^^^^^^
+Formatting Data to Yupana (without QPC)
+=======================================
 
-Besides data being formatted in JSON, it can also be stored as a tar.gz file. In the tar.gz file, metadata and report slices 
-are stored in separate .json files. The file that contains metadata information is named 'metadata.json', while the files containing 
-report slices data are named with their uniquely generated 'report_slice_id' keys with .json extension. An example of such tar.gz file can be `found here`_.
+Yupana tar.gz File Format Overview
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Formatting Data for Yupana
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+Yupana retrieves data from the Insights platform file upload service.  Yupana requires a specially formatted tar.gz file.  Files that do not conform to the required format will be marked as invalid and no processing will occur.  The tar.gz file contains a metadata JSON file and one or more report slices JSON files. The file that contains metadata information is named 'metadata.json', while the files containing report slices data are named with their uniquely generated UUID4 'report_slice_id' keys with .json extension. An example of such tar.gz file can be `found here`_.
 
-Data sent to Yupana should be a set of JSON files compressed in a tar.gz file. The tar.gz file should contain 1 metadata JSON file and 1 to many report slice JSON files. Below we describe the metadata and report slice JSON:
-    1. Metadata. Metadata should include information about the sender of the data, Host Inventory API version, and the report slices included in the tar.gz file. Below is a sample metadata section: ::
-       
-        {
-            "report_id": "05f373dd-e20e-4866-b2a4-9b523acfeb6d",
-            "host_inventory_api_version": "1.0",
-            "source": "qpc",
-            "source_metadata": {
-                "report_platform_id": "05f373dd-e20e-4866-b2a4-9b523acfeb6d",
-                "report_type": "insights",
-                "report_version": "1.0.0.7858056",
-                "qpc_server_report_id": 2,
-                "qpc_server_version": "1.0.0.7858056",
-                "qpc_server_id": "56deb667-8ddd-4647-b1b7-e36e614871d0"
+Yupana Meta-data JSON Format
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Metadata should include information about the sender of the data, Host Inventory API version, and the report slices included in the tar.gz file. Below is a sample metadata section for a report with 2 slices::
+
+    {
+        "report_id": "05f373dd-e20e-4866-b2a4-9b523acfeb6d",
+        "host_inventory_api_version": "1.0",
+        "source": "qpc",
+        "source_metadata": {
+            "report_platform_id": "05f373dd-e20e-4866-b2a4-9b523acfeb6d",
+            "report_type": "insights",
+            "report_version": "1.0.0.7858056",
+            "qpc_server_report_id": 2,
+            "qpc_server_version": "1.0.0.7858056",
+            "qpc_server_id": "56deb667-8ddd-4647-b1b7-e36e614871d0"
+        },
+        "report_slices": {
+            "2dd60c11-ee5b-4ddc-8b75-d8d34de86a34": {
+                "number_hosts": 1
             },
-            "report_slices": {
-                "2dd60c11-ee5b-4ddc-8b75-d8d34de86a34": {
-                    "number_hosts": 1
-                },
-                "eb45725b-165a-44d9-ad28-c531e3a1d9ac": {
-                    "number_hosts": 1
-                }
+            "eb45725b-165a-44d9-ad28-c531e3a1d9ac": {
+                "number_hosts": 1
             }
         }
-    
-       An API specification of the metadata can be found `here`_.
+    }
 
-    2. Report Slices. Report slices are a section of the host inventory data. They are limited to a maximum size of 10K hosts. Slices with more than 10K hosts will be discarded as a validation error. Below is a sample report slice generated during a scan. The report is separated into slices when the data is too large: ::
+An API specification of the metadata can be found `here`_.
 
-        {
-            "report_slice_id": "2dd60c11-ee5b-4ddc-8b75-d8d34de86a34",
-            "hosts": [
-                {
-                    "display_name": "dhcp181-3.gsslab.rdu2.redhat.com",
-                    "fqdn": "dhcp181-3.gsslab.rdu2.redhat.com",
-                    "bios_uuid": "848F1E42-51ED-8D58-9FA4-E0B433EEC7E3",
-                    "ip_addresses": [
-                        "10.10.182.241"
-                    ],
-                    "mac_addresses": [
-                        "00:50:56:9e:f7:d6"
-                    ],
-                    "subscription_manager_id": "848F1E42-51ED-8D58-9FA4-E0B433EEC7E3",
-                    "facts": [
-                        {
-                            "namespace": "qpc",
-                            "facts": {
-                                "bios_uuid": "848F1E42-51ED-8D58-9FA4-E0B433EEC7E3",
-                                "ip_addresses": [
-                                    "10.10.182.241"
-                                ],
-                                "mac_addresses": [
-                                    "00:50:56:9e:f7:d6"
-                                ],
-                                "subscription_manager_id": "848F1E42-51ED-8D58-9FA4-E0B433EEC7E3",
-                                "name": "dhcp181-3.gsslab.rdu2.redhat.com",
-                                "os_release": "Red Hat Enterprise Linux Server release 6.9 (Santiago)",
-                                "os_version": "6.9 (Santiago)",
-                                "infrastructure_type": "virtualized",
-                                "cpu_count": 1,
-                                "architecture": "x86_64",
-                                "is_redhat": true,
-                                "redhat_certs": "69.pem",
-                                "cpu_core_per_socket": 1,
-                                "cpu_socket_count": 1,
-                                "cpu_core_count": 1
-                            },
-                            "rh_product_certs": [],
-                            "rh_products_installed": [
-                                "RHEL"
-                            ]
-                        }
-                    ],
-                    "system_profile": {
-                        "infrastructure_type": "virtualized",
-                        "architecture": "x86_64",
-                        "os_release": "Red Hat Enterprise Linux Server release 6.9 (Santiago)",
-                        "os_kernel_version": "6.9 (Santiago)",
-                        "number_of_cpus": 1,
-                        "number_of_sockets": 1,
-                        "cores_per_socket": 1
+Yupana Report Slice JSON Format
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Report slices are a slice of the host inventory data for a given report. A slice limits the number of hosts to 10K.  Slices with more than 10K hosts will be discarded as a validation error. Below is a sample report slice::
+
+    {
+        "report_slice_id": "2dd60c11-ee5b-4ddc-8b75-d8d34de86a34",
+        "hosts": [
+            {
+                "display_name": "dhcp181-3.gsslab.rdu2.redhat.com",
+                "fqdn": "dhcp181-3.gsslab.rdu2.redhat.com",
+                "bios_uuid": "848F1E42-51ED-8D58-9FA4-E0B433EEC7E3",
+                "ip_addresses": [
+                    "10.10.182.241"
+                ],
+                "mac_addresses": [
+                    "00:50:56:9e:f7:d6"
+                ],
+                "subscription_manager_id": "848F1E42-51ED-8D58-9FA4-E0B433EEC7E3",
+                "facts": [
+                    {
+                        "namespace": "qpc",
+                        "facts": {
+                            "bios_uuid": "848F1E42-51ED-8D58-9FA4-E0B433EEC7E3",
+                            "ip_addresses": [
+                                "10.10.182.241"
+                            ],
+                            "mac_addresses": [
+                                "00:50:56:9e:f7:d6"
+                            ],
+                            "subscription_manager_id": "848F1E42-51ED-8D58-9FA4-E0B433EEC7E3",
+                            "name": "dhcp181-3.gsslab.rdu2.redhat.com",
+                            "os_release": "Red Hat Enterprise Linux Server release 6.9 (Santiago)",
+                            "os_version": "6.9 (Santiago)",
+                            "infrastructure_type": "virtualized",
+                            "cpu_count": 1,
+                            "architecture": "x86_64",
+                            "is_redhat": true,
+                            "redhat_certs": "69.pem",
+                            "cpu_core_per_socket": 1,
+                            "cpu_socket_count": 1,
+                            "cpu_core_count": 1
+                        },
+                        "rh_product_certs": [],
+                        "rh_products_installed": [
+                            "RHEL"
+                        ]
                     }
+                ],
+                "system_profile": {
+                    "infrastructure_type": "virtualized",
+                    "architecture": "x86_64",
+                    "os_release": "Red Hat Enterprise Linux Server release 6.9 (Santiago)",
+                    "os_kernel_version": "6.9 (Santiago)",
+                    "number_of_cpus": 1,
+                    "number_of_sockets": 1,
+                    "cores_per_socket": 1
                 }
-            ]
-        }
-       
-       An API specification of the report slices can be found `here.`_
+            }
+        ]
+    }
+
+An API specification of the report slices can be found `here.`_
 
 .. _readthedocs: https://yupana.readthedocs.io/en/latest/
 .. _here: https://github.com/quipucords/yupana/docs/metadata.yml
