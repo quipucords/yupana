@@ -133,7 +133,7 @@ To lint the code base ::
     tox -e lint
 
 
-Formatting Data to Yupana (without QPC)
+Formatting Data for Yupana (without QPC)
 =======================================
 
 Yupana tar.gz File Format Overview
