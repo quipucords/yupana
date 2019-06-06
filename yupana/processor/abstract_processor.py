@@ -19,6 +19,7 @@
 import asyncio
 import json
 import logging
+import uuid
 from abc import ABC
 from datetime import datetime, timedelta
 from enum import Enum
@@ -279,7 +280,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         """
         Update the report processor state and save.
 
-        :param options: <dict> containing potentially containing the following:
+        :param options: <dict> potentially containing the following:
             retry: <enum> Retry.clear=clear count, RETRY.increment=increase count
             retry_type: <str> either time=retry after time,
                 git_commit=retry after new commit
@@ -290,9 +291,9 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             failed_hosts: <dict> dictionary containing hosts that failed
                 verification or upload
             status: <str> either success or failure based on the report
-            report_type: <str> the type of the report
-            report_id: <int> the report id
-            report_version: <str> the report version
+            host_inventory_api_version: <str> the inventory api version
+            source: <str> containing either qpc or satellite
+            source_metadata: <dict> containing metadata info about the source
             ready_to_archive: <bool> bool regarding archive
         """
         try:
@@ -307,9 +308,9 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             candidate_hosts = options.get('candidate_hosts')
             failed_hosts = options.get('failed_hosts')
             status = options.get('status')
-            report_type = options.get('report_type')
-            report_id = options.get('report_id')
-            report_version = options.get('report_version')
+            host_inventory_api_version = options.get('host_inventory_api_version')
+            source = options.get('source')
+            source_metadata = options.get('source_metadata')
             ready_to_archive = options.get('ready_to_archive')
 
             update_data = {
@@ -349,12 +350,13 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 update_data['failed_hosts'] = json.dumps(failed)
             if status:
                 update_data['upload_ack_status'] = status
-            if report_type:
-                update_data['report_type'] = report_type
-            if report_id:
-                update_data['report_id'] = report_id
-            if report_version:
-                update_data['report_version'] = report_version
+            if host_inventory_api_version:
+                update_data['host_inventory_api_version'] = \
+                    host_inventory_api_version
+            if source:
+                update_data['source'] = source
+            if source_metadata:
+                update_data['source_metadata'] = json.dumps(source_metadata)
             if ready_to_archive:
                 update_data['ready_to_archive'] = ready_to_archive
 
@@ -555,10 +557,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         :returns: tuple contain list of valid and invalid hosts
         """
         self.prefix = 'VALIDATE REPORT STRUCTURE'
-        required_keys = ['report_platform_id',
-                         'report_slice_id',
+        required_keys = ['report_slice_id',
                          'hosts']
-        report_platform_id = self.report_json.get('report_platform_id')
 
         missing_keys = []
         for key in required_keys:
@@ -573,33 +573,27 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     self.prefix,
                     'Report is missing required fields: %s.' % missing_keys_str,
                     account_number=self.account_number,
-                    report_platform_id=report_platform_id))
+                    report_platform_id=self.report_platform_id))
 
-        # validate hosts is a dictionary
-        invalid_hosts_message = 'Hosts must be a dictionary that is not empty. ' \
-                                'All keys must be strings and all values must be dictionaries.'
+        # validate that hosts is an array
+        invalid_hosts_message = 'Hosts must be a list of dictionaries.'
         hosts = self.report_json.get('hosts')
-        if not hosts or not isinstance(hosts, dict):
+        if not hosts or not isinstance(hosts, list):
             raise QPCReportException(
                 format_message(
                     self.prefix,
                     invalid_hosts_message,
                     account_number=self.account_number,
-                    report_platform_id=report_platform_id))
+                    report_platform_id=self.report_platform_id))
 
-        invalid_host_dict_format = False
-        for host_id, host in hosts.items():
-            if not isinstance(host_id, str) or not isinstance(host, dict):
-                invalid_host_dict_format = True
-                break
-
-        if invalid_host_dict_format:
-            raise QPCReportException(
-                format_message(
-                    self.prefix,
-                    invalid_hosts_message,
-                    account_number=self.account_number,
-                    report_platform_id=report_platform_id))
+        for host in hosts:
+            if not isinstance(host, dict):
+                raise QPCReportException(
+                    format_message(
+                        self.prefix,
+                        invalid_hosts_message,
+                        account_number=self.account_number,
+                        report_platform_id=self.report_platform_id))
 
         candidate_hosts, failed_hosts = self._validate_report_hosts()
         number_valid = len(candidate_hosts)
@@ -609,7 +603,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             '%s/%s hosts are valid.' % (
                 number_valid, total),
             account_number=self.account_number,
-            report_platform_id=report_platform_id
+            report_platform_id=self.report_platform_id
         ))
         if not candidate_hosts:
             raise QPCReportException(
@@ -617,7 +611,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     self.prefix,
                     'report does not contain any valid hosts.',
                     account_number=self.account_number,
-                    report_platform_id=report_platform_id))
+                    report_platform_id=self.report_platform_id))
         return candidate_hosts, failed_hosts
 
     def _validate_report_hosts(self):
@@ -625,33 +619,35 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
 
         :returns: tuple containing valid & invalid hosts
         """
-        hosts = self.report_json['hosts']
-        report_platform_id = self.report_json['report_platform_id']
+        hosts = self.report_json.get('hosts', [])
 
         prefix = 'VALIDATE HOSTS'
-        invalid_hosts = {}
         candidate_hosts = []
         failed_hosts = []
-        for host_id, host in hosts.items():
+        for host in hosts:
+            host_uuid = str(uuid.uuid4())
+            host['account'] = self.account_number
+            host_facts = host.get('facts', [])
+            host_facts.append({'namespace': 'yupana',
+                               'facts': {'yupana_host_id': host_uuid}})
+            host['facts'] = host_facts
             found_facts = False
             for fact in CANONICAL_FACTS:
                 if host.get(fact):
                     found_facts = True
                     break
             if found_facts:
-                candidate_hosts.append({host_id: host})
+                candidate_hosts.append({host_uuid: host})
             else:
-                host.pop('metadata', None)
-                failed_hosts.append({host_id: host,
+                failed_hosts.append({host_uuid: host,
                                      'cause': FAILED_VALIDATION})
-                invalid_hosts[host_id] = host
-        if invalid_hosts:
+        if failed_hosts:
             LOG.warning(
                 format_message(
                     prefix,
                     'Removed %d hosts with 0 canonical facts: %s' % (
-                        len(invalid_hosts), invalid_hosts),
+                        len(failed_hosts), failed_hosts),
                     account_number=self.account_number,
-                    report_platform_id=report_platform_id))
+                    report_platform_id=self.report_platform_id))
 
         return candidate_hosts, failed_hosts

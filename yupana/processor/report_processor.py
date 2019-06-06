@@ -134,17 +134,9 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             account_number=self.account_number))
         try:
             report_tar_gz = self._download_report()
-            metadata_json = self._extract_and_create_slices(report_tar_gz)
-            report_platform_id = metadata_json.get('report_platform_id')
-            report_version = metadata_json.get('report_version')
-            report_type = metadata_json.get('report_type')
-            report_id = metadata_json.get('report_id')
+            options = self._extract_and_create_slices(report_tar_gz)
             self.next_state = Report.DOWNLOADED
             # update the report or slice with downloaded info
-            options = {'report_platform_id': report_platform_id,
-                       'report_type': report_type,
-                       'report_id': report_id,
-                       'report_version': report_version}
             self.update_object_state(options=options)
             self.deduplicate_reports()
         except (FailDownloadException, FailExtractException) as err:
@@ -176,6 +168,9 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             try:
                 self.report_json = json.loads(report_slice.report_json)
                 candidate_hosts, failed_hosts = self._validate_report_details()
+                print('\nCandidate and failed: ')
+                print(candidate_hosts)
+                print(failed_hosts)
                 if candidate_hosts:
                     self.status = SUCCESS_CONFIRM_STATUS
                 INVALID_HOSTS.set(len(failed_hosts))
@@ -423,7 +418,78 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                                (report_url, err),
                                account_number=self.account_number))
 
-    # pylint: disable=too-many-locals, too-many-nested-blocks, too-many-branches
+    def validate_metadata_file(self, metadata_file):
+        """Validate the contents of the metadata file.
+
+        :param metadata: metadata file object.
+        :returns: report_slice_ids
+        """
+        metadata_str = metadata_file.read().decode('utf-8')
+        metadata_json = json.loads(metadata_str)
+        required_keys = ['report_id', 'host_inventory_api_version',
+                         'source', 'report_slices']
+        missing_keys = []
+        for key in required_keys:
+            required_key = metadata_json.get(key)
+            if not required_key:
+                missing_keys.append(key)
+
+        if missing_keys:
+            missing_keys_str = ', '.join(missing_keys)
+            raise FailExtractException(
+                format_message(
+                    self.prefix,
+                    'Metadata is missing required fields: %s.' % missing_keys_str,
+                    account_number=self.account_number,
+                    report_platform_id=self.report_platform_id))
+
+        self.report_platform_id = metadata_json.get('report_id')
+        host_inventory_api_version = metadata_json.get('host_inventory_api_version')
+        source = metadata_json.get('source')
+        # we should save the above information into the report object
+        options = {
+            'report_platform_id': self.report_platform_id,
+            'host_inventory_api_version': host_inventory_api_version,
+            'source': source
+        }
+
+        source_metadata = metadata_json.get('source_metadata')
+        # if source_metadata exists, we should log it
+        if source_metadata:
+            LOG.info(format_message(
+                self.prefix,
+                'The following source metadata was uploaded: %s' % source_metadata,
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id
+            ))
+            options['source_metadata'] = source_metadata
+        self.update_object_state(options)
+        invalid_slice_ids = {}
+        valid_slice_ids = []
+        report_slices = metadata_json.get('report_slices', {})
+        # we need to verify that the report slices have the appropriate number of hosts
+        for report_slice_id, report_info in report_slices.items():
+            num_hosts = int(report_info.get('number_hosts', MAX_HOSTS_PER_REP + 1))
+            if num_hosts <= MAX_HOSTS_PER_REP:
+                valid_slice_ids.append(report_slice_id)
+            else:
+                invalid_slice_ids[report_slice_id] = num_hosts
+        # if any reports were over the max number of hosts, we need to log
+        if invalid_slice_ids:
+            for report_slice_id, num_hosts in invalid_slice_ids.items():
+                large_slice_message = 'Report %s has %s hosts. '\
+                    'There must be no more than %s hosts per'\
+                    ' report.' % \
+                    (report_slice_id, str(num_hosts),
+                     str(MAX_HOSTS_PER_REP))
+                LOG.warning(
+                    format_message(self.prefix, large_slice_message,
+                                   account_number=self.account_number,
+                                   report_platform_id=self.report_platform_id))
+
+        return valid_slice_ids, options
+
+    # pylint: disable=too-many-branches
     def _extract_and_create_slices(self, report_tar_gz):  # noqa: C901 (too-complex)
         """Extract Insights report from tar.gz file.
 
@@ -432,7 +498,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         :returns: Insights report as dict
         """
         self.prefix = 'EXTRACT REPORT FROM TAR'
-        try:
+        try:  # pylint: disable=too-many-nested-blocks
             tar = tarfile.open(fileobj=BytesIO(report_tar_gz), mode='r:gz')
             files = tar.getmembers()
             json_files = []
@@ -446,46 +512,21 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     json_files.append(file)
             if json_files and metadata_file:
                 try:
-                    metadata_str = metadata_file.read().decode('utf-8')
-                    metadata_json = json.loads(metadata_str)
-                    report_type = metadata_json.get('report_type')
-                    if not report_type or report_type != 'insights':
-                        raise FailExtractException('Missing or invalid report type.')
-                    # save all of the metadata info to the report record
-                    report_slices = metadata_json.get('report_slices', {})
-                    self.report_platform_id = metadata_json.get('report_platform_id')
+                    valid_slice_ids, options = self.validate_metadata_file(metadata_file)
                     report_names = {}
-                    # loop through the keys in the report_slices dictionary to find the names of the
-                    # files that we need to save
-                    # check the number of hosts and if permissible, find the associated json payload
-                    for report_name, report_info in report_slices.items():
-                        num_hosts = int(report_info.get('number_hosts', MAX_HOSTS_PER_REP + 1))
-                        if num_hosts <= MAX_HOSTS_PER_REP:
-                            # loop through the list of json files found within the payload
-                            for file in json_files:
-                                if report_name in file.name:
-                                    report_slice = tar.extractfile(file)
-                                    report_slice_string = report_slice.read().decode('utf-8')
-                                    report_slice_json = json.loads(report_slice_string)
-                                    report_slice_id = report_slice_json.get('report_slice_id', '')
-                                    created = self.create_report_slice(
-                                        report_json=report_slice_json,
-                                        report_slice_id=report_slice_id)
-                                    if created:
-                                        report_names[report_name] = True
-                                    break
-                        else:
-                            # else we want to warn that the report had too many hosts for yupana
-                            # to process
-                            large_slice_message = 'Report %s has %s hosts. '\
-                                                  'There must be no more than %s hosts per'\
-                                                  ' report.' % \
-                                                  (report_name, str(num_hosts),
-                                                   str(MAX_HOSTS_PER_REP))
-                            LOG.warning(
-                                format_message(self.prefix, large_slice_message,
-                                               account_number=self.account_number,
-                                               report_platform_id=self.report_platform_id))
+                    for report_id in valid_slice_ids:
+                        for file in json_files:
+                            if report_id in file.name:
+                                report_slice = tar.extractfile(file)
+                                report_slice_string = report_slice.read().decode('utf-8')
+                                report_slice_json = json.loads(report_slice_string)
+                                report_slice_id = report_slice_json.get('report_slice_id', '')
+                                created = self.create_report_slice(
+                                    report_json=report_slice_json,
+                                    report_slice_id=report_slice_id)
+                                if created:
+                                    report_names[report_id] = True
+                                break
 
                     if not report_names:
                         raise FailExtractException(format_message(
@@ -498,11 +539,12 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                             'successfully extracted & created report slices',
                             account_number=self.account_number,
                             report_platform_id=self.report_platform_id))
-                    return metadata_json
+                    return options
+
                 except ValueError as error:
                     raise FailExtractException(
                         format_message(self.prefix,
-                                       'Report not JSON. Error: %s' % str(error),
+                                       'Report is not valid JSON. Error: %s' % str(error),
                                        account_number=self.account_number))
             raise FailExtractException(
                 format_message(self.prefix,

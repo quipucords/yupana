@@ -52,5 +52,5 @@ class ReportModelTest(TestCase):
         self.assertEqual(self.report.state_info, [Report.NEW])
         self.assertEqual(self.report.last_update_time, self.date)
         # pylint: disable=line-too-long
-        expected = "{report_platform_id:%s, report_version: None, report_id: None, report_type: None, rh_account: 13423, upload_ack_status: None, upload_srv_kafka_msg: {'accountid': '13423', 'msg_url': 'foo'}, git_commit: None, state: new, state_info: ['new'], retry_count: 0, retry_type: time, last_update_time: %s }" % (self.uuid, self.date)  # noqa
+        expected = "{report_platform_id:%s, host_inventory_api_version: None, source: None, source_metadata: None, rh_account: 13423, upload_ack_status: None, upload_srv_kafka_msg: {'accountid': '13423', 'msg_url': 'foo'}, git_commit: None, state: new, state_info: ['new'], retry_count: 0, retry_type: time, last_update_time: %s }" % (self.uuid, self.date)  # noqa
         self.assertEqual(str(self.report), expected)
