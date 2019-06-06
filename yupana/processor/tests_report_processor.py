@@ -62,8 +62,8 @@ class ReportProcessorTests(TransactionTestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'bios_uuid': 'value'},
-                      self.uuid2: {'invalid': 'value'}}}
+            'hosts': [{'bios_uuid': 'value'},
+                      {'invalid': 'value'}]}
         self.report_record = Report(
             upload_srv_kafka_msg=json.dumps(self.msg),
             rh_account='1234',
@@ -475,6 +475,15 @@ class ReportProcessorTests(TransactionTestCase):
             self.processor.transition_to_downloaded()
             self.assertEqual(self.report_record.state, Report.FAILED_DOWNLOAD)
 
+    def test_transition_to_validated(self):
+        """Test that the transition to validated is successful."""
+        self.processor.report_or_slice = self.report_record
+        self.report_slice.state_info = json.dumps([ReportSlice.PENDING])
+        self.processor.transition_to_validated()
+        invalid_hosts = REGISTRY.get_sample_value('invalid_hosts_per_report')
+        self.assertEqual(self.report_record.state, Report.VALIDATED)
+        self.assertEqual(invalid_hosts, 1)
+
     def test_transition_to_validated_report_exception(self):
         """Test that a report with no report_slice_id is still marked as validated."""
         self.report_record.state = Report.DOWNLOADED
@@ -825,6 +834,7 @@ class ReportProcessorTests(TransactionTestCase):
             'report_id': 1,
             'host_inventory_api_version': '1.0.0',
             'source': 'qpc',
+            'source_metadata': {'foo': 'bar'},
             'report_slices': {'2345322': {'number_hosts': 1}}
         }
         report_json = {
@@ -842,6 +852,7 @@ class ReportProcessorTests(TransactionTestCase):
             'report_platform_id': 1,
             'host_inventory_api_version': '1.0.0',
             'source': 'qpc',
+            'source_metadata': {'foo': 'bar'}
         }
         self.assertEqual(result, expected_result)
 
