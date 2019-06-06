@@ -168,9 +168,6 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             try:
                 self.report_json = json.loads(report_slice.report_json)
                 candidate_hosts, failed_hosts = self._validate_report_details()
-                print('\nCandidate and failed: ')
-                print(candidate_hosts)
-                print(failed_hosts)
                 if candidate_hosts:
                     self.status = SUCCESS_CONFIRM_STATUS
                 INVALID_HOSTS.set(len(failed_hosts))
