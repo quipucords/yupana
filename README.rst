@@ -139,7 +139,7 @@ Formatting Data for Yupana (without QPC)
 Yupana tar.gz File Format Overview
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Yupana retrieves data from the Insights platform file upload service.  Yupana requires a specially formatted tar.gz file.  Files that do not conform to the required format will be marked as invalid and no processing will occur.  The tar.gz file contains a metadata JSON file and one or more report slices JSON files. The file that contains metadata information is named 'metadata.json', while the files containing report slices data are named with their uniquely generated UUID4 'report_slice_id' keys with .json extension. An example of such tar.gz file can be `found here`_.
+Yupana retrieves data from the Insights platform file upload service.  Yupana requires a specially formatted tar.gz file.  Files that do not conform to the required format will be marked as invalid and no processing will occur.  The tar.gz file contains a metadata JSON file and one or more report slice JSON files. The file that contains metadata information is named ``metadata.json``, while the files containing host data are named with their uniquely generated UUID4 ``report_slice_id`` followed by the .json extension. You can download `sample.tar.gz`_ to view an example.
 
 Yupana Meta-data JSON Format
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -233,14 +233,14 @@ Report slices are a slice of the host inventory data for a given report. A slice
     }
 
 An API specification of the report slices can be found `here.`_
-The host based inventory api specification includes a mandatory ``account`` field.  
-Yupana will extract the ``account`` number from the kafka message it receives from the Insights platform 
+The host based inventory api specification includes a mandatory ``account`` field.
+Yupana will extract the ``account`` number from the kafka message it receives from the Insights platform
 file upload service and populate the ``account`` field of each host.
 
 .. _readthedocs: https://yupana.readthedocs.io/en/latest/
-.. _here: https://github.com/quipucords/yupana/docs/metadata.yml
-.. _`here.`: https://github.com/quipucords/yupana/docs/report_slices.yml
-.. _`found here`: https://github.com/quipucords/yupana/sample.tar.gz
+.. _here: https://github.com/quipucords/yupana/blob/master/docs/metadata.yml
+.. _`here.`: https://github.com/quipucords/yupana/blob/master/docs/report_slices.yml
+.. _`sample.tar.gz`: https://github.com/quipucords/yupana/raw/master/sample.tar.gz
 .. |license| image:: https://img.shields.io/github/license/quipucords/yupana.svg
 .. |Updates| image:: https://pyup.io/repos/github/quipucords/yupana/shield.svg
    :target: https://pyup.io/repos/github/quipucords/yupana/
