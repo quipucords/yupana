@@ -139,7 +139,7 @@ Formatting Data for Yupana (without QPC)
 Yupana tar.gz File Format Overview
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Yupana retrieves data from the Insights platform file upload service.  Yupana requires a specially formatted tar.gz file.  Files that do not conform to the required format will be marked as invalid and no processing will occur.  The tar.gz file contains a metadata JSON file and one or more report slices JSON files. The file that contains metadata information is named 'metadata.json', while the files containing report slices data are named with their uniquely generated UUID4 'report_slice_id' keys with .json extension. You can download `sample.tar.gz`_ to view an example.
+Yupana retrieves data from the Insights platform file upload service.  Yupana requires a specially formatted tar.gz file.  Files that do not conform to the required format will be marked as invalid and no processing will occur.  The tar.gz file contains a metadata JSON file and one or more report slice JSON files. The file that contains metadata information is named ``metadata.json``, while the files containing host data are named with their uniquely generated UUID4 ``report_slice_id`` followed by the .json extension. You can download `sample.tar.gz`_ to view an example.
 
 Yupana Meta-data JSON Format
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
