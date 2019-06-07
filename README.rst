@@ -139,7 +139,7 @@ Formatting Data for Yupana (without QPC)
 Yupana tar.gz File Format Overview
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Yupana retrieves data from the Insights platform file upload service.  Yupana requires a specially formatted tar.gz file.  Files that do not conform to the required format will be marked as invalid and no processing will occur.  The tar.gz file contains a metadata JSON file and one or more report slices JSON files. The file that contains metadata information is named 'metadata.json', while the files containing report slices data are named with their uniquely generated UUID4 'report_slice_id' keys with .json extension. An example of such tar.gz file can be `found here`_.
+Yupana retrieves data from the Insights platform file upload service.  Yupana requires a specially formatted tar.gz file.  Files that do not conform to the required format will be marked as invalid and no processing will occur.  The tar.gz file contains a metadata JSON file and one or more report slices JSON files. The file that contains metadata information is named 'metadata.json', while the files containing report slices data are named with their uniquely generated UUID4 'report_slice_id' keys with .json extension. You can download `sample.tar.gz`_ to view an example.
 
 Yupana Meta-data JSON Format
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -240,7 +240,7 @@ file upload service and populate the ``account`` field of each host.
 .. _readthedocs: https://yupana.readthedocs.io/en/latest/
 .. _here: https://github.com/quipucords/yupana/blob/master/docs/metadata.yml
 .. _`here.`: https://github.com/quipucords/yupana/blob/master/docs/report_slices.yml
-.. _`found here`: https://github.com/quipucords/yupana/raw/master/sample.tar.gz
+.. _`sample.tar.gz`: https://github.com/quipucords/yupana/raw/master/sample.tar.gz
 .. |license| image:: https://img.shields.io/github/license/quipucords/yupana.svg
 .. |Updates| image:: https://pyup.io/repos/github/quipucords/yupana/shield.svg
    :target: https://pyup.io/repos/github/quipucords/yupana/
