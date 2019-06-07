@@ -129,3 +129,8 @@ postgres
 
 # Ignore pycharm data
 .idea/*
+
+# Ignore reports data
+tar_upload/data_ready/
+
+.DS_Store

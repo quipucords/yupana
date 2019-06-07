@@ -54,7 +54,14 @@ help:
 	@echo "oc-server-migrate        run migrations"
 	@echo "oc-update-template       update template and build"
 	@echo "oc-delete-yupana         delete the yupana app and data"
-
+	@echo ""
+	@echo "--- Commands to upload data to Insights ---"
+	@echo "sample-data         				ready sample data for upload to Insights"
+	@echo "custom-data data_dir=<path/to/data>		ready given data for upload to Insights"
+	@echo "upload-data account-number=<your-acc-num> \\"
+	@echo "	    org-id=<your-org-id> \\"
+	@echo "	    rh-username=<your-rh-username>	upload data to Insights"
+	@echo ""
 
 clean:
 	git clean -fdx -e .idea/ -e *env/ $(PYDIR)/db.sqlite3
@@ -101,6 +108,29 @@ requirements:
 validate-swagger:
 	npm install swagger-cli
 	node_modules/swagger-cli/bin/swagger-cli.js validate docs/swagger.yml
+
+sample-data:
+	mkdir -p temp/reports
+	curl https://raw.githubusercontent.com/quipucords/yupana/master/sample.tar.gz | tar xvz -C temp
+	python tar_upload/change_uuids.py
+	mkdir -p tar_upload/data_ready
+	@cd temp; COPYFILE_DISABLE=1 tar -zcvf ../tar_upload/data_ready/sample_data_ready_$(shell date +%s).tar.gz reports
+	rm -rf temp
+
+custom-data:
+	mkdir -p temp/reports
+	tar -xvzf $(data_file) -C temp
+	python tar_upload/change_uuids.py
+	mkdir -p tar_upload/data_ready
+	@cd temp; COPYFILE_DISABLE=1 tar -zcvf ../tar_upload/data_ready/custom_data_ready_$(shell date +%s).tar.gz reports
+	rm -rf temp
+
+upload-data:
+	curl -vvvv -H "x-rh-identity: $(shell echo '{"identity": {"account_number": $(account-number), "internal": {"org_id": $(org-id)}}}' | base64)" \
+		-F "upload=@$(file);type=application/vnd.redhat.qpc.tar+tgz" \
+		-H "x-rh-insights-request-id: 52df9f748eabcfea" \
+		https://ci.cloud.paas.upshift.redhat.com/api/ingress/v1/upload \
+		-u $(rh-username)@redhat.com:redhat
 
 .PHONY: build
 build:
