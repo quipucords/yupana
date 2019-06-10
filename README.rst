@@ -240,10 +240,10 @@ file upload service and populate the ``account`` field of each host.
 Sending Data to Insights Upload service for Yupana (without QPC)
 ================================================================
 Data being uploaded to Insights must be in ``tar.gz`` format containing the ``.json`` files with the given JSON structure 
-above. It is important to note that Insights Upload service receives data with unique UUIDs, which means data with a certain
-UUID cannot be uploaded more than once, or else it will cause errors. Therefore, before every upload we need to generate a new UUID
-and replace it with the current one if we want to upload the same data more than once. To ready reports data for an upload to 
-Inisghts Upload service for Yupana, you can try one of the following options. 
+above. It is important to note that Yupana processes & tracks reports based on their UUIDS, which means that data with a 
+specific UUID cannot be uploaded more than once, or else the second upload will be archived and not processed. Therefore, 
+before every upload we need to generate a new UUID and replace the current one with it if we want to upload the same data 
+more than once. Use the following instructions to prepare and upload a sample or custom report.
 
 Preparing Yupana Sample Data for Upload
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
