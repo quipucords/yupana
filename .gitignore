@@ -131,6 +131,6 @@ postgres
 .idea/*
 
 # Ignore reports data
-tar_upload/data_ready/
+temp/
 
 .DS_Store

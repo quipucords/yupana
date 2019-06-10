@@ -59,9 +59,7 @@ help:
 	@echo "sample-data                                        ready sample data for upload to Insights"
 	@echo "custom-data data_dir=<path/to/data>                ready given data for upload to Insights"
 	@echo "upload-data file=<filename> \\"
-	@echo "     account-number=<your-acc-num> \\"
-	@echo "     org-id=<your-org-id> \\"
-	@echo "     rh-username=<your-rh-username>                upload data to Insights"
+	@echo "     account-number=<your-acc-num>                 upload data to Insights"
 	@echo ""
 
 clean:
@@ -112,26 +110,28 @@ validate-swagger:
 
 sample-data:
 	mkdir -p temp/reports
-	curl https://raw.githubusercontent.com/quipucords/yupana/master/sample.tar.gz | tar xvz -C temp
-	python tar_upload/change_uuids.py
-	mkdir -p tar_upload/data_ready
-	@cd temp; COPYFILE_DISABLE=1 tar -zcvf ../tar_upload/data_ready/sample_data_ready_$(shell date +%s).tar.gz reports
-	rm -rf temp
+	mkdir -p temp/old_reports_temp
+	curl https://raw.githubusercontent.com/quipucords/yupana/master/sample.tar.gz | tar xvz -C temp/old_reports_temp
+	python scripts/change_uuids.py
+	@cd temp; COPYFILE_DISABLE=1 tar -zcvf sample_data_ready_$(shell date +%s).tar.gz reports
+	rm -rf temp/reports
+	rm -rf temp/old_reports_temp
 
 custom-data:
 	mkdir -p temp/reports
-	tar -xvzf $(data_file) -C temp
-	python tar_upload/change_uuids.py
-	mkdir -p tar_upload/data_ready
-	@cd temp; COPYFILE_DISABLE=1 tar -zcvf ../tar_upload/data_ready/custom_data_ready_$(shell date +%s).tar.gz reports
-	rm -rf temp
+	mkdir -p temp/old_reports_temp
+	tar -xvzf $(data_file) -C temp/old_reports_temp
+	python scripts/change_uuids.py
+	@cd temp; COPYFILE_DISABLE=1 tar -zcvf custom_data_ready_$(shell date +%s).tar.gz reports
+	rm -rf temp/reports
+	rm -rf temp/old_reports_temp
 
 upload-data:
 	curl -vvvv -H "x-rh-identity: $(shell echo '{"identity": {"account_number": $(account-number), "internal": {"org_id": $(org-id)}}}' | base64)" \
 		-F "upload=@$(file);type=application/vnd.redhat.qpc.tar+tgz" \
 		-H "x-rh-insights-request-id: 52df9f748eabcfea" \
-		https://ci.cloud.paas.upshift.redhat.com/api/ingress/v1/upload \
-		-u $(rh-username)@redhat.com:redhat
+		$(FILE_UPLOAD_URL) \
+		-u $(RH_USERNAME)@redhat.com:$(RH_PASSWORD)
 
 .PHONY: build
 build:
