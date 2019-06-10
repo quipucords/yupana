@@ -6,15 +6,15 @@ import glob
     
 def change_uuids():
     path = 'temp/old_reports_temp'
-    files = []
-    # r=root, d=directories, f = files
-    for r, d, f in os.walk(path):
-        for file in f:
+    filenames = []
+    for root, _d, files in os.walk(path):
+        for file in files:
+            print(file)
             if '.json' in file and file != 'metadata.json':
-                files.append(os.path.join(r, file))
+                filenames.append(os.path.join(root, file))
     new_slices = {}
     # change uuids for report slice files
-    for filename in files:
+    for filename in filenames:
         new_uuid = str(uuid.uuid4())
         with open(filename, 'r') as f:
             data = json.load(f)
@@ -28,10 +28,10 @@ def change_uuids():
     # change uuid for metadata.json
     metadata = ''
     new_uuid = str(uuid.uuid4())
-    for r, d, f in os.walk(path):
-        for file in f:
+    for root, _d, files in os.walk(path):
+        for file in files:
             if file == 'metadata.json':
-                metadata = os.path.join(r, file)
+                metadata = os.path.join(root, file)
     with open(metadata, 'r') as f:
         data = json.load(f)
         data['report_id'] = new_uuid # modify the report_id

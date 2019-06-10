@@ -56,9 +56,9 @@ help:
 	@echo "oc-delete-yupana         delete the yupana app and data"
 	@echo ""
 	@echo "--- Commands to upload data to Insights ---"
-	@echo "sample-data                                        ready sample data for upload to Insights"
-	@echo "custom-data data_dir=<path/to/data>                ready given data for upload to Insights"
-	@echo "upload-data file=<filename>                        upload data to Insights"
+	@echo "sample-data                                 ready sample data for upload to Insights"
+	@echo "custom-data file=<path/to/file>             ready given data for upload to Insights"
+	@echo "upload-data file=<path/to/file>             upload data to Insights"
 	@echo ""
 
 clean:
@@ -112,18 +112,26 @@ sample-data:
 	mkdir -p temp/old_reports_temp
 	tar -xvzf sample.tar.gz -C temp/old_reports_temp
 	python scripts/change_uuids.py
-	@cd temp; COPYFILE_DISABLE=1 tar -zcvf sample_data_ready_$(shell date +%s).tar.gz reports
+	@echo sample_data_ready_$(shell date +%s).tar.gz > filename_temp.txt
+	@cd temp; COPYFILE_DISABLE=1 tar -zcvf ${shell cat filename_temp.txt} reports
 	rm -rf temp/reports
 	rm -rf temp/old_reports_temp
+	@echo ""
+	@echo "The updated report was written to" temp/${shell cat filename_temp.txt}
+	@echo ""
 
 custom-data:
 	mkdir -p temp/reports
 	mkdir -p temp/old_reports_temp
-	tar -xvzf $(data_file) -C temp/old_reports_temp
+	tar -xvzf $(file) -C temp/old_reports_temp
 	python scripts/change_uuids.py
-	@cd temp; COPYFILE_DISABLE=1 tar -zcvf custom_data_ready_$(shell date +%s).tar.gz reports
+	@echo sample_data_ready_$(shell date +%s).tar.gz > filename_temp.txt
+	@cd temp; COPYFILE_DISABLE=1 tar -zcvf ${shell cat filename_temp.txt} reports
 	rm -rf temp/reports
 	rm -rf temp/old_reports_temp
+	@echo ""
+	@echo "The updated report was written to" temp/${shell cat filename_temp.txt}
+	@echo ""
 
 upload-data:
 	curl -vvvv -H "x-rh-identity: $(shell echo '{"identity": {"account_number": $(RH_ACCOUNT_NUMBER), "internal": {"org_id": $(RH_ORG_ID)}}}' | base64)" \
