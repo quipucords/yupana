@@ -17,7 +17,7 @@ from django.db import models
 class AbstractReport(models.Model):
     """Represents report information."""
 
-    report_platform_id = models.CharField(max_length=50, null=True)
+    report_platform_id = models.UUIDField(null=True)
     host_inventory_api_version = models.CharField(max_length=10, null=True)
     source = models.CharField(max_length=15, null=True)
     source_metadata = models.TextField(null=True)

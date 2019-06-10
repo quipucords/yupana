@@ -57,7 +57,8 @@ class ReportSliceModelTest(TestCase):
             failed_hosts=[],
             candidate_hosts=[],
             ready_to_archive=False,
-            report=self.report)
+            report=self.report,
+            hosts_count=10)
 
     def test_report_fields(self):
         """Test the report slice fields."""
@@ -68,5 +69,5 @@ class ReportSliceModelTest(TestCase):
         self.assertEqual(self.report_slice.last_update_time, self.date)
         self.assertEqual(self.report_slice.report, self.report)
         # pylint: disable=line-too-long
-        expected = "{report_platform_id:%s, report_slice_id: %s, rh_account: 13423, report_json: {'report_platform_id': '%s', 'report_type': 'insights', 'hosts': {}}, git_commit: None, state: new, state_info: ['new'], retry_count: 0, retry_type: time, last_update_time: %s, failed_hosts: [], candidate_hosts: [] }" % (self.uuid, self.uuid2, self.uuid, self.date)  # noqa
+        expected = "{report_platform_id:%s, report_slice_id: %s, rh_account: 13423, report_json: {'report_platform_id': '%s', 'report_type': 'insights', 'hosts': {}}, git_commit: None, state: new, state_info: ['new'], retry_count: 0, retry_type: time, last_update_time: %s, failed_hosts: [], candidate_hosts: [] hosts_count: 10}" % (str(self.uuid), str(self.uuid2), str(self.uuid), self.date)  # noqa
         self.assertEqual(str(self.report_slice), expected)

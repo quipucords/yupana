@@ -510,7 +510,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     'state_info': report_slice.state_info,
                     'last_update_time': report_slice.last_update_time,
                     'report_slice_id': report_slice.report_slice_id,
-                    'report': archived_rep.id
+                    'report': archived_rep.id,
+                    'hosts_count': report_slice.hosts_count
                 }
                 if report_slice.report_platform_id:
                     archived_slice_data['report_platform_id'] = report_slice.report_platform_id
