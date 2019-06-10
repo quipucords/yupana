@@ -56,11 +56,12 @@ help:
 	@echo "oc-delete-yupana         delete the yupana app and data"
 	@echo ""
 	@echo "--- Commands to upload data to Insights ---"
-	@echo "sample-data         				ready sample data for upload to Insights"
-	@echo "custom-data data_dir=<path/to/data>		ready given data for upload to Insights"
-	@echo "upload-data account-number=<your-acc-num> \\"
-	@echo "	    org-id=<your-org-id> \\"
-	@echo "	    rh-username=<your-rh-username>	upload data to Insights"
+	@echo "sample-data                                        ready sample data for upload to Insights"
+	@echo "custom-data data_dir=<path/to/data>                ready given data for upload to Insights"
+	@echo "upload-data file=<filename> \\"
+	@echo "     account-number=<your-acc-num> \\"
+	@echo "     org-id=<your-org-id> \\"
+	@echo "     rh-username=<your-rh-username>                upload data to Insights"
 	@echo ""
 
 clean:
