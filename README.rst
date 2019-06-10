@@ -213,6 +213,52 @@ The host based inventory api specification includes a mandatory ``account`` fiel
 Yupana will extract the ``account`` number from the kafka message it receives from the Insights platform
 file upload service and populate the ``account`` field of each host.
 
+Sending Data to Insights Upload service for Yupana (without QPC)
+================================================================
+Data being uploaded to Insights must be in ``tar.gz`` format containing the ``.json`` files with the given JSON structure 
+above. It is important to note that Yupana processes & tracks reports based on their UUIDS, which means that data with a 
+specific UUID cannot be uploaded more than once, or else the second upload will be archived and not processed. Therefore, 
+before every upload we need to generate a new UUID and replace the current one with it if we want to upload the same data 
+more than once. Use the following instructions to prepare and upload a sample or custom report.
+
+Preparing Yupana Sample Data for Upload
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Yupana has a sample ``tar.gz`` file to showcase file upload to Insights. To prepare the data for upload, simply run: ::
+
+    make sample-data
+
+This command will use the ``sample.tar.gz`` file in the Yupana repository, change UUIDs of the report, and save it as a new ``tar.gz`` file. 
+Newly generated ``tar.gz`` files are found in ``temp/`` directory.
+
+Preparing Custom Data for Upload
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Besides sending a sample ``tar.gz`` file, you also have the option to send your own reports data to Insights. To prepare the data for upload,
+simply run: ::
+
+    make custom-data data_file=<path/to/your-data.tar.gz>
+
+Replace the ``<path/to/your-data.tar.gz-dir>`` with your reports data file path. You can either provide absolute path or relative path 
+to the Yupana project. Your data should be in ``tar.gz`` format. This command will copy your data files into temp folder, change the UUIDs and place the
+files into a new ``tar.gz`` file inside ``temp/`` folder.
+
+Uploading Data
+^^^^^^^^^^^^^^
+
+After generating the data with new UUIDs through either of the above steps, now you can upload it to Insights. To upload the data, run: ::
+
+    make upload-data file=<filename> 
+
+You need to replace ``<filename>`` with the path to ``tar.gz`` file you want to upload to Insights (we generated this in previous steps). Besides, there are other variables 
+such as ``RH_ACCOUNT_NUMBER``, ``RH_ORG_ID``, ``FILE_UPLOAD_URL``, ``RH_USERNAME``, 
+AND ``RH_PASSWORD`` that need to be exported as environment variables in the ``.env`` file with necessary values, since we also use them to validate to the upload host. 
+
+After running this command if you see ``HTTP 202`` like the following lines in your output logs, it means your file upload to Insights was successful: ::
+
+    * Connection state changed (MAX_CONCURRENT_STREAMS updated)!
+    < HTTP/2 202 
+
 .. _readthedocs: https://yupana.readthedocs.io/en/latest/
 .. _here: https://github.com/quipucords/yupana/blob/master/docs/metadata.yml
 .. _`here.`: https://github.com/quipucords/yupana/blob/master/docs/report_slices.yml
