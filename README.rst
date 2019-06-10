@@ -149,14 +149,9 @@ Metadata should include information about the sender of the data, Host Inventory
     {
         "report_id": "05f373dd-e20e-4866-b2a4-9b523acfeb6d",
         "host_inventory_api_version": "1.0",
-        "source": "qpc",
+        "source": "satellite",
         "source_metadata": {
-            "report_platform_id": "05f373dd-e20e-4866-b2a4-9b523acfeb6d",
-            "report_type": "insights",
-            "report_version": "1.0.0.7858056",
-            "qpc_server_report_id": 2,
-            "qpc_server_version": "1.0.0.7858056",
-            "qpc_server_id": "56deb667-8ddd-4647-b1b7-e36e614871d0"
+            "any_satellite_info_you_want": "some stuff that will not be validated but will be logged"
         },
         "report_slices": {
             "2dd60c11-ee5b-4ddc-8b75-d8d34de86a34": {
@@ -191,32 +186,13 @@ Report slices are a slice of the host inventory data for a given report. A slice
                 "subscription_manager_id": "848F1E42-51ED-8D58-9FA4-E0B433EEC7E3",
                 "facts": [
                     {
-                        "namespace": "qpc",
+                        "namespace": "satellite",
                         "facts": {
-                            "bios_uuid": "848F1E42-51ED-8D58-9FA4-E0B433EEC7E3",
-                            "ip_addresses": [
-                                "10.10.182.241"
-                            ],
-                            "mac_addresses": [
-                                "00:50:56:9e:f7:d6"
-                            ],
-                            "subscription_manager_id": "848F1E42-51ED-8D58-9FA4-E0B433EEC7E3",
-                            "name": "dhcp181-3.gsslab.rdu2.redhat.com",
-                            "os_release": "Red Hat Enterprise Linux Server release 6.9 (Santiago)",
-                            "os_version": "6.9 (Santiago)",
-                            "infrastructure_type": "virtualized",
-                            "cpu_count": 1,
-                            "architecture": "x86_64",
-                            "is_redhat": true,
-                            "redhat_certs": "69.pem",
-                            "cpu_core_per_socket": 1,
-                            "cpu_socket_count": 1,
-                            "cpu_core_count": 1
-                        },
-                        "rh_product_certs": [],
-                        "rh_products_installed": [
-                            "RHEL"
-                        ]
+                            "rh_product_certs": [69],
+                            "rh_products_installed": [
+                                "RHEL"
+                            ]
+                        }
                     }
                 ],
                 "system_profile": {
