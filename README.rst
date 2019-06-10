@@ -252,7 +252,7 @@ Yupana has a sample ``tar.gz`` file to showcase file upload to Insights. To prep
 
     make sample-data
 
-This command will download ``sample.tar.gz`` file from Yupana repository, change UUIDs of the report, and save it as a new ``tar.gz`` file. 
+This command will use the ``sample.tar.gz`` file in the Yupana repository, change UUIDs of the report, and save it as a new ``tar.gz`` file. 
 Newly generated ``tar.gz`` files are found in ``temp/`` directory.
 
 Preparing Custom Data for Upload
@@ -272,10 +272,10 @@ Uploading Data
 
 After generating the data with new UUIDs through either of the above steps, now you can upload it to Insights. To upload the data, run: ::
 
-    make upload-data file=<filename> account-number=<your-account-number> org-id=<your-org-id>
+    make upload-data file=<filename> 
 
-You need to replace ``<filename>`` with the path to ``tar.gz`` file you want to upload to Insights (we generated this in previous steps), 
-``<your-account-number>`` with your account number and ``<your-org-id>`` with your organizatoin ID. Besides, there are other variables such as ``FILE_UPLOAD_URL``, ``RH_USERNAME``,  
+You need to replace ``<filename>`` with the path to ``tar.gz`` file you want to upload to Insights (we generated this in previous steps). Besides, there are other variables 
+such as ``RH_ACCOUNT_NUMBER``, ``RH_ORG_ID``, ``FILE_UPLOAD_URL``, ``RH_USERNAME``, 
 AND ``RH_PASSWORD`` that need to be exported as environment variables in the ``.env`` file with necessary values, since we also use them to validate to the upload host. 
 
 After running this command if you see ``HTTP 202`` like the following lines in your output logs, it means your file upload to Insights was successful: ::
