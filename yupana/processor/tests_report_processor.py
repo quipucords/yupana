@@ -49,10 +49,6 @@ class ReportProcessorTests(TransactionTestCase):
         self.uuid = uuid.uuid4()
         self.uuid2 = uuid.uuid4()
         self.uuid3 = uuid.uuid4()
-        self.uuid4 = uuid.uuid4()
-        self.uuid5 = uuid.uuid4()
-        self.uuid6 = uuid.uuid4()
-        self.uuid7 = uuid.uuid4()
         self.fake_record = test_handler.KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
         self.msg = msg_handler.unpack_consumer_record(self.fake_record)
         self.report_json = {
@@ -427,6 +423,33 @@ class ReportProcessorTests(TransactionTestCase):
         metadata_json = {
             'report_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'source': 'qpc',
+            'host_inventory_api_version': '1.0.0',
+            'report_slices': {str(self.uuid): {'number_hosts': 1}}
+        }
+        report_json = {
+            'report_slice_id': str(self.uuid),
+            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'hosts': [{'key': 'value'}]}
+
+        report_files = {
+            '%s.json' % str(self.uuid): report_json,
+            'metadata.json': metadata_json
+        }
+        self.processor.upload_message = {'url': self.payload_url, 'rh_account': '00001'}
+        self.processor.report_or_slice = self.report_record
+        self.processor.account_number = '0001'
+        buffer_content = test_handler.create_tar_buffer(report_files)
+        with requests_mock.mock() as mock_req:
+            mock_req.get(self.payload_url, content=buffer_content)
+            self.processor.transition_to_downloaded()
+            self.assertEqual(self.report_record.state, Report.DOWNLOADED)
+
+    def test_transition_to_downloaded_satellite(self):
+        """Test that the transition to download works successfully wit sat source."""
+        metadata_json = {
+            'report_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'source': 'satellite',
+            'source_metadata': {'foo': 'bar'},
             'host_inventory_api_version': '1.0.0',
             'report_slices': {str(self.uuid): {'number_hosts': 1}}
         }

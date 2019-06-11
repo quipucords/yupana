@@ -26,7 +26,6 @@ from api.models import Report, ReportArchive
 class AbstractReportSerializer(ModelSerializer):
     """Abstract serializer for the Report models."""
 
-    # report_platform_id = CharField(max_length=50, required=False)
     report_platform_id = UUIDField(format='hex_verbose', required=False)
     host_inventory_api_version = CharField(max_length=10, required=False)
     source = CharField(max_length=15, required=False)

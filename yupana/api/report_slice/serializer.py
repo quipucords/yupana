@@ -26,9 +26,7 @@ from api.models import ReportSlice, ReportSliceArchive
 class AbstractReportSliceSerializer(ModelSerializer):
     """Abstract serializer for the ReportSlice models."""
 
-    # report_platform_id = CharField(max_length=50, required=False)
     report_platform_id = UUIDField(format='hex_verbose', required=False)
-    # report_slice_id = CharField(max_length=50, required=False)
     report_slice_id = UUIDField(format='hex_verbose', required=False)
     rh_account = CharField(max_length=50, required=False)
     report_json = JSONField(allow_null=False)
