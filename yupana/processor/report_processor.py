@@ -533,7 +533,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             if json_files and metadata_file:
                 try:
                     valid_slice_ids, options = self.validate_metadata_file(tar, metadata_file)
-                    report_names = {}
+                    report_names = []
                     for report_id, num_hosts in valid_slice_ids.items():
                         for file in json_files:
                             if report_id in file.name:
@@ -556,7 +556,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                                                        account_number=self.account_number,
                                                        report_platform_id=self.report_platform_id)
                                     )
-                                    break
+                                    continue
                                 LOG.info(format_message(
                                     self.prefix,
                                     'Successfully decoded the file %s' % file.name,
@@ -587,14 +587,13 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                                         format_message(self.prefix, mismatch_message,
                                                        account_number=self.account_number,
                                                        report_platform_id=self.report_platform_id))
-                                    break
+                                    continue
                                 created = self.create_report_slice(
                                     report_json=report_slice_json,
                                     report_slice_id=report_slice_id,
                                     hosts_count=num_hosts)
                                 if created:
-                                    report_names[report_id] = True
-                                break
+                                    report_names.append(report_id)
 
                     if not report_names:
                         raise FailExtractException(format_message(
