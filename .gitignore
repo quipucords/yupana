@@ -129,3 +129,9 @@ postgres
 
 # Ignore pycharm data
 .idea/*
+
+# Ignore reports data
+temp/
+filename_temp.txt
+
+.DS_Store
