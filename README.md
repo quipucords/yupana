@@ -1,4 +1,5 @@
 [![GitHub license](https://img.shields.io/github/license/quipucords/yupana.svg)](https://github.com/quipucords/yupana/blob/master/LICENSE)
+[![Code Coverage](https://codecov.io/gh/quipucords/yupana/branch/master/graph/badge.svg)](https://codecov.io/gh/quipucords/yupana)
 [![Documentation Status](https://readthedocs.org/projects/yupana/badge/)](https://yupana.readthedocs.io/en/latest/)
 [![Updates](https://pyup.io/repos/github/quipucords/yupana/shield.svg)](https://pyup.io/repos/github/quipucords/yupana/)
 [![Python 3](https://pyup.io/repos/github/quipucords/yupana/python-3-shield.svg)](https://pyup.io/repos/github/quipucords/yupana/)
