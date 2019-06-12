@@ -3,15 +3,19 @@
 [![Updates](https://pyup.io/repos/github/quipucords/yupana/shield.svg)](https://pyup.io/repos/github/quipucords/yupana/)
 [![Python 3](https://pyup.io/repos/github/quipucords/yupana/python-3-shield.svg)](https://pyup.io/repos/github/quipucords/yupana/)
 
-# About
+# Overview
+- [Getting started](#intro)
+- [Development](#development)
+- [Formatting Data for Yupana (without QPC)](#formatting_data)
+- [Sending Data to Insights Upload service for Yupana (without QPC)](#sending_data)
 
 Full documentation is available through [readthedocs](https://yupana.readthedocs.io/en/latest/).
 
-# Getting Started
+# <a name="intro"></a> Getting Started
 
 This is a Python project developed using Python 3.6. Make sure you have at least this version installed.
 
-# Development
+# <a name="development"></a> Development
 
 To get started developing against Yupana first clone a local copy of the git repository.
 ```
@@ -134,7 +138,7 @@ To lint the code base:
 tox -e lint
 ```
 
-# Formatting Data for Yupana (without QPC)
+# <a name="formatting_data"></a> Formatting Data for Yupana (without QPC)
 Below is a description of how to create data formatted for the yupana service.
 
 ## Yupana tar.gz File Format Overview
@@ -207,7 +211,7 @@ Report slices are a slice of the host inventory data for a given report. A slice
 
 An API specification of the report slices can be found in [report_slices.yml](https://github.com/quipucords/yupana/blob/master/docs/report_slices.yml). The host based inventory api specification includes a mandatory `account` field. Yupana will extract the `account` number from the kafka message it receives from the Insights platform file upload service and populate the `account` field of each host.
 
-# Sending Data to Insights Upload service for Yupana (without QPC)
+# <a name="sending_data"></a> Sending Data to Insights Upload service for Yupana (without QPC)
 Data being uploaded to Insights must be in `tar.gz` format containing the `.json` files with the given JSON structure above. It is important to note that Yupana processes & tracks reports based on their UUIDS, which means that data with a specific UUID cannot be uploaded more than once, or else the second upload will be archived and not processed. Therefore, before every upload we need to generate a new UUID and replace the current one with it if we want to upload the same data more than once. Use the following instructions to prepare and upload a sample or custom report.
 
 ## Preparing Yupana Sample Data for Upload
