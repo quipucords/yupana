@@ -40,6 +40,7 @@ from processor.kafka_msg_handler import (KafkaMsgHandlerError,
 from api.models import (Report, ReportSlice, Status)
 from api.serializers import ReportSerializer, ReportSliceSerializer
 from config.settings.base import (INSIGHTS_KAFKA_ADDRESS,
+                                  MAX_HOSTS_PER_REP,
                                   RETRIES_ALLOWED,
                                   RETRY_TIME)
 
@@ -50,8 +51,7 @@ SUCCESS_CONFIRM_STATUS = 'success'
 FAILURE_CONFIRM_STATUS = 'failure'
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
-HOSTS_PER_REQ = 1000
-MAX_HOSTS_PER_REP = 10000
+MAX_HOSTS_PER_REP = int(MAX_HOSTS_PER_REP)
 
 
 class FailDownloadException(Exception):
@@ -134,17 +134,9 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             account_number=self.account_number))
         try:
             report_tar_gz = self._download_report()
-            metadata_json = self._extract_and_create_slices(report_tar_gz)
-            report_platform_id = metadata_json.get('report_platform_id')
-            report_version = metadata_json.get('report_version')
-            report_type = metadata_json.get('report_type')
-            report_id = metadata_json.get('report_id')
+            options = self._extract_and_create_slices(report_tar_gz)
             self.next_state = Report.DOWNLOADED
             # update the report or slice with downloaded info
-            options = {'report_platform_id': report_platform_id,
-                       'report_type': report_type,
-                       'report_id': report_id,
-                       'report_version': report_version}
             self.update_object_state(options=options)
             self.deduplicate_reports()
         except (FailDownloadException, FailExtractException) as err:
@@ -236,11 +228,12 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 report_platform_id=self.report_platform_id))
             self.determine_retry(Report.FAILED_VALIDATION_REPORTING, Report.VALIDATED)
 
-    def create_report_slice(self, report_json, report_slice_id):
+    def create_report_slice(self, report_json, report_slice_id, hosts_count):
         """Create report slice.
 
         :param report_json: <dict> the report info in json format
         :param report_slice_id: <str> the report slice id
+        :param hosts_count: <int> the number of hosts inside the report slice
         :returns boolean regarding whether or not the slice was created.
         """
         LOG.info(
@@ -272,7 +265,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             'failed_hosts': json.dumps({}),
             'candidate_hosts': json.dumps({}),
             'report_slice_id': report_slice_id,
-            'report': self.report_or_slice.id
+            'report': self.report_or_slice.id,
+            'hosts_count': hosts_count
         }
         slice_serializer = ReportSliceSerializer(data=report_slice)
         if slice_serializer.is_valid(raise_exception=True):
@@ -423,7 +417,99 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                                (report_url, err),
                                account_number=self.account_number))
 
-    # pylint: disable=too-many-locals, too-many-nested-blocks, too-many-branches
+    def validate_metadata_file(self, tar, metadata):   # noqa: C901 (too-complex)
+        """Validate the contents of the metadata file.
+
+        :param tar: the tarfile object.
+        :param metadata: metadata file object.
+        :returns: report_slice_ids
+        """
+        LOG.info(format_message(self.prefix,
+                                'Attempting to decode the file %s' % metadata.name,
+                                account_number=self.account_number,
+                                report_platform_id=self.report_platform_id))
+        metadata_file = tar.extractfile(metadata)
+        try:
+            metadata_str = metadata_file.read().decode('utf-8')
+        except UnicodeDecodeError as error:
+            decode_error_message = 'Attempting to decode the file'\
+                ' %s resulted in the following error: %s. Discarding file.' % \
+                (metadata_file.name, error)
+            LOG.exception(
+                format_message(self.prefix, decode_error_message,
+                               account_number=self.account_number,
+                               report_platform_id=self.report_platform_id)
+            )
+            return {}
+        LOG.info(format_message(self.prefix,
+                                'Successfully decoded the file %s' % metadata.name,
+                                account_number=self.account_number,
+                                report_platform_id=self.report_platform_id))
+        metadata_json = json.loads(metadata_str)
+        required_keys = ['report_id', 'host_inventory_api_version',
+                         'source', 'report_slices']
+        missing_keys = []
+        for key in required_keys:
+            required_key = metadata_json.get(key)
+            if not required_key:
+                missing_keys.append(key)
+
+        if missing_keys:
+            missing_keys_str = ', '.join(missing_keys)
+            raise FailExtractException(
+                format_message(
+                    self.prefix,
+                    'Metadata is missing required fields: %s.' % missing_keys_str,
+                    account_number=self.account_number,
+                    report_platform_id=self.report_platform_id))
+
+        self.report_platform_id = metadata_json.get('report_id')
+        host_inventory_api_version = metadata_json.get('host_inventory_api_version')
+        source = metadata_json.get('source')
+        # we should save the above information into the report object
+        options = {
+            'report_platform_id': self.report_platform_id,
+            'host_inventory_api_version': host_inventory_api_version,
+            'source': source
+        }
+
+        source_metadata = metadata_json.get('source_metadata')
+        # if source_metadata exists, we should log it
+        if source_metadata:
+            LOG.info(format_message(
+                self.prefix,
+                'The following source metadata was uploaded: %s' % source_metadata,
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id
+            ))
+            options['source_metadata'] = source_metadata
+        self.update_object_state(options)
+        invalid_slice_ids = {}
+        valid_slice_ids = {}
+        report_slices = metadata_json.get('report_slices', {})
+        # we need to verify that the report slices have the appropriate number of hosts
+        for report_slice_id, report_info in report_slices.items():
+            num_hosts = int(report_info.get('number_hosts', MAX_HOSTS_PER_REP + 1))
+            if num_hosts <= MAX_HOSTS_PER_REP:
+                valid_slice_ids[report_slice_id] = num_hosts
+            else:
+                invalid_slice_ids[report_slice_id] = num_hosts
+        # if any reports were over the max number of hosts, we need to log
+        if invalid_slice_ids:
+            for report_slice_id, num_hosts in invalid_slice_ids.items():
+                large_slice_message = 'Report %s has %s hosts. '\
+                    'There must be no more than %s hosts per'\
+                    ' report.' % \
+                    (report_slice_id, str(num_hosts),
+                     str(MAX_HOSTS_PER_REP))
+                LOG.warning(
+                    format_message(self.prefix, large_slice_message,
+                                   account_number=self.account_number,
+                                   report_platform_id=self.report_platform_id))
+
+        return valid_slice_ids, options
+
+    # pylint: disable=too-many-branches, too-many-statements
     def _extract_and_create_slices(self, report_tar_gz):  # noqa: C901 (too-complex)
         """Extract Insights report from tar.gz file.
 
@@ -432,65 +518,87 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         :returns: Insights report as dict
         """
         self.prefix = 'EXTRACT REPORT FROM TAR'
-        try:
+        try:  # pylint: disable=too-many-nested-blocks
             tar = tarfile.open(fileobj=BytesIO(report_tar_gz), mode='r:gz')
             files = tar.getmembers()
             json_files = []
             metadata_file = None
             for file in files:
                 # First we need to Find the metadata file
-                if 'metadata.json' in file.name:
-                    metadata_file = tar.extractfile(file)
+                if '/metadata.json' in file.name or file.name == 'metadata.json':
+                    metadata_file = file
                 # Next we want to add all .json files to our list
                 elif '.json' in file.name:
                     json_files.append(file)
             if json_files and metadata_file:
                 try:
-                    metadata_str = metadata_file.read().decode('utf-8')
-                    metadata_json = json.loads(metadata_str)
-                    report_type = metadata_json.get('report_type')
-                    if not report_type or report_type != 'insights':
-                        raise FailExtractException('Missing or invalid report type.')
-                    # save all of the metadata info to the report record
-                    report_slices = metadata_json.get('report_slices', {})
-                    self.report_platform_id = metadata_json.get('report_platform_id')
-                    report_names = {}
-                    # loop through the keys in the report_slices dictionary to find the names of the
-                    # files that we need to save
-                    # check the number of hosts and if permissible, find the associated json payload
-                    for report_name, report_info in report_slices.items():
-                        num_hosts = int(report_info.get('number_hosts', MAX_HOSTS_PER_REP + 1))
-                        if num_hosts <= MAX_HOSTS_PER_REP:
-                            # loop through the list of json files found within the payload
-                            for file in json_files:
-                                if report_name in file.name:
-                                    report_slice = tar.extractfile(file)
+                    valid_slice_ids, options = self.validate_metadata_file(tar, metadata_file)
+                    report_names = []
+                    for report_id, num_hosts in valid_slice_ids.items():
+                        for file in json_files:
+                            if report_id in file.name:
+                                matches_metadata = True
+                                mismatch_message = ''
+                                report_slice = tar.extractfile(file)
+                                LOG.info(format_message(
+                                    self.prefix,
+                                    'Attempting to decode the file %s' % file.name,
+                                    account_number=self.account_number,
+                                    report_platform_id=self.report_platform_id))
+                                try:
                                     report_slice_string = report_slice.read().decode('utf-8')
-                                    report_slice_json = json.loads(report_slice_string)
-                                    report_slice_id = report_slice_json.get('report_slice_id', '')
-                                    created = self.create_report_slice(
-                                        report_json=report_slice_json,
-                                        report_slice_id=report_slice_id)
-                                    if created:
-                                        report_names[report_name] = True
-                                    break
-                        else:
-                            # else we want to warn that the report had too many hosts for yupana
-                            # to process
-                            large_slice_message = 'Report %s has %s hosts. '\
-                                                  'There must be no more than %s hosts per'\
-                                                  ' report.' % \
-                                                  (report_name, str(num_hosts),
-                                                   str(MAX_HOSTS_PER_REP))
-                            LOG.warning(
-                                format_message(self.prefix, large_slice_message,
-                                               account_number=self.account_number,
-                                               report_platform_id=self.report_platform_id))
+                                except UnicodeDecodeError as error:
+                                    decode_error_message = 'Attempting to decode the file'\
+                                        ' %s resulted in the following error: %s. '\
+                                        'Discarding file.' % (file.name, error)
+                                    LOG.exception(
+                                        format_message(self.prefix, decode_error_message,
+                                                       account_number=self.account_number,
+                                                       report_platform_id=self.report_platform_id)
+                                    )
+                                    continue
+                                LOG.info(format_message(
+                                    self.prefix,
+                                    'Successfully decoded the file %s' % file.name,
+                                    account_number=self.account_number,
+                                    report_platform_id=self.report_platform_id))
+                                report_slice_json = json.loads(report_slice_string)
+                                report_slice_id = report_slice_json.get('report_slice_id', '')
+                                if report_slice_id != report_id:
+                                    matches_metadata = False
+                                    invalid_report_id = 'Metadata & filename reported the '\
+                                        '"report_slice_id" as %s but the "report_slice_id" '\
+                                        'inside the JSON has a value of %s. ' % \
+                                        (report_id, report_slice_id)
+                                    mismatch_message += invalid_report_id
+                                hosts = report_slice_json.get('hosts', {})
+                                if len(hosts) != num_hosts:
+                                    matches_metadata = False
+                                    invalid_hosts = 'Metadata for report slice'\
+                                        ' %s reported %s hosts '\
+                                        'but report contains %s hosts. ' % \
+                                        (report_slice_id, str(num_hosts),
+                                         str(MAX_HOSTS_PER_REP))
+                                    mismatch_message += invalid_hosts
+                                if not matches_metadata:
+                                    mismatch_message += 'Metadata must match report slice data. '\
+                                        'Discarding the report slice as invalid. '
+                                    LOG.warning(
+                                        format_message(self.prefix, mismatch_message,
+                                                       account_number=self.account_number,
+                                                       report_platform_id=self.report_platform_id))
+                                    continue
+                                created = self.create_report_slice(
+                                    report_json=report_slice_json,
+                                    report_slice_id=report_slice_id,
+                                    hosts_count=num_hosts)
+                                if created:
+                                    report_names.append(report_id)
 
                     if not report_names:
                         raise FailExtractException(format_message(
                             self.prefix,
-                            'Report contained no valid JSON payloads.',
+                            'Report contained no valid report slices.',
                             account_number=self.account_number))
                     LOG.info(
                         format_message(
@@ -498,11 +606,12 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                             'successfully extracted & created report slices',
                             account_number=self.account_number,
                             report_platform_id=self.report_platform_id))
-                    return metadata_json
+                    return options
+
                 except ValueError as error:
                     raise FailExtractException(
                         format_message(self.prefix,
-                                       'Report not JSON. Error: %s' % str(error),
+                                       'Report is not valid JSON. Error: %s' % str(error),
                                        account_number=self.account_number))
             raise FailExtractException(
                 format_message(self.prefix,

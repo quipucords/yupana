@@ -19,8 +19,8 @@ from api.report.model import Report, ReportArchive
 class AbstractReportSlice(models.Model):
     """Represents report slice information."""
 
-    report_platform_id = models.CharField(max_length=50, null=True)
-    report_slice_id = models.CharField(max_length=50, null=True)
+    report_platform_id = models.UUIDField(null=True)
+    report_slice_id = models.UUIDField(null=True)
     rh_account = models.CharField(max_length=50, null=True)
     report_json = models.TextField(null=True)
     git_commit = models.CharField(max_length=50, null=True)
@@ -65,6 +65,7 @@ class AbstractReportSlice(models.Model):
     last_update_time = models.DateTimeField(null=True)
     failed_hosts = models.TextField(null=True)
     candidate_hosts = models.TextField(null=True)
+    hosts_count = models.PositiveIntegerField(null=False)
 
     def __str__(self):
         """Convert to string."""
@@ -79,7 +80,8 @@ class AbstractReportSlice(models.Model):
             'retry_type: {}, '\
             'last_update_time: {}, '\
             'failed_hosts: {}, '\
-            'candidate_hosts: {} '.format(
+            'candidate_hosts: {} '\
+            'hosts_count: {}'.format(
                 self.report_platform_id,
                 self.report_slice_id,
                 self.rh_account,
@@ -91,7 +93,8 @@ class AbstractReportSlice(models.Model):
                 self.retry_type,
                 self.last_update_time,
                 self.failed_hosts,
-                self.candidate_hosts) + '}'
+                self.candidate_hosts,
+                self.hosts_count) + '}'
 
     class Meta:
         """Metadata for abstract report slice model."""

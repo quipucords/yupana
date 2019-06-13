@@ -46,24 +46,20 @@ class ReportProcessorTests(TransactionTestCase):
     def setUp(self):
         """Create test setup."""
         self.payload_url = 'http://insights-upload.com/q/file_to_validate'
-        self.uuid = str(uuid.uuid4())
-        self.uuid2 = str(uuid.uuid4())
-        self.uuid3 = str(uuid.uuid4())
-        self.uuid4 = str(uuid.uuid4())
-        self.uuid5 = str(uuid.uuid4())
-        self.uuid6 = str(uuid.uuid4())
-        self.uuid7 = str(uuid.uuid4())
+        self.uuid = uuid.uuid4()
+        self.uuid2 = uuid.uuid4()
+        self.uuid3 = uuid.uuid4()
         self.fake_record = test_handler.KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
         self.msg = msg_handler.unpack_consumer_record(self.fake_record)
         self.report_json = {
             'report_id': 1,
-            'report_slice_id': self.uuid2,
+            'report_slice_id': str(self.uuid2),
             'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'bios_uuid': 'value'},
-                      self.uuid2: {'invalid': 'value'}}}
+            'hosts': [{'bios_uuid': 'value'},
+                      {'invalid': 'value'}]}
         self.report_record = Report(
             upload_srv_kafka_msg=json.dumps(self.msg),
             rh_account='1234',
@@ -86,7 +82,8 @@ class ReportProcessorTests(TransactionTestCase):
             failed_hosts=[],
             candidate_hosts=[],
             report=self.report_record,
-            ready_to_archive=True)
+            ready_to_archive=True,
+            hosts_count=2)
         self.report_slice.save()
 
         self.processor = report_processor.ReportProcessor()
@@ -424,18 +421,45 @@ class ReportProcessorTests(TransactionTestCase):
     def test_transition_to_downloaded(self):
         """Test that the transition to download works successfully."""
         metadata_json = {
-            'report_id': 1,
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'report_type': 'insights',
-            'report_version': '1.0.0.1b025b8',
-            'report_slices': {'2345322': {'number_hosts': 1}}
+            'report_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'source': 'qpc',
+            'host_inventory_api_version': '1.0.0',
+            'report_slices': {str(self.uuid): {'number_hosts': 1}}
         }
         report_json = {
-            'report_slice_id': '2345322',
+            'report_slice_id': str(self.uuid),
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'key': 'value'}}}
+            'hosts': [{'key': 'value'}]}
+
         report_files = {
-            '2345322.json': report_json,
+            '%s.json' % str(self.uuid): report_json,
+            'metadata.json': metadata_json
+        }
+        self.processor.upload_message = {'url': self.payload_url, 'rh_account': '00001'}
+        self.processor.report_or_slice = self.report_record
+        self.processor.account_number = '0001'
+        buffer_content = test_handler.create_tar_buffer(report_files)
+        with requests_mock.mock() as mock_req:
+            mock_req.get(self.payload_url, content=buffer_content)
+            self.processor.transition_to_downloaded()
+            self.assertEqual(self.report_record.state, Report.DOWNLOADED)
+
+    def test_transition_to_downloaded_satellite(self):
+        """Test that the transition to download works successfully wit sat source."""
+        metadata_json = {
+            'report_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'source': 'satellite',
+            'source_metadata': {'foo': 'bar'},
+            'host_inventory_api_version': '1.0.0',
+            'report_slices': {str(self.uuid): {'number_hosts': 1}}
+        }
+        report_json = {
+            'report_slice_id': str(self.uuid),
+            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'hosts': [{'key': 'value'}]}
+
+        report_files = {
+            '%s.json' % str(self.uuid): report_json,
             'metadata.json': metadata_json
         }
         self.processor.upload_message = {'url': self.payload_url, 'rh_account': '00001'}
@@ -494,7 +518,7 @@ class ReportProcessorTests(TransactionTestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'key': 'value'}}}
+            'hosts': {str(self.uuid): {'key': 'value'}}}
         self.report_slice.state = ReportSlice.PENDING
         self.report_slice.report_json = json.dumps(report_json)
         self.report_slice.save()
@@ -615,6 +639,7 @@ class ReportProcessorTests(TransactionTestCase):
     # Tests for the functions that carry out the work ie (download/upload)
     def test_validate_report_success(self):
         """Test that a QPC report with the correct structure passes validation."""
+        self.processor.account_number = '123'
         self.processor.report_json = {
             'report_id': 1,
             'report_slice_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319-1',
@@ -622,11 +647,15 @@ class ReportProcessorTests(TransactionTestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'bios_uuid': 'value'}}}
+            'hosts': [{'bios_uuid': 'value', 'facts': []}]}
         valid, invalid = self.processor._validate_report_details()
-        expect_valid = [{self.uuid: {'bios_uuid': 'value'}}]
         expect_invalid = []
-        self.assertEqual(valid, expect_valid)
+        for _, value in valid[0].items():
+            self.assertIn('bios_uuid', value)
+            self.assertIn('account', value)
+            self.assertIn('facts', value)
+            self.assertEqual(value['bios_uuid'], 'value')
+            self.assertEqual(value['account'], '123')
         self.assertEqual(invalid, expect_invalid)
 
     def test_validate_report_missing_id(self):
@@ -768,27 +797,16 @@ class ReportProcessorTests(TransactionTestCase):
     def test_validate_report_hosts(self):
         """Test host verification."""
         # test all valid hosts
-        uuid8 = str(uuid.uuid4())
-        uuid9 = str(uuid.uuid4())
+        hosts = [{'bios_uuid': 'value', 'name': 'value', 'facts': []},
+                 {'insights_client_id': 'value', 'name': 'foo', 'facts': []},
+                 {'ip_addresses': 'value', 'name': 'foo', 'facts': []},
+                 {'mac_addresses': 'value', 'name': 'foo', 'facts': []},
+                 {'vm_uuid': 'value', 'name': 'foo', 'facts': []},
+                 {'etc_machine_id': 'value', 'facts': []},
+                 {'subscription_manager_id': 'value', 'facts': []},
+                 {'not_valid': 'value', 'facts': []}
+                 ]
 
-        hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
-                 self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
-                 self.uuid3: {'ip_addresses': 'value', 'name': 'foo'},
-                 self.uuid4: {'mac_addresses': 'value', 'name': 'foo'},
-                 self.uuid5: {'vm_uuid': 'value', 'name': 'foo'},
-                 self.uuid6: {'etc_machine_id': 'value'},
-                 self.uuid7: {'subscription_manager_id': 'value'},
-                 uuid8: {'not_valid': 'value'}
-                 }
-        expected_valid = [{self.uuid: {'bios_uuid': 'value', 'name': 'value'}},
-                          {self.uuid2: {'insights_client_id': 'value', 'name': 'foo'}},
-                          {self.uuid3: {'ip_addresses': 'value', 'name': 'foo'}},
-                          {self.uuid4: {'mac_addresses': 'value', 'name': 'foo'}},
-                          {self.uuid5: {'vm_uuid': 'value', 'name': 'foo'}},
-                          {self.uuid6: {'etc_machine_id': 'value'}},
-                          {self.uuid7: {'subscription_manager_id': 'value'}}]
-        expected_invalid = [{uuid8: {'not_valid': 'value'},
-                             'cause': abstract_processor.FAILED_VALIDATION}]
         self.processor.report_json = {
             'report_id': 1,
             'report_type': 'insights',
@@ -797,17 +815,30 @@ class ReportProcessorTests(TransactionTestCase):
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'hosts': hosts}
         actual_valid, actual_invalid = self.processor._validate_report_hosts()
-        self.assertEqual(actual_valid, expected_valid)
-        self.assertEqual(actual_invalid, expected_invalid)
+        for valid_host in actual_valid:
+            for host_id, host in valid_host.items():
+                self.assertIn('facts', host)
+                self.assertEqual(host['facts'],
+                                 [{'namespace': 'yupana',
+                                   'facts': {'yupana_host_id': host_id}}])
+        for invalid_host in actual_invalid:
+            for host_id, host in invalid_host.items():
+                if host_id != 'cause':
+                    self.assertIn('facts', host)
+                    self.assertIn('not_valid', host)
+                    self.assertEqual(host['facts'],
+                                     [{'namespace': 'yupana',
+                                       'facts': {'yupana_host_id': host_id}}])
 
         # test that invalid hosts are removed
-        invalid_host = {uuid9: {'no': 'canonical facts', 'metadata': []}}
-        hosts.update(invalid_host)
+        invalid_host = {'no': 'canonical facts', 'metadata': []}
+        hosts.append(invalid_host)
         valid_hosts, _ = self.processor._validate_report_hosts()
-        self.assertEqual(valid_hosts, expected_valid)
-
+        for valid_host in valid_hosts:
+            for host_id, host in valid_host.items():
+                self.assertNotIn('no', host)
         # test that if there are no valid hosts we return []
-        self.processor.report_json['hosts'] = invalid_host
+        self.processor.report_json['hosts'] = [invalid_host]
         valid_hosts, _ = self.processor._validate_report_hosts()
         self.assertEqual([], valid_hosts)
 
@@ -825,31 +856,119 @@ class ReportProcessorTests(TransactionTestCase):
         """Testing the extract method with valid buffer content."""
         metadata_json = {
             'report_id': 1,
-            'report_type': 'insights',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'report_version': '1.0.0.1b025b8',
-            'report_slices': {'2345322': {'number_hosts': 1}}
+            'host_inventory_api_version': '1.0.0',
+            'source': 'qpc',
+            'source_metadata': {'foo': 'bar'},
+            'report_slices': {str(self.uuid): {'number_hosts': 1}}
         }
         report_json = {
-            'report_slice_id': '2345322',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'key': 'value'}}}
+            'report_slice_id': str(self.uuid),
+            'hosts': {str(self.uuid): {'key': 'value'}}}
         report_files = {
             'metadata.json': metadata_json,
-            '2345322.json': report_json
+            '%s.json' % str(self.uuid): report_json
         }
         self.processor.report_or_slice = self.report_record
         self.processor.account_number = '0001'
         buffer_content = test_handler.create_tar_buffer(report_files)
         result = self.processor._extract_and_create_slices(buffer_content)
-        self.assertEqual(result, metadata_json)
+        expected_result = {
+            'report_platform_id': 1,
+            'host_inventory_api_version': '1.0.0',
+            'source': 'qpc',
+            'source_metadata': {'foo': 'bar'}
+        }
+        self.assertEqual(result, expected_result)
+
+    def test_extract_and_create_slices_mismatch(self):
+        """Testing the extract method with mismatched metadata content."""
+        metadata_json = {
+            'report_id': 1,
+            'host_inventory_api_version': '1.0.0',
+            'source': 'qpc',
+            'source_metadata': {'foo': 'bar'},
+            'report_slices': {str(self.uuid): {'number_hosts': 5}}
+        }
+        report_json = {
+            'report_slice_id': '1234556',
+            'hosts': {str(self.uuid): {'key': 'value'}}}
+        report_files = {
+            'metadata.json': metadata_json,
+            '%s.json' % str(self.uuid): report_json
+        }
+        self.processor.report_or_slice = self.report_record
+        self.processor.account_number = '0001'
+        buffer_content = test_handler.create_tar_buffer(report_files)
+        with self.assertRaises(report_processor.FailExtractException):
+            self.processor._extract_and_create_slices(buffer_content)
+
+    def test_extract_and_create_slices_too_many_hosts(self):
+        """Testing the extract method with valid buffer content."""
+        metadata_json = {
+            'report_id': 1,
+            'host_inventory_api_version': '1.0.0',
+            'source': 'qpc',
+            'source_metadata': {'foo': 'bar'},
+            'report_slices': {str(self.uuid): {'number_hosts': 1000000}}
+        }
+        report_json = {
+            'report_slice_id': str(self.uuid),
+            'hosts': {str(self.uuid): {'key': 'value'}}}
+        report_files = {
+            'metadata.json': metadata_json,
+            '%s.json' % str(self.uuid): report_json
+        }
+        self.processor.report_or_slice = self.report_record
+        self.processor.account_number = '0001'
+        buffer_content = test_handler.create_tar_buffer(report_files)
+        with self.assertRaises(report_processor.FailExtractException):
+            self.processor._extract_and_create_slices(buffer_content)
+
+    def test_extract_and_create_slices_metadata_fail(self):
+        """Testing the extract method with invalid metadata buffer content."""
+        metadata_json = 'myfakeencodedstring'
+        report_json = {
+            'report_slice_id': str(self.uuid),
+            'hosts': {str(self.uuid): {'key': 'value'}}}
+        report_files = {
+            'metadata.json': metadata_json,
+            '%s.json' % str(self.uuid): report_json
+        }
+        self.processor.report_or_slice = self.report_record
+        self.processor.account_number = '0001'
+        buffer_content = test_handler.create_tar_buffer(report_files, meta_encoding='utf-16')
+        with self.assertRaises(report_processor.FailExtractException):
+            self.processor._extract_and_create_slices(buffer_content)
+
+    def test_extract_and_create_slices_slice_fail(self):
+        """Testing the extract method with bad slice."""
+        metadata_json = {
+            'report_id': 1,
+            'host_inventory_api_version': '1.0.0',
+            'source': 'qpc',
+            'source_metadata': {'foo': 'bar'},
+            'report_slices': {str(self.uuid): {'number_hosts': 1}}
+        }
+        report_json = 'myfakeencodedstring'
+        report_files = {
+            'metadata.json': metadata_json,
+            '%s.json' % str(self.uuid): report_json
+        }
+        self.processor.report_or_slice = self.report_record
+        self.processor.account_number = '0001'
+        buffer_content = test_handler.create_tar_buffer(report_files,
+                                                        encoding='utf-16',
+                                                        meta_encoding='utf-8')
+        with self.assertRaises(report_processor.FailExtractException):
+            self.processor._extract_and_create_slices(buffer_content)
 
     def test_create_slice_invalid(self):
         """Test the create slice method with an invalid slice."""
         report_json = None
         slice_id = '1234556'
+        hosts_count = 1
         with self.assertRaises(Exception):
-            self.processor.create_report_slice(report_json, slice_id)
+            self.processor.create_report_slice(report_json, slice_id, hosts_count)
 
     def test_extract_and_create_slices_two_reps_copy(self):
         """Testing the extract method with valid buffer content."""
@@ -859,56 +978,60 @@ class ReportProcessorTests(TransactionTestCase):
         self.report_slice.save()
         self.processor.report_platform_id = self.uuid
         metadata_json = {
-            'report_id': 1,
-            'report_type': 'insights',
-            'report_platform_id': self.uuid,
-            'report_version': '1.0.0.1b025b8',
-            'report_slices': {'234532a2': {'number_hosts': 1},
-                              self.uuid2: {'number_hosts': 3}}
+            'source': 'qpc',
+            'report_id': str(self.uuid),
+            'host_inventory_api_version': '1.0.0',
+            'report_slices': {str(self.uuid): {'number_hosts': 1},
+                              str(self.uuid2): {'number_hosts': 1}}
         }
         report_json = {
-            'report_slice_id': '2345322',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'key': 'value'}}}
+            'report_slice_id': str(self.uuid),
+            'hosts': {str(self.uuid): {'key': 'value'}}}
         report_json2 = {
-            'report_slice_id': self.uuid2,
-            'report_platform_id': self.uuid,
-            'hosts': {self.uuid: {'key': 'value'}}}
+            'report_slice_id': str(self.uuid2),
+            'hosts': {str(self.uuid): {'key': 'value'}}}
         report_files = {
             'metadata.json': metadata_json,
-            '234532a2.json': report_json,
-            '%s.json' % self.uuid2: report_json2
+            '%s.json' % str(self.uuid): report_json,
+            '%s.json' % str(self.uuid2): report_json2
         }
         self.processor.report_or_slice = self.report_record
         self.processor.account_number = '000001'
         buffer_content = test_handler.create_tar_buffer(report_files)
         result = self.processor._extract_and_create_slices(buffer_content)
-        self.assertEqual(result, metadata_json)
+        expected_result = {
+            'report_platform_id': str(self.uuid),
+            'host_inventory_api_version': '1.0.0',
+            'source': 'qpc',
+        }
+        self.assertEqual(result, expected_result)
 
     def test_extract_and_create_slices_two_reps(self):
         """Testing the extract method with valid buffer content."""
         metadata_json = {
-            'report_id': 1,
-            'report_type': 'insights',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'report_version': '1.0.0.1b025b8',
-            'report_slices': {'2345322': {'number_hosts': 1},
-                              '23453223': {'number_hosts': 100000}}
+            'source': 'qpc',
+            'host_inventory_api_version': '1.0.0',
+            'report_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'report_slices': {str(self.uuid): {'number_hosts': 1}}
         }
         report_json = {
-            'report_slice_id': '2345322',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'key': 'value'}}}
+            'report_slice_id': str(self.uuid),
+            'hosts': [{'key': 'value'}]}
 
         report_files = {
             'metadata.json': metadata_json,
-            '2345322.json': report_json
+            '%s.json' % str(self.uuid): report_json
         }
         self.processor.report_or_slice = self.report_record
         self.processor.account_number = '0001'
         buffer_content = test_handler.create_tar_buffer(report_files)
         result = self.processor._extract_and_create_slices(buffer_content)
-        self.assertEqual(result, metadata_json)
+        expected_result = {
+            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'host_inventory_api_version': '1.0.0',
+            'source': 'qpc',
+        }
+        self.assertEqual(result, expected_result)
 
     def test_extract_and_create_slices_failure(self):
         """Testing the extract method failure no matching report_slice."""
@@ -917,7 +1040,7 @@ class ReportProcessorTests(TransactionTestCase):
             'report_type': 'insights',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'report_version': '1.0.0.1b025b8',
-            'report_slices': {'2345322': {'number_hosts': 1}}
+            'report_slices': {str(self.uuid): {'number_hosts': 1}}
         }
         report_files = {
             'metadata.json': metadata_json
@@ -933,15 +1056,15 @@ class ReportProcessorTests(TransactionTestCase):
             'report_type': 'deployments',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'report_version': '1.0.0.1b025b8',
-            'report_slices': {'2345322': {'number_hosts': 1}}
+            'report_slices': {str(self.uuid): {'number_hosts': 1}}
         }
         report_json = {
-            'report_slice_id': '2345322',
+            'report_slice_id': str(self.uuid),
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'key': 'value'}}}
+            'hosts': {str(self.uuid): {'key': 'value'}}}
         report_files = {
             'metadata.json': metadata_json,
-            '2345322.json': report_json
+            '%s.json' % str(self.uuid): report_json
         }
         buffer_content = test_handler.create_tar_buffer(report_files)
         with self.assertRaises(report_processor.FailExtractException):
@@ -952,7 +1075,7 @@ class ReportProcessorTests(TransactionTestCase):
         report_json = {
             'report_slice_id': '2345322',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'key': 'value'}}}
+            'hosts': {str(self.uuid): {'key': 'value'}}}
         report_files = {
             '2345322.json': report_json
         }
@@ -963,10 +1086,9 @@ class ReportProcessorTests(TransactionTestCase):
     def test__extract_and_create_slices_failure_invalid_json(self):
         """Testing the extract method failure invalid json."""
         metadata_json = {
-            'report_id': 1,
-            'report_type': 'insights',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'report_version': '1.0.0.1b025b8',
+            'report_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'host_inventory_api_version': '1.0',
+            'source': 'qpc',
             'report_slices': {'2345322': {'number_hosts': 1}}
         }
         report_json = 'This is not JSON.'
@@ -981,10 +1103,9 @@ class ReportProcessorTests(TransactionTestCase):
     def test__extract_and_create_slices_failure_no_json(self):
         """Testing the extract method failure invalid json."""
         metadata_json = {
-            'report_id': 1,
-            'report_type': 'insights',
-            'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'report_version': '1.0.0.1b025b8',
+            'report_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
+            'source': 'qpc',
+            'host_inventory_api_version': '1.0.0.',
             'report_slices': {'2345322': {'number_hosts': 1}}
         }
         report_json = None
@@ -1022,7 +1143,7 @@ class ReportProcessorTests(TransactionTestCase):
         report_json = {
             'report_slice_id': '2345322',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'key': 'value'}}}
+            'hosts': {str(self.uuid): {'key': 'value'}}}
         report_files = {
             'metadata.json': metadata_json,
             '2345322.json': report_json
@@ -1054,7 +1175,7 @@ class ReportProcessorTests(TransactionTestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
-            'hosts': {self.uuid: {'key': 'value'}}}
+            'hosts': {str(self.uuid): {'key': 'value'}}}
         self.processor.upload_message = {'url': self.payload_url, 'rh_account': '00001'}
         report_files = {'report.json': report_json}
         buffer_content = test_handler.create_tar_buffer(report_files)

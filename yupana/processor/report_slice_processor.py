@@ -21,7 +21,6 @@ import base64
 import concurrent.futures
 import json
 import logging
-import math
 import threading
 from http import HTTPStatus
 
@@ -49,7 +48,6 @@ RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
 HOSTS_PER_REQ = int(HOSTS_PER_REQ)
 MAX_THREADS = int(MAX_THREADS)
-MAX_HOSTS_PER_REP = 10000
 
 
 class RetryUploadTimeException(Exception):
@@ -190,121 +188,14 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                                  retry_type=ReportSlice.GIT_COMMIT)
 
     @staticmethod
-    def format_certs(redhat_certs):
-        """Strip the .pem from each cert in the list.
-
-        :param redhat_certs: <list> of redhat certs.
-        :returns: <list> of formatted certs.
-        """
-        try:
-            return [int(cert.strip('.pem')) for cert in redhat_certs if cert]
-        except Exception:  # pylint: disable=broad-except
-            return []
-
-    @staticmethod
-    def format_products(redhat_products, is_rhel):
-        """Return the installed products on the system.
-
-        :param redhat_products: <dict> of products.
-        :returns: a list of the installed products.
-        """
-        products = []
-        name_to_product = {'JBoss EAP': 'EAP',
-                           'JBoss Fuse': 'FUSE',
-                           'JBoss BRMS': 'DCSM',
-                           'JBoss Web Server': 'JWS'}
-        if is_rhel:
-            products.append('RHEL')
-        for product_dict in redhat_products:
-            if product_dict.get('presence') == 'present':
-                name = name_to_product.get(product_dict.get('name'))
-                if name:
-                    products.append(name)
-
-        return products
-
-    @staticmethod
-    def format_system_profile(host):
-        """Grab facts from original host for system profile.
-
-        :param host: <dict> the host to pull facts from
-        :returns: a list with the system profile facts.
-        """
-        qpc_to_system_profile = {
-            'infrastructure_type': 'infrastructure_type',
-            'architecture': 'arch',
-            'os_release': 'os_release',
-            'os_version': 'os_kernel_version',
-            'vm_host': 'infrastructure_vendor'
-        }
-        system_profile = {}
-        for qpc_fact, system_fact in qpc_to_system_profile.items():
-            fact_value = host.get(qpc_fact)
-            if fact_value:
-                system_profile[system_fact] = str(fact_value)
-        cpu_count = host.get('cpu_count')
-        # grab the default socket count
-        cpu_socket_count = host.get('cpu_socket_count')
-        # grab the preferred socket count, and default if it does not exist
-        socket_count = host.get('vm_host_socket_count', cpu_socket_count)
-        # grab the default core count
-        cpu_core_count = host.get('cpu_core_count')
-        # grab the preferred core count, and default if it does not exist
-        core_count = host.get('vm_host_core_count', cpu_core_count)
-        try:
-            # try to get the cores per socket but wrap it in a try/catch
-            # because these values might not exist
-            core_per_socket = math.ceil(int(core_count) / int(socket_count))
-        except Exception:  # pylint: disable=broad-except
-            core_per_socket = None
-        # grab the preferred core per socket, but default if it does not exist
-        cpu_core_per_socket = host.get('cpu_core_per_socket', core_per_socket)
-        # check for each of the above facts and add them to the profile if they
-        # are not none
-        if cpu_count:
-            system_profile['number_of_cpus'] = math.ceil(cpu_count)
-        if socket_count:
-            system_profile['number_of_sockets'] = math.ceil(socket_count)
-        if cpu_core_per_socket:
-            system_profile['cores_per_socket'] = math.ceil(cpu_core_per_socket)
-
-        return system_profile
-
-    def generate_bulk_upload_list(self, hosts):  # pylint:disable=too-many-locals
+    def generate_bulk_upload_list(hosts):  # pylint:disable=too-many-locals
         """Generate a list of hosts to upload.
 
         :param hosts: <dict> dictionary containing hosts to upload.
         """
         bulk_upload_list = []
-        non_null_facts = \
-            ['bios_uuid', 'ip_addresses',
-             'mac_addresses', 'insights_client_id',
-             'rhel_machine_id', 'subscription_manager_id']
         for _, host in hosts.items():
-            redhat_certs = host.get('redhat_certs', [])
-            redhat_products = host.get('products', [])
-            is_redhat = host.get('is_redhat')
-            system_profile = self.format_system_profile(host)
-            formatted_certs = self.format_certs(redhat_certs)
-            formatted_products = self.format_products(redhat_products,
-                                                      is_redhat)
-
-            body = {
-                'account': self.account_number,
-                'display_name': host.get('name'),
-                'fqdn': host.get('name'),
-                'facts': [{'namespace': 'qpc', 'facts': host,
-                           'rh_product_certs': formatted_certs,
-                           'rh_products_installed': formatted_products}]
-            }
-            if system_profile:
-                body['system_profile'] = system_profile
-            for fact_name in non_null_facts:
-                fact_value = host.get(fact_name)
-                if fact_value:
-                    body[fact_name] = fact_value
-
-            bulk_upload_list.append(body)
+            bulk_upload_list.append(host)
         return bulk_upload_list
 
     def generate_upload_candidates(self):
@@ -379,17 +270,19 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     for host_data in all_data:
                         host_status = host_data.get('status')
                         if host_status not in [HTTPStatus.OK, HTTPStatus.CREATED]:
+                            original_host = {}
+                            host_id = ''
                             upload_host = hosts_list[host_index]
-                            host_facts = upload_host.get('facts')
+                            host_facts = upload_host.get('facts', [])
                             for namespace_facts in host_facts:
-                                if namespace_facts.get('namespace') == 'qpc':
-                                    qpc_facts = namespace_facts.get('facts')
-                                    host_id = qpc_facts.get('system_platform_id')
+                                if namespace_facts.get('namespace') == 'yupana':
+                                    yupana_facts = namespace_facts.get('facts', {})
+                                    host_id = yupana_facts.get('yupana_host_id', '')
                                     original_host = hosts.get(host_id, {})
                             failed_hosts.append({
                                 'status_code': host_status,
-                                'display_name': original_host.get('name'),
-                                'system_platform_id': host_id,
+                                'display_name': original_host.get('display_name'),
+                                'yupana_host_id': host_id,
                                 'host': original_host})
 
                             # if the response code is a 500, then something on
@@ -442,16 +335,18 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             # we are going to have to look up the original host, and map it to the
             # one we are trying to upload so that we can retry it.
             for upload_host in hosts_list:
-                host_facts = upload_host.get('facts')
+                host_id = 'unknown'
+                original_host = {}
+                host_facts = upload_host.get('facts', [])
                 for namespace_facts in host_facts:
-                    if namespace_facts.get('namespace') == 'qpc':
-                        qpc_facts = namespace_facts.get('facts')
-                        host_id = qpc_facts.get('system_platform_id')
+                    if namespace_facts.get('namespace') == 'yupana':
+                        yupana_facts = namespace_facts.get('facts', {})
+                        host_id = yupana_facts.get('yupana_host_id', '')
                         original_host = hosts.get(host_id, {})
                 failed_hosts.append({
                     'status_code': 'unknown',
-                    'display_name': original_host.get('name'),
-                    'system_platform_id': host_id,
+                    'display_name': original_host.get('display_name', 'unknown'),
+                    'yupana_host_id': host_id,
                     'host': original_host})
                 retry_list.append({host_id: original_host,
                                    'cause': FAILED_UPLOAD})
@@ -523,10 +418,10 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 LOG.error(format_message(
                     self.prefix,
                     'Host inventory returned %s for %s. '
-                    'system_platform_id: %s. host: %s' % (
+                    'yupana_host_id: %s. host: %s' % (
                         failed_info.get('status_code'),
                         failed_info.get('display_name'),
-                        failed_info.get('system_platform_id'),
+                        failed_info.get('yupana_host_id'),
                         failed_info.get('host')),
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id

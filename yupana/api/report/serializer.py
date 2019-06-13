@@ -17,7 +17,8 @@ from rest_framework.serializers import (BooleanField,
                                         DateTimeField,
                                         IntegerField,
                                         JSONField,
-                                        ModelSerializer)
+                                        ModelSerializer,
+                                        UUIDField)
 
 from api.models import Report, ReportArchive
 
@@ -25,10 +26,10 @@ from api.models import Report, ReportArchive
 class AbstractReportSerializer(ModelSerializer):
     """Abstract serializer for the Report models."""
 
-    report_platform_id = CharField(max_length=50, required=False)
-    report_version = CharField(max_length=50, required=False)
-    report_type = CharField(max_length=20, required=False)
-    report_id = IntegerField(allow_null=True, required=False)
+    report_platform_id = UUIDField(format='hex_verbose', required=False)
+    host_inventory_api_version = CharField(max_length=10, required=False)
+    source = CharField(max_length=15, required=False)
+    source_metadata = JSONField(allow_null=True, required=False)
     rh_account = CharField(max_length=50, required=False)
     upload_ack_status = CharField(max_length=10, required=False)
     upload_srv_kafka_msg = JSONField(required=True)

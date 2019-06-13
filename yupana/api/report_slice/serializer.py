@@ -17,16 +17,20 @@ from rest_framework.serializers import (BooleanField,
                                         DateTimeField,
                                         IntegerField,
                                         JSONField,
-                                        ModelSerializer)
+                                        ModelSerializer,
+                                        UUIDField)
 
 from api.models import ReportSlice, ReportSliceArchive
+from config.settings.base import MAX_HOSTS_PER_REP
+
+MAX_HOSTS_PER_REP = int(MAX_HOSTS_PER_REP)
 
 
 class AbstractReportSliceSerializer(ModelSerializer):
     """Abstract serializer for the ReportSlice models."""
 
-    report_platform_id = CharField(max_length=50, required=False)
-    report_slice_id = CharField(max_length=50, required=False)
+    report_platform_id = UUIDField(format='hex_verbose', required=False)
+    report_slice_id = UUIDField(format='hex_verbose', required=False)
     rh_account = CharField(max_length=50, required=False)
     report_json = JSONField(allow_null=False)
     git_commit = CharField(max_length=50, required=False)
@@ -34,6 +38,7 @@ class AbstractReportSliceSerializer(ModelSerializer):
     retry_type = ChoiceField(choices=ReportSlice.RETRY_CHOICES, default=ReportSlice.TIME)
     state_info = JSONField(allow_null=False)
     retry_count = IntegerField(default=0)
+    hosts_count = IntegerField(min_value=1, max_value=MAX_HOSTS_PER_REP)
     last_update_time = DateTimeField(allow_null=False)
     failed_hosts = JSONField(allow_null=True)
     candidate_hosts = JSONField(allow_null=True)
