@@ -21,6 +21,9 @@ from rest_framework.serializers import (BooleanField,
                                         UUIDField)
 
 from api.models import ReportSlice, ReportSliceArchive
+from config.settings.base import MAX_HOSTS_PER_REP
+
+MAX_HOSTS_PER_REP = int(MAX_HOSTS_PER_REP)
 
 
 class AbstractReportSliceSerializer(ModelSerializer):
@@ -35,7 +38,7 @@ class AbstractReportSliceSerializer(ModelSerializer):
     retry_type = ChoiceField(choices=ReportSlice.RETRY_CHOICES, default=ReportSlice.TIME)
     state_info = JSONField(allow_null=False)
     retry_count = IntegerField(default=0)
-    hosts_count = IntegerField(min_value=1, max_value=10000)
+    hosts_count = IntegerField(min_value=1, max_value=MAX_HOSTS_PER_REP)
     last_update_time = DateTimeField(allow_null=False)
     failed_hosts = JSONField(allow_null=True)
     candidate_hosts = JSONField(allow_null=True)

@@ -40,6 +40,7 @@ from processor.kafka_msg_handler import (KafkaMsgHandlerError,
 from api.models import (Report, ReportSlice, Status)
 from api.serializers import ReportSerializer, ReportSliceSerializer
 from config.settings.base import (INSIGHTS_KAFKA_ADDRESS,
+                                  MAX_HOSTS_PER_REP,
                                   RETRIES_ALLOWED,
                                   RETRY_TIME)
 
@@ -50,8 +51,7 @@ SUCCESS_CONFIRM_STATUS = 'success'
 FAILURE_CONFIRM_STATUS = 'failure'
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
-HOSTS_PER_REQ = 1000
-MAX_HOSTS_PER_REP = 10000
+MAX_HOSTS_PER_REP = int(MAX_HOSTS_PER_REP)
 
 
 class FailDownloadException(Exception):

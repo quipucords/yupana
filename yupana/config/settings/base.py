@@ -59,6 +59,9 @@ RETRIES_ALLOWED = ENVIRONMENT.get_value('RETRIES_ALLOWED', default=5)
 # requests (default is 100)
 HOSTS_PER_REQ = ENVIRONMENT.get_value('HOSTS_PER_REQ', default=250)
 
+# this is the max number of hosts per report slice
+MAX_HOSTS_PER_REP = ENVIRONMENT.get_value('MAX_HOSTS_PER_REP', default=10000)
+
 # this is the max number of threads that we want to allow per pod
 # default is 25
 MAX_THREADS = ENVIRONMENT.get_value('MAX_THREADS', default=10)

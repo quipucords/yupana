@@ -11,7 +11,6 @@
 
 """Model for report slice progress."""
 
-from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from api.report.model import Report, ReportArchive
@@ -66,8 +65,7 @@ class AbstractReportSlice(models.Model):
     last_update_time = models.DateTimeField(null=True)
     failed_hosts = models.TextField(null=True)
     candidate_hosts = models.TextField(null=True)
-    hosts_count = models.PositiveSmallIntegerField(
-        null=False, validators=[MinValueValidator(1), MaxValueValidator(10000)])
+    hosts_count = models.PositiveIntegerField(null=False)
 
     def __str__(self):
         """Convert to string."""
