@@ -683,10 +683,12 @@ parameters:
   displayName: Hosts per request
   name: HOSTS_PER_REQ
   required: false
+  value: "250"
 - description: Maximum number of hosts per report slice
   displayName: Max hosts per report slice
   name: MAX_HOSTS_PER_REP
   required: false
+  value: "10000"
 - description: Max number of threads per pod
   displayName: Max threads
   name: MAX_THREADS
