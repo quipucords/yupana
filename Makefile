@@ -64,6 +64,7 @@ help:
 clean:
 	git clean -fdx -e .idea/ -e *env/ $(PYDIR)/db.sqlite3
 	rm -rf yupana/static
+	rm -rf temp/
 
 gen-apidoc:
 	rm -fr $(PYDIR)/$(STATIC)/
