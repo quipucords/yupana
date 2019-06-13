@@ -94,6 +94,7 @@ objects:
     retries-allowed: ${RETRIES_ALLOWED}
     retry-time: ${RETRY_TIME}
     hosts-per-req: ${HOSTS_PER_REQ}
+    max-hosts-per-rep: ${MAX_HOSTS_PER_REP}
     max-threads: ${MAX_THREADS}
     minimum-replicas: ${MINIMUM_REPLICAS}
     maximum-replicas: ${MAXIMUM_REPLICAS}
@@ -322,6 +323,12 @@ objects:
                 configMapKeyRef:
                   name: yupana-env
                   key: hosts-per-req
+                  optional: true
+            - name: MAX_HOSTS_PER_REP
+              valueFrom:
+                configMapKeyRef:
+                  name: yupana-env
+                  key: max-hosts-per-rep
                   optional: true
             - name: MAX_THREADS
               valueFrom:
@@ -665,17 +672,23 @@ parameters:
 - description: Retry time in minutes
   displayName: Retry time
   name: RETRY_TIME
-  required: true
+  required: false
   value: "480"
 - description: Number of retries allowed
   displayName: Retries allowed
   name: RETRIES_ALLOWED
-  required: true
+  required: false
   value: "5"
 - description: Hosts to upload per bulk request
   displayName: Hosts per request
   name: HOSTS_PER_REQ
-  required: true
+  required: false
+  value: "250"
+- description: Maximum number of hosts per report slice
+  displayName: Max hosts per report slice
+  name: MAX_HOSTS_PER_REP
+  required: false
+  value: "10000"
 - description: Max number of threads per pod
   displayName: Max threads
   name: MAX_THREADS

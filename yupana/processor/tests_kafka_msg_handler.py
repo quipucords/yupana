@@ -30,7 +30,7 @@ from django.test import TestCase
 from api.models import Report
 
 
-def create_tar_buffer(files_data):
+def create_tar_buffer(files_data, encoding='utf-8', meta_encoding='utf-8'):
     """Generate a file buffer based off a dictionary."""
     if not isinstance(files_data, (dict,)):
         return None
@@ -39,11 +39,14 @@ def create_tar_buffer(files_data):
     tar_buffer = io.BytesIO()
     with tarfile.open(fileobj=tar_buffer, mode='w:gz') as tar_file:
         for file_name, file_content in files_data.items():
-            if file_name.endswith('json'):
+            if 'metadata.json' in file_name:
                 file_buffer = \
-                    io.BytesIO(json.dumps(file_content).encode('utf-8'))
+                    io.BytesIO(json.dumps(file_content).encode(meta_encoding))
+            elif file_name.endswith('json'):
+                file_buffer = \
+                    io.BytesIO(json.dumps(file_content).encode(encoding))
             elif file_name.endswith('csv'):
-                file_buffer = io.BytesIO(file_content.encode('utf-8'))
+                file_buffer = io.BytesIO(file_content.encode(encoding))
             else:
                 return None
             info = tarfile.TarInfo(name=file_name)
