@@ -277,8 +277,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     'Successfully created report slice %s' % report_slice_id,
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id))
-        created = True
-        return created
+        return True
 
     # pylint: disable=too-many-arguments,too-many-locals
     def update_slice_state(self, options, report_slice):  # noqa: C901 (too-complex)

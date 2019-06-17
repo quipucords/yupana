@@ -33,7 +33,8 @@ from processor import (abstract_processor,
                        tests_kafka_msg_handler as test_handler)
 from prometheus_client import REGISTRY
 
-from api.models import (Report,
+from api.models import (InventoryUploadError,
+                        Report,
                         ReportArchive,
                         ReportSlice,
                         ReportSliceArchive)
@@ -890,3 +891,30 @@ class ReportProcessorTests(TestCase):
         self.assertEqual(str(existing.report_platform_id), str(self.uuid))
         # assert the processor was reset
         self.check_variables_are_reset()
+
+    def test_record_inventory_error(self):
+        """Test recording the inventory errors method."""
+        request_body = {
+            'host_id': 'foo',
+            'ip_addresses': 'bar'
+        }
+        response_body = {
+            'foo': 'bar'
+        }
+        identity_header = {
+            'account' : '123456'
+        }
+        self.processor.report_platform_id = str(self.uuid)
+        self.processor.report_slice_id = str(self.uuid2)
+        self.processor.account_number = '123456'
+        options = {
+            'request_body': json.dumps(request_body),
+            'response_body': json.dumps(response_body),
+            'response_code': 200,
+            'identity_header': json.dumps(identity_header),
+            'failure_catagory': 'INVENTORY FAILURE'
+        }
+        self.processor.record_inventory_upload_errors(options)
+        inventory_error = InventoryUploadError.objects.get(
+            rh_account=self.processor.account_number)
+        self.assertEqual(inventory_error.response_code, 200)
