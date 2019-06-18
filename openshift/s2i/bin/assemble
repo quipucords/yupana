@@ -79,6 +79,17 @@ elif [[ -f setup.py ]]; then
   python setup.py develop
 fi
 
+# check if a version has been specified
+if [[ -z "$BUILD_VERSION"]]; then
+    (
+      echo "--> Writing the release version."
+      APP_HOME=${APP_HOME:-.}
+      # Look for 'release.py' in the directory specified by APP_HOME, or the current directory
+      release_file=$APP_HOME/release.py
+      sh "sed -i 's/BUILD_VERSION_PLACEHOLDER/$BUILD_VERSION/' release_file"
+    )
+fi
+
 if [[ -f apidoc.json ]]; then
   install_apidoc
   echo "---> Generating apidoc ..."

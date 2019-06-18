@@ -12,7 +12,7 @@ OPENSHIFT_PROJECT='yupana'
 OPENSHIFT_TEMPLATE_PATH='openshift/yupana-template.yaml'
 TEMPLATE='yupana-template'
 CODE_REPO='https://github.com/quipucords/yupana.git'
-REPO_BRANCH='master'
+REPO_BRANCH='issues/162'
 EMAIL_SERVICE_PASSWORD=$EMAIL_SERVICE_PASSWORD
 PGSQL_VERSION=9.6
 
@@ -173,7 +173,11 @@ oc-new-app:
 	oc new-app --template ${OPENSHIFT_PROJECT}/${TEMPLATE} \
 		--param NAMESPACE=${OPENSHIFT_PROJECT} \
 		--param SOURCE_REPOSITORY_URL=${CODE_REPO} \
-        --param SOURCE_REPOSITORY_REF=${REPO_BRANCH}
+        --param SOURCE_REPOSITORY_REF=${REPO_BRANCH} \
+		--param MINIMUM_REPLICAS=1 \
+	    --param MAXIMUM_REPLICAS=1 \
+        --param BUILD_VERSION='1.0.0' \
+        --param MAX_THREADS=10
 
 oc-apply:
 	oc apply -f ${OPENSHIFT_TEMPLATE_PATH}
