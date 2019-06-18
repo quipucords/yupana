@@ -21,6 +21,7 @@ from collections import namedtuple
 from unittest.mock import ANY, Mock, patch
 
 from django.test import TestCase
+from release import DEFAULT_VERSION
 
 from api.status.model import Status
 
@@ -116,5 +117,5 @@ class StatusModelTest(TestCase):
         """Test the release version default."""
         release_version = self.status_info.release_version
         git_commit = self.status_info.git_commit
-        expected = '0.0.0.%s' % git_commit
+        expected = '%s.%s' % (DEFAULT_VERSION, git_commit)
         self.assertEqual(expected, release_version)
