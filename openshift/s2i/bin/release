@@ -16,7 +16,7 @@ if [[ -z "${BUILD_VERSION}" ]]; then
   APP_HOME=${APP_HOME:-.}
   echo "$APP_HOME"
   # Look for 'release.py' in the directory specified by APP_HOME, or the current directory
-  ls $APP_HOME
+  ls -l $APP_HOME
   release_file=$APP_HOME/release.py
   sh "cat $release_file"
   if [[ -f "$release_file" ]]; then
