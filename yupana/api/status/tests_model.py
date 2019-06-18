@@ -111,3 +111,10 @@ class StatusModelTest(TestCase):
         """Test the startup method with a module list."""
         self.status_info.startup()
         mock_logger.assert_called_with(ANY, ANY, ANY)
+
+    def test_release_version_default(self):
+        """Test the release version default."""
+        release_version = self.status_info.release_version
+        git_commit = self.status_info.git_commit
+        expected = '0.0.0.%s' % git_commit
+        self.assertEqual(expected, release_version)
