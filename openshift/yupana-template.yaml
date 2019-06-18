@@ -192,6 +192,11 @@ objects:
               configMapKeyRef:
                 name: yupana-env
                 key: app-domain
+          - name: BUILD_VERSION
+            valueFrom:
+              configMapKeyRef:
+                name: yupana-env
+                key: build-version
         from:
           kind: ImageStreamTag
           name: python-36-centos7:latest
