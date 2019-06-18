@@ -40,7 +40,6 @@ RUN INSTALL_PKGS="${NODEJS_SCL} \
     yum-config-manager --enable centos-sclo-rh-testing && \
     yum -y --setopt=tsflags=nodocs install --enablerepo=centosplus $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
-    yum -y install sed && \
     yum remove -y rh-nodejs6\* && \
     ln -s /usr/lib/node_modules/nodemon/bin/nodemon.js /usr/bin/nodemon && \
     yum -y clean all --enablerepo='*'
