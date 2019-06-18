@@ -14,7 +14,8 @@ ENV NODEJS_VERSION=8 \
     PIP_NO_CACHE_DIR=off \
     ENABLE_PIPENV=true \
     APP_HOME="/opt/app-root/src/yupana" \
-    APP_MODULE="config.wsgi"
+    APP_MODULE="config.wsgi" \
+    BUILD_VERSION=${BUILD_VERSION}
 
 ENV SUMMARY="Yupana is a subscriptions services application" \
     DESCRIPTION="Yupana is a subscriptions services application"
