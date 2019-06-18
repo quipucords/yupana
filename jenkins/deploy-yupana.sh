@@ -36,6 +36,7 @@ if [ -z "$BUILD_CONFIG" ]; then
       --param TARGET_CPU_UTILIZATION=${TARGET_CPU_UTILIZATION} \
       --param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
       --param MAX_THREADS=${MAX_THREADS} \
+      --param BUILD_VERSION=${BUILD_VERSION} \
 
   echo "Find build id"
   BUILD_ID=`oc get builds | grep ${APP_NAME} | tail -1 | awk '{print $1}'`
@@ -77,6 +78,7 @@ else
       --param TARGET_CPU_UTILIZATION=${TARGET_CPU_UTILIZATION} \
       --param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
       --param MAX_THREADS=${MAX_THREADS} \
+      --param BUILD_VERSION=${BUILD_VERSION} \
       | oc apply -f -
   BUILD_ID=`oc start-build ${BUILD_CONFIG} | awk '{print $2}' | sed -e 's/^"//' -e 's/"$//'`
 fi
