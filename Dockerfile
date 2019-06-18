@@ -52,7 +52,7 @@ COPY openshift/root /
 
 # Copy application files to the image.
 COPY . ${APP_ROOT}/src
-RUN STI_SCRIPTS_PATH/release
+RUN $STI_SCRIPTS_PATH/release
 # - Create a Python virtual environment for use by any application to avoid
 #   potential conflicts with Python packages preinstalled in the main Python
 #   installation.
