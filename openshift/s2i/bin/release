@@ -18,7 +18,7 @@ if [[ -z "${BUILD_VERSION}" ]]; then
   # Look for 'release.py' in the directory specified by APP_HOME, or the current directory
   ls -l $APP_HOME
   release_file=$APP_HOME/release.py
-  sh "cat $release_file"
+  sh "sudo cat $release_file"
   if [[ -f "$release_file" ]]; then
     sh "sed -i 's/BUILD_VERSION_PLACEHOLDER/1.0.0/' $release_file"
   fi
