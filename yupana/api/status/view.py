@@ -1,5 +1,5 @@
 #
-# Copyright 2018 Red Hat, Inc.
+# Copyright 2018-2019 Red Hat, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -37,6 +37,7 @@ def status(request):
     @apiDescription Request server status.
 
     @apiSuccess {Number} api_version The version of the API.
+    @apiSuccess {String} release_version The release version.
     @apiSuccess {String} commit  The commit hash of the code base.
     @apiSuccess {Object} modules  The code modules found on the server.
     @apiSuccess {Object} platform_info  The server platform information.
@@ -46,6 +47,7 @@ def status(request):
         HTTP/1.1 200 OK
         {
             "api_version": 1,
+            "release_version": "1.0.0.178d2ea",
             "commit": "178d2ea",
             "server_address": "127.0.0.1:8001",
             "platform_info": {

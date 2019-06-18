@@ -69,7 +69,7 @@ else
 fi
 
 APP_HOME=${APP_HOME:-.}
-# Look for 'manage.py' in the directory specified by APP_HOME, or the current direcotry
+# Look for 'manage.py' in the directory specified by APP_HOME, or the current directory
 manage_file=$APP_HOME/manage.py
 
 if should_migrate; then
