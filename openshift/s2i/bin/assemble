@@ -80,20 +80,17 @@ elif [[ -f setup.py ]]; then
 fi
 
 # check if a version has been specified
-# echo "-----> BEFORE THE BUILD VERSION."
-# if [[ -z "${BUILD_VERSION}" ]]; then
-#   echo "--> Writing the release version."
-#   echo "-->Build version: ${BUILD_VERSION}."
-#   APP_HOME=${APP_HOME:-.}
-#   echo "$APP_HOME"
-#   # Look for 'release.py' in the directory specified by APP_HOME, or the current directory
-#   ls $APP_HOME
-#   release_file=$APP_HOME/release.py
-#   sh "cat $release_file"
-#   if [[ -f "$release_file" ]]; then
-#     sh "sed -i 's/BUILD_VERSION_PLACEHOLDER/1.0.0/' $release_file"
-#   fi
-# fi
+echo "-----> BEFORE THE BUILD VERSION."
+if [[ ! -z "${BUILD_VERSION}" ]]; then
+  echo "--> Writing the release version."
+  echo "--> Build version: ${BUILD_VERSION}."
+  APP_HOME=${APP_HOME:-.}
+  # Look for 'release.py' in the directory specified by APP_HOME, or the current directory
+  release_file=$APP_HOME/release.py
+  if [[ -f "$release_file" ]]; then
+    sed -i "s/BUILD_VERSION_PLACEHOLDER/${BUILD_VERSION}/" $release_file
+  fi
+fi
 
 if [[ -f apidoc.json ]]; then
   install_apidoc

@@ -14,8 +14,7 @@ ENV NODEJS_VERSION=8 \
     PIP_NO_CACHE_DIR=off \
     ENABLE_PIPENV=true \
     APP_HOME="/opt/app-root/src/yupana" \
-    APP_MODULE="config.wsgi" \
-    BUILD_VERSION=${BUILD_VERSION}
+    APP_MODULE="config.wsgi"
 
 ENV SUMMARY="Yupana is a subscriptions services application" \
     DESCRIPTION="Yupana is a subscriptions services application"
@@ -54,7 +53,7 @@ COPY openshift/root /
 
 # Copy application files to the image.
 COPY . ${APP_ROOT}/src
-RUN $STI_SCRIPTS_PATH/release
+
 # - Create a Python virtual environment for use by any application to avoid
 #   potential conflicts with Python packages preinstalled in the main Python
 #   installation.
