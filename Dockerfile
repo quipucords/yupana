@@ -20,22 +20,22 @@ ENV SUMMARY="Yupana is a subscriptions services application" \
     DESCRIPTION="Yupana is a subscriptions services application"
 
 LABEL summary="$SUMMARY" \
-      description="$DESCRIPTION" \
-      io.k8s.description="$DESCRIPTION" \
-      io.k8s.display-name="Yupana" \
-      io.openshift.expose-services="8080:http" \
-      io.openshift.tags="builder,python,python36,rh-python36" \
-      com.redhat.component="python36-docker" \
-      name="Yupana" \
-      version="1" \
-      maintainer="Red Hat Subscription Management Services"
+    description="$DESCRIPTION" \
+    io.k8s.description="$DESCRIPTION" \
+    io.k8s.display-name="Yupana" \
+    io.openshift.expose-services="8080:http" \
+    io.openshift.tags="builder,python,python36,rh-python36" \
+    com.redhat.component="python36-docker" \
+    name="Yupana" \
+    version="1" \
+    maintainer="Red Hat Subscription Management Services"
 
 USER root
 
 # replace nodejs 6 with nodejs 8
 RUN INSTALL_PKGS="${NODEJS_SCL} \
-                  ${NODEJS_SCL}-npm \
-                  ${NODEJS_SCL}-nodejs-nodemon \
+    ${NODEJS_SCL}-npm \
+    ${NODEJS_SCL}-nodejs-nodemon \
     " && \
     yum-config-manager --enable centos-sclo-rh-testing && \
     yum -y --setopt=tsflags=nodocs install --enablerepo=centosplus $INSTALL_PKGS && \
@@ -61,6 +61,7 @@ COPY . ${APP_ROOT}/src
 #   under random UID.
 RUN source scl_source enable rh-python36 rh-nodejs8 && \
     virtualenv ${APP_ROOT} && \
+    $STI_SCRIPTS_PATH/release && \
     chown -R 1001:0 ${APP_ROOT} && \
     fix-permissions ${APP_ROOT} -P && \
     rpm-file-permissions && \
