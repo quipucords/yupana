@@ -18,13 +18,12 @@
 
 
 # -- Project information -----------------------------------------------------
-from yupana.api.release import BUILD_VERSION
 project = 'Yupana'
 copyright = '2018-2019, Red Hat, Inc.'
 author = 'Red Hat, Inc.'
 
 # The short X.Y version
-version = BUILD_VERSION
+version = '1.0'
 # The full version, including alpha/beta/rc tags
 release = '1.0.0'
 
