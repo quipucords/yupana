@@ -31,6 +31,12 @@ if [ -z "$BUILD_CONFIG" ]; then
       --param KAFKA_PORT=${KAFKA_PORT} \
       --param KAFKA_NAMESPACE=${KAFKA_NAMESPACE} \
       --param INSIGHTS_HOST_INVENTORY_URL=${INSIGHTS_HOST_INVENTORY_URL} \
+      --param MINIMUM_REPLICAS=${MINIMUM_REPLICAS} \
+      --param MAXIMUM_REPLICAS=${MAXIMUM_REPLICAS} \
+      --param TARGET_CPU_UTILIZATION=${TARGET_CPU_UTILIZATION} \
+      --param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
+      --param MAX_THREADS=${MAX_THREADS} \
+      --param BUILD_VERSION=${BUILD_VERSION} \
 
   echo "Find build id"
   BUILD_ID=`oc get builds | grep ${APP_NAME} | tail -1 | awk '{print $1}'`
@@ -67,6 +73,12 @@ else
       --param KAFKA_PORT=${KAFKA_PORT} \
       --param KAFKA_NAMESPACE=${KAFKA_NAMESPACE} \
       --param INSIGHTS_HOST_INVENTORY_URL=${INSIGHTS_HOST_INVENTORY_URL} \
+      --param MINIMUM_REPLICAS=${MINIMUM_REPLICAS} \
+      --param MAXIMUM_REPLICAS=${MAXIMUM_REPLICAS} \
+      --param TARGET_CPU_UTILIZATION=${TARGET_CPU_UTILIZATION} \
+      --param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
+      --param MAX_THREADS=${MAX_THREADS} \
+      --param BUILD_VERSION=${BUILD_VERSION} \
       | oc apply -f -
   BUILD_ID=`oc start-build ${BUILD_CONFIG} | awk '{print $2}' | sed -e 's/^"//' -e 's/"$//'`
 fi

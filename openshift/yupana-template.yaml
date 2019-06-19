@@ -88,6 +88,7 @@ objects:
     app-module: ${APP_MODULE}
     app-namespace: ${NAMESPACE}
     app-domain: ${APP_DOMAIN}
+    build-version: ${BUILD_VERSION}
     insights-kafka-server-host: ${KAFKA_HOST}.${KAFKA_NAMESPACE}.svc
     insights-kafka-server-port: ${KAFKA_PORT}
     insights-host-inventory-url: ${INSIGHTS_HOST_INVENTORY_URL}
@@ -191,6 +192,11 @@ objects:
               configMapKeyRef:
                 name: yupana-env
                 key: app-domain
+          - name: BUILD_VERSION
+            valueFrom:
+              configMapKeyRef:
+                name: yupana-env
+                key: build-version
         from:
           kind: ImageStreamTag
           name: python-36-centos7:latest
@@ -287,6 +293,12 @@ objects:
                 configMapKeyRef:
                   name: yupana-env
                   key: app-domain
+                  optional: true
+            - name: BUILD_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: yupana-env
+                  key: build-version
                   optional: true
             - name: INSIGHTS_KAFKA_HOST
               valueFrom:
@@ -649,6 +661,10 @@ parameters:
   description: Whether to upgrade pip to latest
   name: UPGRADE_PIP_TO_LATEST
   value: ''
+- displayName: Build Version
+  description: The build version
+  name: BUILD_VERSION
+  required: false
 - description: Insights Upload Server address
   displayName: Kafka server address
   name: KAFKA_HOST

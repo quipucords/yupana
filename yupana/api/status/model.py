@@ -1,5 +1,5 @@
 #
-# Copyright 2018 Red Hat, Inc.
+# Copyright 2018-2019 Red Hat, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -22,6 +22,8 @@ import os
 import platform
 import subprocess
 import sys
+
+from release import BUILD_VERSION
 
 from api import API_VERSION
 
@@ -81,6 +83,11 @@ class Status:
         return API_VERSION
 
     @property
+    def release_version(self):
+        """Return the release version."""
+        return '%s.%s' % (BUILD_VERSION, self.git_commit)
+
+    @property
     def environment_vars(self):
         """Return the non-sensitive envs."""
         env_dict = {}
@@ -99,6 +106,7 @@ class Status:
         logger.info('Python: %s', self.python_version)
 
         logger.info('Commit: %s', self.git_commit)
+        logger.info('Release Version: %s', self.release_version)
         logger.info('API Version: %s', self.api_version)
 
         prefix = '-' * 18

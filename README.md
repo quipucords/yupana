@@ -143,7 +143,7 @@ tox -e lint
 Below is a description of how to create data formatted for the yupana service.
 
 ## Yupana tar.gz File Format Overview
-Yupana retrieves data from the Insights platform file upload service.  Yupana requires a specially formatted tar.gz file.  Files that do not conform to the required format will be marked as invalid and no processing will occur.  The tar.gz file contains a metadata JSON file and one or more report slice JSON files. The file that contains metadata information is named `metadata.json`, while the files containing host data are named with their uniquely generated UUID4 `report_slice_id` followed by the .json extension. You can download [sample.tar.gz](https://github.com/quipucords/yupana/raw/master/sample.tar.gz) to view an example.
+Yupana retrieves data from the Insights platform file upload service.  Yupana requires a specially formatted tar.gz file.  Files that do not conform to the required format will be marked as invalid and no processing will occur.  The tar.gz file must contain a metadata JSON file and one or more report slice JSON files. The file that contains metadata information is named `metadata.json`, while the files containing host data are named with their uniquely generated UUID4 `report_slice_id` followed by the .json extension. You can download [sample.tar.gz](https://github.com/quipucords/yupana/raw/master/sample.tar.gz) to view an example.
 
 ## Yupana Meta-data JSON Format
 Metadata should include information about the sender of the data, Host Inventory API version, and the report slices included in the tar.gz file. Below is a sample metadata section for a report with 2 slices:
@@ -216,31 +216,37 @@ An API specification of the report slices can be found in [report_slices.yml](ht
 Data being uploaded to Insights must be in `tar.gz` format containing the `.json` files with the given JSON structure above. It is important to note that Yupana processes & tracks reports based on their UUIDS, which means that data with a specific UUID cannot be uploaded more than once, or else the second upload will be archived and not processed. Therefore, before every upload we need to generate a new UUID and replace the current one with it if we want to upload the same data more than once. Use the following instructions to prepare and upload a sample or custom report.
 
 ## Preparing Yupana Sample Data for Upload
-Yupana has a sample `tar.gz` file to showcase file upload to Insights. To prepare the data for upload, simply run:
+Yupana has a sample `tar.gz` file to showcase how to upload data to Insights. To prepare the sample data for upload, simply run:
 ```
 make sample-data
 ```
 
-This command will use the `sample.tar.gz` file in the Yupana repository, change UUIDs of the report, and save it as a new `tar.gz` file.  Newly generated `tar.gz` files are found in `temp/` directory.
+This command will use the `sample.tar.gz` file in the Yupana repository, change the UUIDs within the metadata & each report slice, and save it as a new `tar.gz` file.  Newly generated `tar.gz` files are located in the `temp/` directory.
 
 ## Preparing Custom Data for Upload
-Besides sending a sample `tar.gz` file, you also have the option to send your own reports data to Insights. To prepare the data for upload,
-simply run:
+In addition to preparing a sample `tar.gz` file, you also have the option to prepare your own data for uploading to Insights. To prepare your custom data for upload, simply run:
 ```
 make custom-data data_file=<path/to/your-data.tar.gz>
 ```
 
-Replace the `<path/to/your-data.tar.gz-dir>` with your reports data file path. You can either provide absolute path or relative path to the Yupana project. Your data should be in `tar.gz` format. This command will copy your data files into temp folder, change the UUIDs and place the files into a new `tar.gz` file inside `temp/` folder.
+Replace the `<path/to/your-data.tar.gz>` with either the absolute or relative path to the `tar.gz` file holding your data. This command will copy your data files into the `temp/` directory, change the UUIDs and place the files into a new `tar.gz` file inside the `temp/` directory.
 
 ## Uploading Data
-After generating the data with new UUIDs through either of the above steps, now you can upload it to Insights. To upload the data, run: ::
+After preparing the data with new UUIDs through either of the above steps, you can upload it to Insights. Additionally, you must export the following required information as environment variables or add them to your `.env` file:
 ```
-make upload-data file=<filename>
+RH_ACCOUNT_NUMBER=<your-account-number>
+RH_ORG_ID=<your-org-id>
+FILE_UPLOAD_URL=<file-upload-url>
+RH_USERNAME=<your-username>
+RH_PASSWORD=<your-password>
 ```
 
-You need to replace `<filename>` with the path to `tar.gz` file you want to upload to Insights (we generated this in previous steps). Besides, there are other variables
-such as `RH_ACCOUNT_NUMBER`, `RH_ORG_ID`, `FILE_UPLOAD_URL`, `RH_USERNAME`,
-AND `RH_PASSWORD` that need to be exported as environment variables in the `.env` file with necessary values, since we also use them to validate to the upload host.
+To upload the data, run:
+```
+make upload-data file=<path/to/your-data.tar.gz>
+```
+
+You need to replace `<path/to/your-data.tar.gz>` with either the absolute or relative path to the `tar.gz` file that you want to upload to Insights.
 
 After running this command if you see `HTTP 202` like the following lines in your output logs, it means your file upload to Insights was successful:
 ```
