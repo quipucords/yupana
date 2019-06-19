@@ -145,8 +145,8 @@ async def save_message_and_ack(consumer, consumer_record):
                     'commit the message: %s' % error))
         except QPCKafkaMsgException as message_error:
             LOG.error(format_message(
-                prefix, 'Error processing records.  Message: %s, Error: %s',
-                consumer_record, message_error))
+                prefix, 'Error processing records.  Message: %s, Error: %s' %
+                (consumer_record, message_error)))
             await consumer.commit()
     else:
         LOG.debug(format_message(
