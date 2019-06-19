@@ -1,5 +1,5 @@
 #
-# Copyright 2018 Red Hat, Inc.
+# Copyright 2018-2019 Red Hat, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -21,6 +21,7 @@ from collections import namedtuple
 from unittest.mock import ANY, Mock, patch
 
 from django.test import TestCase
+from release import DEFAULT_VERSION
 
 from api.status.model import Status
 
@@ -111,3 +112,10 @@ class StatusModelTest(TestCase):
         """Test the startup method with a module list."""
         self.status_info.startup()
         mock_logger.assert_called_with(ANY, ANY, ANY)
+
+    def test_release_version_default(self):
+        """Test the release version default."""
+        release_version = self.status_info.release_version
+        git_commit = self.status_info.git_commit
+        expected = '%s.%s' % (DEFAULT_VERSION, git_commit)
+        self.assertEqual(expected, release_version)

@@ -136,7 +136,7 @@ custom-data:
 
 upload-data:
 	curl -vvvv -H "x-rh-identity: $(shell echo '{"identity": {"account_number": $(RH_ACCOUNT_NUMBER), "internal": {"org_id": $(RH_ORG_ID)}}}' | base64)" \
-		-F "upload=@$(file);type=application/vnd.redhat.qpc.tar+tgz" \
+		-F "file=@$(file);type=application/vnd.redhat.qpc.tar+tgz" \
 		-H "x-rh-insights-request-id: 52df9f748eabcfea" \
 		$(FILE_UPLOAD_URL) \
 		-u $(RH_USERNAME):$(RH_PASSWORD)
@@ -171,9 +171,13 @@ oc-project:
 
 oc-new-app:
 	oc new-app --template ${OPENSHIFT_PROJECT}/${TEMPLATE} \
-		--param NAMESPACE=${OPENSHIFT_PROJECT} \
-		--param SOURCE_REPOSITORY_URL=${CODE_REPO} \
-        --param SOURCE_REPOSITORY_REF=${REPO_BRANCH}
+        --param NAMESPACE=${OPENSHIFT_PROJECT} \
+        --param SOURCE_REPOSITORY_URL=${CODE_REPO} \
+        --param SOURCE_REPOSITORY_REF=${REPO_BRANCH} \
+        --param MINIMUM_REPLICAS=1 \
+        --param MAXIMUM_REPLICAS=1 \
+        --param BUILD_VERSION='1.0.0' \
+        --param MAX_THREADS=10
 
 oc-apply:
 	oc apply -f ${OPENSHIFT_TEMPLATE_PATH}

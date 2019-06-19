@@ -18,13 +18,12 @@
 
 
 # -- Project information -----------------------------------------------------
-
 project = 'Yupana'
-copyright = '2018, Red Hat, Inc.'
+copyright = '2018-2019, Red Hat, Inc.'
 author = 'Red Hat, Inc.'
 
 # The short X.Y version
-version = ''
+version = '1.0'
 # The full version, including alpha/beta/rc tags
 release = '1.0.0'
 
