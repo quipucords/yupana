@@ -1,7 +1,7 @@
 -i https://pypi.python.org/simple
 aiokafka==0.5.1
 asynctest==0.13.0
-certifi==2019.3.9
+certifi==2019.6.16
 chardet==3.0.4
 django-environ==0.4.5
 django-prometheus==1.0.15
@@ -11,7 +11,7 @@ gunicorn==19.9.0
 idna==2.8; python_version != '3.3.*'
 kafka-python==1.4.6
 prometheus-client==0.7.0
-psycopg2-binary==2.8.2
+psycopg2-binary==2.8.3
 pytz==2019.1
 requests==2.22.0
 urllib3==1.25.3; python_version != '3.0.*'
