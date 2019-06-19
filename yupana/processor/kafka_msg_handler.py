@@ -97,7 +97,9 @@ def unpack_consumer_record(upload_service_message):
     try:
         json_message = json.loads(upload_service_message.value.decode('utf-8'))
         message = 'received on %s topic' % upload_service_message.topic
-        account_number = json_message.get('rh_account')
+        account_number = json_message.get('account')
+        if not account_number:
+            account_number = json_message.get('rh_account')
         LOG.info(format_message(prefix,
                                 message,
                                 account_number=account_number))

@@ -109,7 +109,7 @@ class KafkaMsgHandlerTest(TestCase):
         qpc_msg = KafkaMsg(msg_handler.QPC_TOPIC, self.payload_url)
         # test happy case
         with patch('processor.kafka_msg_handler.unpack_consumer_record',
-                   return_value={'rh_account': '8910'}):
+                   return_value={'account': '8910'}):
             await msg_handler.save_message_and_ack(test_consumer, qpc_msg)
             report = Report.objects.get(rh_account='8910')
             self.assertEqual(json.loads(report.upload_srv_kafka_msg),
