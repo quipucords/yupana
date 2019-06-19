@@ -118,7 +118,9 @@ async def save_message_and_ack(consumer, consumer_record):
     if consumer_record.topic == QPC_TOPIC:
         try:
             upload_service_message = unpack_consumer_record(consumer_record)
-            rh_account = upload_service_message.get('rh_account')
+            rh_account = upload_service_message.get('account')
+            if not rh_account:
+                rh_account = json_message.get('rh_account')
             if not rh_account:
                 raise QPCKafkaMsgException(
                     format_message(
