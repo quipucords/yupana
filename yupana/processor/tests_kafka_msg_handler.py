@@ -113,7 +113,7 @@ class KafkaMsgHandlerTest(TestCase):
             await msg_handler.save_message_and_ack(test_consumer, qpc_msg)
             report = Report.objects.get(rh_account='8910')
             self.assertEqual(json.loads(report.upload_srv_kafka_msg),
-                             {'rh_account': '8910'})
+                             {'account': '8910'})
             self.assertEqual(report.state, Report.NEW)
 
         # test available topic

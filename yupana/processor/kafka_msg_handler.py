@@ -97,9 +97,10 @@ def unpack_consumer_record(upload_service_message):
     try:
         json_message = json.loads(upload_service_message.value.decode('utf-8'))
         message = 'received on %s topic' % upload_service_message.topic
-        account_number = json_message.get('account')
-        if not account_number:
-            account_number = json_message.get('rh_account')
+        # rh_account is being deprecated so we use it as a backup if
+        # account is not there
+        rh_account = json_message.get('rh_account')
+        account_number = json_message.get('account', rh_account)
         LOG.info(format_message(prefix,
                                 message,
                                 account_number=account_number))
@@ -118,18 +119,19 @@ async def save_message_and_ack(consumer, consumer_record):
     if consumer_record.topic == QPC_TOPIC:
         try:
             upload_service_message = unpack_consumer_record(consumer_record)
-            rh_account = upload_service_message.get('account')
-            if not rh_account:
-                rh_account = json_message.get('rh_account')
-            if not rh_account:
+            # rh_account is being deprecated so we use it as a backup if
+            # account is not there
+            rh_account = upload_service_message.get('rh_account')
+            account_number = upload_service_message.get('account', rh_account)
+            if not account_number:
                 raise QPCKafkaMsgException(
                     format_message(
                         prefix,
-                        'Message missing rh_account.'))
+                        'Message missing account.'))
             try:
                 uploaded_report = {
                     'upload_srv_kafka_msg': json.dumps(upload_service_message),
-                    'rh_account': rh_account,
+                    'rh_account': account_number,
                     'state': Report.NEW,
                     'state_info': json.dumps([Report.NEW]),
                     'last_update_time': datetime.now(pytz.utc),
