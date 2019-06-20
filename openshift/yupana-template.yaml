@@ -732,6 +732,6 @@ parameters:
   required: true
   value: "75"
 - description: Pause the kafka consumer for file upload
-  displayName: Puase kafka for file upload
+  displayName: Pause kafka for file upload
   name: PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE
   required: false
