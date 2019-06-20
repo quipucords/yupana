@@ -77,8 +77,13 @@ class ApiConfig(AppConfig):
     def start_kafka_consumer():
         """Start the kafka consumer."""
         from processor.kafka_msg_handler import initialize_kafka_handler
-        logger.info('Initializing the kafka messaging handler.')
-        initialize_kafka_handler()
+        pause_kafka_for_file_upload = ENVIRONMENT.get_value(
+            'PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE', default=False)
+        if not pause_kafka_for_file_upload:
+            logger.info('Initializing the kafka messaging handler.')
+            initialize_kafka_handler()
+        else:
+            logger.info('Kafka messing handler paused for file upload service.')
 
     @staticmethod
     def start_report_processor():

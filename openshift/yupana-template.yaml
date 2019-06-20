@@ -100,6 +100,7 @@ objects:
     minimum-replicas: ${MINIMUM_REPLICAS}
     maximum-replicas: ${MAXIMUM_REPLICAS}
     target-cpu-utilization: ${TARGET_CPU_UTILIZATION}
+    pause-kafka-for-file-upload-service: ${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE}
     log-level: INFO
 - apiVersion: v1
   kind: Service
@@ -366,6 +367,12 @@ objects:
                   name: yupana-env
                   key: target-cpu-utilization
                   optional: false
+            - name: PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE
+              valueFrom:
+                configMapKeyRef:
+                  name: yupana-env
+                  key: pause-kafka-for-file-upload-service
+                  optional: true
           livenessProbe:
             failureThreshold: 3
             httpGet:
@@ -724,3 +731,7 @@ parameters:
   name: TARGET_CPU_UTILIZATION
   required: true
   value: "75"
+- description: Pause the kafka consumer for file upload
+  displayName: Puase kafka for file upload
+  name: PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE
+  required: false
