@@ -21,7 +21,7 @@ import uuid
 
 from django.test import TestCase
 
-from api.forensics.model import InventoryUploadError
+from api.models import InventoryUploadError
 
 
 class InventoryUploadErrorModelTest(TestCase):
