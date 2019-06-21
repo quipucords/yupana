@@ -62,7 +62,7 @@ class ReportProcessorTests(TransactionTestCase):
                       {'invalid': 'value'}]}
         self.report_record = Report(
             upload_srv_kafka_msg=json.dumps(self.msg),
-            rh_account='1234',
+            account='1234',
             state=Report.NEW,
             state_info=json.dumps([Report.NEW]),
             last_update_time=datetime.now(pytz.utc),
@@ -73,7 +73,7 @@ class ReportProcessorTests(TransactionTestCase):
         self.report_slice = ReportSlice(
             report_platform_id=self.uuid,
             report_slice_id=self.uuid2,
-            rh_account='13423',
+            account='13423',
             report_json=json.dumps(self.report_json),
             state=ReportSlice.NEW,
             state_info=json.dumps([ReportSlice.NEW]),
@@ -106,7 +106,7 @@ class ReportProcessorTests(TransactionTestCase):
     def test_archiving_report(self):
         """Test that archiving creates a ReportArchive, deletes report, and resets the processor."""
         report_to_archive = Report(upload_srv_kafka_msg=json.dumps(self.msg),
-                                   rh_account='4321',
+                                   account='4321',
                                    report_platform_id=self.uuid2,
                                    state=Report.NEW,
                                    state_info=json.dumps([Report.NEW]),
@@ -126,7 +126,7 @@ class ReportProcessorTests(TransactionTestCase):
         with self.assertRaises(Report.DoesNotExist):
             Report.objects.get(id=report_to_archive.id)
         # assert the report archive does exist
-        archived = ReportArchive.objects.get(rh_account='4321')
+        archived = ReportArchive.objects.get(account='4321')
         self.assertEqual(json.loads(archived.state_info), [Report.NEW])
         # assert the processor was reset
         self.check_variables_are_reset()
@@ -134,7 +134,7 @@ class ReportProcessorTests(TransactionTestCase):
     def test_archiving_report_not_ready(self):
         """Test that archiving fails if report not ready to archive."""
         report_to_archive = Report(upload_srv_kafka_msg=json.dumps(self.msg),
-                                   rh_account='4321',
+                                   account='4321',
                                    report_platform_id=self.uuid2,
                                    state=Report.NEW,
                                    state_info=json.dumps([Report.NEW]),
@@ -155,7 +155,7 @@ class ReportProcessorTests(TransactionTestCase):
         self.assertEqual(existing_report, report_to_archive)
         # assert the report archive does not exist
         with self.assertRaises(ReportArchive.DoesNotExist):
-            ReportArchive.objects.get(rh_account='4321')
+            ReportArchive.objects.get(account='4321')
         # assert the processor was reset
         self.check_variables_are_reset()
 
@@ -164,7 +164,7 @@ class ReportProcessorTests(TransactionTestCase):
         self.report_record.report_platform_id = self.uuid
         self.report_record.save()
         report_to_dedup = Report(upload_srv_kafka_msg=json.dumps(self.msg),
-                                 rh_account='4321',
+                                 account='4321',
                                  report_platform_id=self.uuid,
                                  state=Report.NEW,
                                  upload_ack_status='success',
@@ -185,7 +185,7 @@ class ReportProcessorTests(TransactionTestCase):
         with self.assertRaises(Report.DoesNotExist):
             Report.objects.get(id=report_to_dedup.id)
         # assert the report archive does exist
-        archived = ReportArchive.objects.get(rh_account='4321')
+        archived = ReportArchive.objects.get(account='4321')
         self.assertEqual(json.loads(archived.state_info), [Report.NEW])
         # assert the processor was reset
         self.check_variables_are_reset()
@@ -253,7 +253,7 @@ class ReportProcessorTests(TransactionTestCase):
         current_time = datetime.now(pytz.utc)
         hours_old_time = current_time - timedelta(hours=9)
         older_report = Report(upload_srv_kafka_msg=json.dumps(self.msg),
-                              rh_account='4321',
+                              account='4321',
                               report_platform_id=self.uuid2,
                               state=Report.NEW,
                               state_info=json.dumps([Report.NEW]),
@@ -276,7 +276,7 @@ class ReportProcessorTests(TransactionTestCase):
         current_time = datetime.now(pytz.utc)
         min_old_time = current_time - timedelta(minutes=1)
         older_report = Report(upload_srv_kafka_msg=json.dumps(self.msg),
-                              rh_account='4321',
+                              account='4321',
                               report_platform_id=self.uuid2,
                               state=Report.STARTED,
                               state_info=json.dumps([Report.NEW]),
@@ -293,7 +293,7 @@ class ReportProcessorTests(TransactionTestCase):
         current_time = datetime.now(pytz.utc)
         twentyminold_time = current_time - timedelta(minutes=20)
         older_report = Report(upload_srv_kafka_msg=json.dumps(self.msg),
-                              rh_account='4321',
+                              account='4321',
                               report_platform_id=self.uuid2,
                               state=Report.DOWNLOADED,
                               state_info=json.dumps([Report.NEW,
@@ -600,7 +600,7 @@ class ReportProcessorTests(TransactionTestCase):
     async def async_transition_to_validation_reported_failure_status(self):
         """Set up the test for transitioning to validation reported failure status."""
         report_to_archive = Report(upload_srv_kafka_msg=json.dumps(self.msg),
-                                   rh_account='43214',
+                                   account='43214',
                                    report_platform_id=self.uuid2,
                                    state=Report.VALIDATED,
                                    state_info=json.dumps([Report.NEW]),
@@ -620,7 +620,7 @@ class ReportProcessorTests(TransactionTestCase):
         await self.processor.transition_to_validation_reported()
         with self.assertRaises(Report.DoesNotExist):
             Report.objects.get(id=report_to_archive.id)
-        archived = ReportArchive.objects.get(rh_account='43214')
+        archived = ReportArchive.objects.get(account='43214')
         self.assertEqual(archived.state,
                          Report.VALIDATION_REPORTED)
         self.assertEqual(archived.upload_ack_status,
@@ -1249,7 +1249,7 @@ class ReportProcessorTests(TransactionTestCase):
         min_old_time = current_time - timedelta(hours=8)
         older_report = Report(
             upload_srv_kafka_msg=json.dumps(self.msg),
-            rh_account='4321',
+            account='4321',
             report_platform_id=self.uuid2,
             state=Report.STARTED,
             state_info=json.dumps([Report.NEW]),
@@ -1260,7 +1260,7 @@ class ReportProcessorTests(TransactionTestCase):
 
         retry_commit_report = Report(
             upload_srv_kafka_msg=json.dumps(self.msg),
-            rh_account='4321',
+            account='4321',
             report_platform_id=self.uuid2,
             state=Report.DOWNLOADED,
             state_info=json.dumps([Report.NEW]),
@@ -1274,7 +1274,7 @@ class ReportProcessorTests(TransactionTestCase):
         not_old_enough = current_time - timedelta(hours=1)
         too_young_report = Report(
             upload_srv_kafka_msg=json.dumps(self.msg),
-            rh_account='4321',
+            account='4321',
             report_platform_id=self.uuid2,
             state=Report.DOWNLOADED,
             state_info=json.dumps([Report.NEW]),
@@ -1286,7 +1286,7 @@ class ReportProcessorTests(TransactionTestCase):
 
         same_commit_report = Report(
             upload_srv_kafka_msg=json.dumps(self.msg),
-            rh_account='4321',
+            account='4321',
             report_platform_id=self.uuid2,
             state=Report.DOWNLOADED,
             state_info=json.dumps([Report.NEW]),

@@ -67,7 +67,7 @@ class ReportProcessorTests(TestCase):
                       {'invalid': 'value'}]}
         self.report_record = Report(
             upload_srv_kafka_msg=json.dumps(self.msg),
-            rh_account='1234',
+            account='1234',
             state=Report.NEW,
             state_info=json.dumps([Report.NEW]),
             last_update_time=datetime.now(pytz.utc),
@@ -78,7 +78,7 @@ class ReportProcessorTests(TestCase):
         self.report_slice = ReportSlice(
             report_platform_id=self.uuid,
             report_slice_id=self.uuid2,
-            rh_account='13423',
+            account='13423',
             report_json=json.dumps(self.report_json),
             state=ReportSlice.NEW,
             state_info=json.dumps([ReportSlice.NEW]),
@@ -323,7 +323,7 @@ class ReportProcessorTests(TestCase):
         self.report_record.ready_to_archive = True
         self.report_record.save()
         faulty_report = ReportSlice(
-            rh_account='987',
+            account='987',
             report_platform_id=str(self.uuid2),
             report_slice_id=str(self.uuid),
             state=ReportSlice.NEW,
@@ -833,7 +833,7 @@ class ReportProcessorTests(TestCase):
         with self.assertRaises(Report.DoesNotExist):
             Report.objects.get(id=self.report_record.id)
         # assert the report archive does exist
-        archived = ReportArchive.objects.get(rh_account=self.report_record.rh_account)
+        archived = ReportArchive.objects.get(account=self.report_record.account)
         archived_slice = ReportSliceArchive.objects.get(
             report_slice_id=self.report_slice.report_slice_id)
         self.assertEqual(str(archived.report_platform_id), str(self.uuid))
@@ -859,7 +859,7 @@ class ReportProcessorTests(TestCase):
         with self.assertRaises(Report.DoesNotExist):
             Report.objects.get(id=self.report_record.id)
         # assert the report archive does exist
-        archived = ReportArchive.objects.get(rh_account=self.report_record.rh_account)
+        archived = ReportArchive.objects.get(account=self.report_record.account)
         archived_slice = ReportSliceArchive.objects.get(
             report_slice_id=self.report_slice.report_slice_id)
         self.assertEqual(str(archived.report_platform_id), str(self.uuid))
@@ -884,7 +884,7 @@ class ReportProcessorTests(TestCase):
         existing = Report.objects.get(id=self.report_record.id)
         # assert the report archive does exist
         with self.assertRaises(ReportArchive.DoesNotExist):
-            ReportArchive.objects.get(rh_account=self.report_record.rh_account)
+            ReportArchive.objects.get(account=self.report_record.account)
         with self.assertRaises(ReportSliceArchive.DoesNotExist):
             ReportSliceArchive.objects.get(
                 report_slice_id=self.report_slice.report_slice_id)
@@ -902,19 +902,23 @@ class ReportProcessorTests(TestCase):
             'foo': 'bar'
         }
         identity_header = {
-            'account' : '123456'
+            'account': '123456'
+        }
+        details = {
+            'request_body': request_body,
+            'response_body': response_body,
+            'response_code': 200,
+            'identity_header': identity_header,
+            'failure_catagory': 'INVENTORY FAILURE'
         }
         self.processor.report_platform_id = str(self.uuid)
         self.processor.report_slice_id = str(self.uuid2)
         self.processor.account_number = '123456'
         options = {
-            'request_body': json.dumps(request_body),
-            'response_body': json.dumps(response_body),
-            'response_code': 200,
-            'identity_header': json.dumps(identity_header),
-            'failure_catagory': 'INVENTORY FAILURE'
+            'source': InventoryUploadError.HTTP,
+            'details': details
         }
         self.processor.record_inventory_upload_errors(options)
         inventory_error = InventoryUploadError.objects.get(
-            rh_account=self.processor.account_number)
-        self.assertEqual(inventory_error.response_code, 200)
+            account=self.processor.account_number)
+        self.assertEqual(inventory_error.source, InventoryUploadError.HTTP)

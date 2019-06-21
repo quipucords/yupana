@@ -12,7 +12,7 @@
 """Serializer for forensics."""
 
 from rest_framework.serializers import (CharField,
-                                        IntegerField,
+                                        ChoiceField,
                                         JSONField,
                                         ModelSerializer,
                                         UUIDField)
@@ -25,13 +25,9 @@ class InventoryUploadErrorSerializer(ModelSerializer):
 
     report_platform_id = UUIDField(format='hex_verbose', required=False)
     report_slice_id = UUIDField(format='hex_verbose', required=False)
-    request_body = JSONField(allow_null=False)
-    response_body = JSONField(allow_null=True, required=False)
-    response_code = IntegerField(required=False)
-    rh_account = CharField(max_length=50, required=True)
-    identity_header = JSONField(allow_null=False)
-    failure_catagory = CharField(max_length=64, required=False)
-    additional_info = CharField(required=False)
+    account = CharField(max_length=50, required=True)
+    source = ChoiceField(choices=InventoryUploadError.SOURCE_CHOICES, required=False)
+    details = JSONField(allow_null=False)
 
     class Meta:
         """Meta class for InventoryUploadErrorSerializer."""

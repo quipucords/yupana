@@ -469,7 +469,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                                     account_number=self.account_number,
                                     report_platform_id=self.report_platform_id))
             archived_rep_data = {
-                'rh_account': report.rh_account,
+                'account': report.account,
                 'retry_count': report.retry_count,
                 'retry_type': report.retry_type,
                 'state': report.state,
@@ -502,7 +502,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             # loop through the associated reports & archive them
             for report_slice in all_report_slices:
                 archived_slice_data = {
-                    'rh_account': report_slice.rh_account,
+                    'account': report_slice.account,
                     'retry_count': report_slice.retry_count,
                     'retry_type': report_slice.retry_type,
                     'candidate_hosts': report_slice.candidate_hosts,

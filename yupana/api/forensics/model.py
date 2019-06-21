@@ -19,29 +19,29 @@ class InventoryUploadError(models.Model):
 
     report_platform_id = models.UUIDField(null=False)
     report_slice_id = models.UUIDField(null=False)
-    request_body = models.TextField(null=False)
-    response_body = models.TextField(null=True)
-    response_code = models.PositiveSmallIntegerField(null=True)
-    rh_account = models.CharField(max_length=50, null=False)
-    identity_header = models.TextField(null=False)
-    failure_catagory = models.TextField(max_length=64, null=False)
-    additional_info = models.TextField(null=True)
+    account = models.CharField(max_length=50, null=False)
+
+    HTTP = 'http'
+    KAFKA = 'kafka'
+    SOURCE_CHOICES = ((HTTP, HTTP),
+                      (KAFKA, KAFKA))
+
+    source = models.CharField(
+        max_length=10,
+        choices=SOURCE_CHOICES
+    )
+
+    details = models.TextField(null=False)
 
     def __str__(self):
         """Convert to string."""
-        return '{' + 'report_platform_id:{}, '\
+        return '{' + 'report_platform_id: {}, '\
             'report_slice_id: {}, '\
-            'request_body: {}, '\
-            'response_body: {}, '\
-            'rh_account: {}, '\
-            'identity_header: {}, '\
-            'failure_catagory: {}, '\
-            'additional_info: {} '.format(
+            'account: {}, '\
+            'source: {}, '\
+            'details: {}'.format(
                 self.report_platform_id,
                 self.report_slice_id,
-                self.request_body,
-                self.response_body,
-                self.rh_account,
-                self.identity_header,
-                self.failure_catagory,
-                self.additional_info) + '}'
+                self.account,
+                self.source,
+                self.details) + '}'

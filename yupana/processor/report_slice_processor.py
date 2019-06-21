@@ -32,7 +32,7 @@ from processor.abstract_processor import (AbstractProcessor, FAILED_TO_VALIDATE,
 from processor.kafka_msg_handler import (QPCReportException,
                                          format_message)
 
-from api.models import ReportSlice
+from api.models import InventoryUploadError, ReportSlice
 from api.serializers import InventoryUploadErrorSerializer, ReportSliceSerializer
 from config.settings.base import (HOSTS_PER_REQ,
                                   INSIGHTS_HOST_INVENTORY_URL,
@@ -95,7 +95,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         If the function is async, make sure to await it.
         """
         self.state = self.report_or_slice.state
-        self.account_number = self.report_or_slice.rh_account
+        self.account_number = self.report_or_slice.account
         if self.report_or_slice.candidate_hosts:
             self.candidate_hosts = json.loads(self.report_or_slice.candidate_hosts)
         if self.report_or_slice.failed_hosts:
@@ -236,28 +236,20 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         return thread_lists_to_upload
 
     def record_inventory_upload_errors(self, options):
-        """Record request and response body of requests that failed to upload."""
-        request_body = options.get('request_body')
-        response_body = options.get('response_body')
-        identity_header = options.get('identity_header')
-        response_code = options.get('response_code')
-        failure_catagory = options.get('failure_catagory')
-        additional_info = options.get('additional_info')
+        """Record request and response body of requests that failed to upload.
+
+        :param options: <dict> containing the source and details of the failure.
+        """
+        details = options.get('details')
+        source = options.get('source')
 
         inventory_upload_error = {
             'report_platform_id': self.report_platform_id,
             'report_slice_id': self.report_slice_id,
-            'request_body': json.dumps(request_body),
-            'rh_account': self.account_number,
-            'identity_header': json.dumps(identity_header),
-            'failure_catagory': failure_catagory
+            'account': self.account_number,
+            'details': json.dumps(details),
+            'source': source
         }
-        if additional_info:
-            inventory_upload_error['additional_info'] = additional_info
-        if response_body:
-            inventory_upload_error['response_body'] = json.dumps(response_body)
-        if response_code:
-            inventory_upload_error['response_code'] = json.dumps(response_code)
         error_serializer = InventoryUploadErrorSerializer(data=inventory_upload_error)
         if error_serializer.is_valid(raise_exception=True):
             error_serializer.save()
@@ -286,8 +278,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         retry_time_candidates = []  # storing hosts to retry after time
         retry_commit_candidates = []  # storing hosts to retry after commit change
         error_messages = []
-        inventory_error_info = {'request_body': hosts_list,
-                                'identity_header': identity_header}
+        details = {'identity_header': identity_header}
+        inventory_error_info = {'source': InventoryUploadError.HTTP}
         retry_exception = False
         inventory_error = False
         UPLOAD_GROUP_SIZE.set(len(hosts_list))
@@ -296,7 +288,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
                                          data=json.dumps(hosts_list),
                                          headers=identity_header)
-            inventory_error_info['response_code'] = response.status_code
+            details['response_code'] = response.status_code
             if response.status_code in [HTTPStatus.MULTI_STATUS]:
                 try:
                     json_body = response.json()
@@ -304,16 +296,16 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     # something went wrong
                     json_error = 'Missing JSON response.'
                     error_messages.append(json_error)
-                    inventory_error_info['additional_info'] = json_error
+                    details['additional_info'] = json_error
                     inventory_error = True
-                    inventory_error_info['failure_catagory'] = INVENTORY_FAILURE
+                    details['failure_catagory'] = INVENTORY_FAILURE
                     raise RetryUploadTimeException()
 
                 errors = json_body.get('errors')
                 if errors != 0:
-                    inventory_error_info['response_body'] = json_body
+                    details['response_body'] = json_body
                     inventory_error = True
-                    inventory_error_info['failure_catagory'] = UPLOAD_DATA_FAILURE
+                    details['failure_catagory'] = UPLOAD_DATA_FAILURE
                     all_data = json_body.get('data', [])
                     host_index = 0
                     for host_data in all_data:
@@ -357,21 +349,21 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 error_messages.append('Attempted to upload the following: %s' % str(hosts_list))
                 try:
                     message = response.json()
-                    inventory_error_info['response_body'] = message
+                    details['response_body'] = message
                     error_messages.append(message)
                 except ValueError:
                     json_error = 'Missing JSON response.'
-                    inventory_error_info['additional_info'] = json_error
+                    details['additional_info'] = json_error
                     error_messages.append(json_error)
                     error_messages.append('Unexpected response code %s' % str(response.status_code))
                 if str(response.status_code).startswith('5'):
-                    inventory_error_info['failure_catagory'] = INVENTORY_FAILURE
+                    details['failure_catagory'] = INVENTORY_FAILURE
                     # something went wrong on host inventory side and we should regenerate after
                     # some time has passed
                     raise RetryUploadTimeException()
                 # else something went wrong possibly on our side (if its a 400)
                 # and we should regenerate the hosts dictionary and re-upload after a commit
-                inventory_error_info['failure_catagory'] = UPLOAD_DATA_FAILURE
+                details['failure_catagory'] = UPLOAD_DATA_FAILURE
                 raise RetryUploadCommitException()
 
         except RetryUploadCommitException:
@@ -382,9 +374,9 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             retry_list = retry_time_candidates
         except requests.exceptions.RequestException as err:
             inventory_error = True
-            inventory_error_info['failure_catagory'] = INVENTORY_FAILURE
+            details['failure_catagory'] = INVENTORY_FAILURE
             request_error = 'A request exception occurred: %s ' % str(err)
-            inventory_error_info['additional_info'] = request_error
+            details['additional_info'] = request_error
             error_messages.append(request_error)
             error_messages.append('Attempted to upload the following: %s' % str(hosts_list))
             retry_exception = True
@@ -416,6 +408,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             'failed_hosts': failed_hosts,
             'error_messages': error_messages
         }
+        inventory_error_info['details'] = details
         if inventory_error:
             response['inventory_error'] = inventory_error_info
         return response

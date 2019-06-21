@@ -31,7 +31,7 @@ class AbstractReportSliceSerializer(ModelSerializer):
 
     report_platform_id = UUIDField(format='hex_verbose', required=False)
     report_slice_id = UUIDField(format='hex_verbose', required=False)
-    rh_account = CharField(max_length=50, required=False)
+    account = CharField(max_length=50, required=False)
     report_json = JSONField(allow_null=False)
     git_commit = CharField(max_length=50, required=False)
     state = ChoiceField(choices=ReportSlice.STATE_CHOICES)

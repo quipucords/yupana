@@ -111,7 +111,7 @@ class KafkaMsgHandlerTest(TestCase):
         with patch('processor.kafka_msg_handler.unpack_consumer_record',
                    return_value={'account': '8910'}):
             await msg_handler.save_message_and_ack(test_consumer, qpc_msg)
-            report = Report.objects.get(rh_account='8910')
+            report = Report.objects.get(account='8910')
             self.assertEqual(json.loads(report.upload_srv_kafka_msg),
                              {'account': '8910'})
             self.assertEqual(report.state, Report.NEW)
@@ -136,7 +136,7 @@ class KafkaMsgHandlerTest(TestCase):
         with patch('processor.kafka_msg_handler.unpack_consumer_record',
                    return_value={'rh_account': '1112'}):
             await msg_handler.save_message_and_ack(test_consumer, qpc_msg)
-            report = Report.objects.get(rh_account='1112')
+            report = Report.objects.get(account='1112')
             self.assertEqual(json.loads(report.upload_srv_kafka_msg),
                              {'rh_account': '1112'})
             self.assertEqual(report.state, Report.NEW)

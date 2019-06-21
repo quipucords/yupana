@@ -112,7 +112,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         If the function is async, make sure to await it.
         """
         self.state = self.report_or_slice.state
-        self.account_number = self.report_or_slice.rh_account
+        self.account_number = self.report_or_slice.account
         self.upload_message = json.loads(self.report_or_slice.upload_srv_kafka_msg)
         if self.report_or_slice.report_platform_id:
             self.report_platform_id = self.report_or_slice.report_platform_id
@@ -256,7 +256,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
 
         report_slice = {
             'state': ReportSlice.PENDING,
-            'rh_account': self.account_number,
+            'account': self.account_number,
             'state_info': json.dumps([ReportSlice.PENDING]),
             'last_update_time': datetime.now(pytz.utc),
             'retry_count': 0,
