@@ -134,6 +134,12 @@ To run unit tests specifically:
 tox -e py36
 ```
 
+If you would like to run a single test you can do this.
+```
+tox -e py36 -- processor.tests_report_processor.ReportProcessorTests.test_archiving_report
+```
+**Note:** You can specify any module or class to run all tests in the class or module.
+
 To lint the code base:
 ```
 tox -e lint
