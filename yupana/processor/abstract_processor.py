@@ -597,8 +597,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                         invalid_hosts_message,
                         account_number=self.account_number,
                         report_platform_id=self.report_platform_id))
-
-        candidate_hosts, failed_hosts = self._validate_report_hosts()
+        report_slice_id = self.report_json.get('report_slice_id')
+        candidate_hosts, failed_hosts = self._validate_report_hosts(report_slice_id)
         number_valid = len(candidate_hosts)
         total = number_valid + len(failed_hosts)
         LOG.info(format_message(
@@ -617,7 +617,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     report_platform_id=self.report_platform_id))
         return candidate_hosts, failed_hosts
 
-    def _validate_report_hosts(self):
+    def _validate_report_hosts(self, report_slice_id):
         """Verify that report hosts contain canonical facts.
 
         :returns: tuple containing valid & invalid hosts
@@ -632,7 +632,10 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             host['account'] = self.account_number
             host_facts = host.get('facts', [])
             host_facts.append({'namespace': 'yupana',
-                               'facts': {'yupana_host_id': host_uuid}})
+                               'facts': {'yupana_host_id': host_uuid,
+                                         'report_platform_id': self.report_platform_id,
+                                         'report_slice_id': report_slice_id,
+                                         'account': self.account_number}})
             host['facts'] = host_facts
             found_facts = False
             for fact in CANONICAL_FACTS:
