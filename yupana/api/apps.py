@@ -83,7 +83,7 @@ class ApiConfig(AppConfig):
             logger.info('Initializing the kafka messaging handler.')
             initialize_kafka_handler()
         else:
-            logger.info('Kafka messing handler paused for file upload service.')
+            logger.info('Kafka messaging handler paused for file upload service.')
 
     @staticmethod
     def start_report_processor():
