@@ -634,8 +634,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             host_facts = host.get('facts', [])
             host_facts.append({'namespace': 'yupana',
                                'facts': {'yupana_host_id': host_uuid,
-                                         'report_platform_id': self.report_platform_id,
-                                         'report_slice_id': report_slice_id,
+                                         'report_platform_id': str(self.report_platform_id),
+                                         'report_slice_id': str(report_slice_id),
                                          'account': self.account_number,
                                          'source': self.report_or_slice.source}})
             host['facts'] = host_facts
