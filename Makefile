@@ -228,7 +228,7 @@ oc-stop-forwarding-ports:
 
 oc-forward-ports:
 	-make oc-stop-forwarding-ports 2>/dev/null
-	oc port-forward $$(oc get pods -o jsonpath='{.items[*].metadata.name}' -l name=yupana-pgsql) 15432:5432 >/dev/null 2>&1 &
+	oc port-forward $$(oc get pods -o jsonpath='{.items[*].metadata.name}' -l name=yupana-pgsql) 5432:5432 >/dev/null 2>&1 &
 
 clean-db:
 	$(PREFIX) rm -rf $(TOPDIR)/pg_data
