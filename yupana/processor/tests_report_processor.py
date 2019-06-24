@@ -797,6 +797,8 @@ class ReportProcessorTests(TransactionTestCase):
     def test_validate_report_hosts(self):
         """Test host verification."""
         # test all valid hosts
+        self.processor.report_platform_id = self.uuid2
+        self.processor.account_number = '12345'
         hosts = [{'bios_uuid': 'value', 'name': 'value', 'facts': []},
                  {'insights_client_id': 'value', 'name': 'foo', 'facts': []},
                  {'ip_addresses': 'value', 'name': 'foo', 'facts': []},
@@ -809,18 +811,22 @@ class ReportProcessorTests(TransactionTestCase):
 
         self.processor.report_json = {
             'report_id': 1,
+            'report_slice_id': self.uuid,
             'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'hosts': hosts}
-        actual_valid, actual_invalid = self.processor._validate_report_hosts()
+        actual_valid, actual_invalid = self.processor._validate_report_hosts(self.uuid)
         for valid_host in actual_valid:
             for host_id, host in valid_host.items():
                 self.assertIn('facts', host)
                 self.assertEqual(host['facts'],
                                  [{'namespace': 'yupana',
-                                   'facts': {'yupana_host_id': host_id}}])
+                                   'facts': {'yupana_host_id': host_id,
+                                             'report_platform_id': self.uuid2,
+                                             'report_slice_id': self.uuid,
+                                             'account': '12345'}}])
         for invalid_host in actual_invalid:
             for host_id, host in invalid_host.items():
                 if host_id != 'cause':
@@ -828,18 +834,21 @@ class ReportProcessorTests(TransactionTestCase):
                     self.assertIn('not_valid', host)
                     self.assertEqual(host['facts'],
                                      [{'namespace': 'yupana',
-                                       'facts': {'yupana_host_id': host_id}}])
+                                       'facts': {'yupana_host_id': host_id,
+                                                 'report_platform_id': self.uuid2,
+                                                 'report_slice_id': self.uuid,
+                                                 'account': '12345'}}])
 
         # test that invalid hosts are removed
         invalid_host = {'no': 'canonical facts', 'metadata': []}
         hosts.append(invalid_host)
-        valid_hosts, _ = self.processor._validate_report_hosts()
+        valid_hosts, _ = self.processor._validate_report_hosts(self.uuid)
         for valid_host in valid_hosts:
             for host_id, host in valid_host.items():
                 self.assertNotIn('no', host)
         # test that if there are no valid hosts we return []
         self.processor.report_json['hosts'] = [invalid_host]
-        valid_hosts, _ = self.processor._validate_report_hosts()
+        valid_hosts, _ = self.processor._validate_report_hosts(self.uuid)
         self.assertEqual([], valid_hosts)
 
     def test_update_slice_exception(self):
