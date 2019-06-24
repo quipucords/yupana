@@ -72,7 +72,8 @@ class ReportProcessorTests(TestCase):
             state_info=json.dumps([Report.NEW]),
             last_update_time=datetime.now(pytz.utc),
             retry_count=0,
-            ready_to_archive=False)
+            ready_to_archive=False,
+            source='satellite')
         self.report_record.save()
 
         self.report_slice = ReportSlice(
@@ -88,7 +89,8 @@ class ReportProcessorTests(TestCase):
             candidate_hosts=[],
             report=self.report_record,
             ready_to_archive=True,
-            hosts_count=2)
+            hosts_count=2,
+            source='satellite')
         self.report_slice.save()
         self.report_record.save()
         self.processor = report_slice_processor.ReportSliceProcessor()
@@ -424,6 +426,7 @@ class ReportProcessorTests(TestCase):
     def test_split_host_list(self):
         """Test splitting the host list into."""
         self.processor.account_number = self.uuid
+        self.processor.report_or_slice = self.report_slice
         all_hosts = [{'account': self.uuid, 'display_name': 'value',
                       'fqdn': 'value', 'bios_uuid': 'value',
                       'facts': [{
@@ -440,6 +443,7 @@ class ReportProcessorTests(TestCase):
     async def async_test_no_account_number_inventory_upload(self):
         """Test the no account number present when uploading to inventory."""
         self.processor.account_number = None
+        self.processor.report_or_slice = self.report_slice
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value'},
                  self.uuid2: {'insights_client_id': 'value', 'name': 'foo'},
                  self.uuid3: {'ip_addresses': 'value', 'name': 'foo'},
@@ -460,6 +464,7 @@ class ReportProcessorTests(TestCase):
     async def async_test_successful_host_inventory_upload(self):
         """Test successful upload to host inventory."""
         self.processor.account_number = self.uuid
+        self.processor.report_or_slice = self.report_slice
         hosts = {self.uuid: {'bios_uuid': 'value', 'name': 'value',
                              'infrastructure_type': 'virtualized',
                              'architecture': 'x86',
@@ -507,6 +512,7 @@ class ReportProcessorTests(TestCase):
     async def async_test_no_json_resp_host_inventory_upload(self):
         """Test unsuccessful upload to host inventory."""
         self.processor.account_number = self.uuid
+        self.processor.report_or_slice = self.report_slice
         hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value',
                                   'facts': [{'namespace': 'yupana',
                                              'facts': {'yupana_host_id': str(self.uuid)}}]},
@@ -553,6 +559,7 @@ class ReportProcessorTests(TestCase):
     async def async_test_400_resp_host_inventory_upload(self):
         """Test 400 response when uploading to host inventory."""
         self.processor.account_number = self.uuid
+        self.processor.report_or_slice = self.report_slice
         hosts = {str(self.uuid):
                  {'bios_uuid': 'value', 'display_name': 'value',
                   'facts': [{'namespace': 'yupana',
@@ -601,6 +608,7 @@ class ReportProcessorTests(TestCase):
     async def async_test_500_resp_host_inventory_upload(self):
         """Test 500 response when uploading to host inventory."""
         self.processor.account_number = self.uuid
+        self.processor.report_or_slice = self.report_slice
         hosts = {
             str(self.uuid): {
                 'bios_uuid': 'value', 'display_name': 'value',
@@ -650,6 +658,7 @@ class ReportProcessorTests(TestCase):
     async def async_test_host_inventory_upload_500(self):
         """Test unsuccessful upload to host inventory with 500 errors."""
         self.processor.account_number = self.uuid
+        self.processor.report_or_slice = self.report_slice
         hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value',
                                   'facts': [{'namespace': 'yupana',
                                              'facts': {'yupana_host_id': str(self.uuid)}}]},
@@ -706,6 +715,7 @@ class ReportProcessorTests(TestCase):
     async def async_test_host_inventory_upload_400(self):
         """Test upload to host inventory with 400 errors."""
         self.processor.account_number = self.uuid
+        self.processor.report_or_slice = self.report_record
         hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value',
                                   'facts': [{'namespace': 'yupana',
                                              'facts': {'yupana_host_id': str(self.uuid)}}]},
@@ -783,6 +793,7 @@ class ReportProcessorTests(TestCase):
         mock_request.side_effect = [good_resp, bad_resp]
         self.processor.account_number = '00001'
         self.processor.report_platform_id = '0001-kevan'
+        self.processor.report_or_slice = self.report_slice
         hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
                  str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'}}
         with patch('processor.report_slice_processor.INSIGHTS_HOST_INVENTORY_URL',
@@ -802,6 +813,7 @@ class ReportProcessorTests(TestCase):
         """Test a request exception raised during host inventory upload."""
         mock_request.side_effect = requests.exceptions.RequestException()
         self.processor.account_number = '00001'
+        self.processor.report_or_slice = self.report_slice
         self.processor.report_platform_id = '0001-kevan'
         hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
                  str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'}}
@@ -909,16 +921,18 @@ class ReportProcessorTests(TestCase):
             'response_body': response_body,
             'response_code': 200,
             'identity_header': identity_header,
-            'failure_catagory': 'INVENTORY FAILURE'
+            'failure_category': 'INVENTORY FAILURE'
         }
         self.processor.report_platform_id = str(self.uuid)
         self.processor.report_slice_id = str(self.uuid2)
         self.processor.account_number = '123456'
         options = {
-            'source': InventoryUploadError.HTTP,
+            'upload_type': InventoryUploadError.HTTP,
+            'source': 'qpc',
             'details': details
         }
         self.processor.record_inventory_upload_errors(options)
         inventory_error = InventoryUploadError.objects.get(
             account=self.processor.account_number)
-        self.assertEqual(inventory_error.source, InventoryUploadError.HTTP)
+        self.assertEqual(inventory_error.upload_type, InventoryUploadError.HTTP)
+        self.assertEqual(inventory_error.source, 'qpc')

@@ -34,6 +34,7 @@ class AbstractReportSliceSerializer(ModelSerializer):
     account = CharField(max_length=50, required=False)
     report_json = JSONField(allow_null=False)
     git_commit = CharField(max_length=50, required=False)
+    source = CharField(max_length=15, required=True)
     state = ChoiceField(choices=ReportSlice.STATE_CHOICES)
     retry_type = ChoiceField(choices=ReportSlice.RETRY_CHOICES, default=ReportSlice.TIME)
     state_info = JSONField(allow_null=False)

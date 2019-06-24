@@ -26,7 +26,9 @@ class InventoryUploadErrorSerializer(ModelSerializer):
     report_platform_id = UUIDField(format='hex_verbose', required=False)
     report_slice_id = UUIDField(format='hex_verbose', required=False)
     account = CharField(max_length=50, required=True)
-    source = ChoiceField(choices=InventoryUploadError.SOURCE_CHOICES, required=False)
+    source = CharField(max_length=15, required=True)
+    upload_type = ChoiceField(choices=InventoryUploadError.UPLOAD_TYPE_CHOICES,
+                              required=False)
     details = JSONField(allow_null=False)
 
     class Meta:

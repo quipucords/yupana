@@ -67,7 +67,8 @@ class ReportProcessorTests(TransactionTestCase):
             state_info=json.dumps([Report.NEW]),
             last_update_time=datetime.now(pytz.utc),
             retry_count=0,
-            ready_to_archive=False)
+            ready_to_archive=False,
+            source='qpc')
         self.report_record.save()
 
         self.report_slice = ReportSlice(
@@ -640,6 +641,7 @@ class ReportProcessorTests(TransactionTestCase):
     def test_validate_report_success(self):
         """Test that a QPC report with the correct structure passes validation."""
         self.processor.account_number = '123'
+        self.processor.report_or_slice = self.report_record
         self.processor.report_json = {
             'report_id': 1,
             'report_slice_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319-1',
@@ -799,6 +801,7 @@ class ReportProcessorTests(TransactionTestCase):
         # test all valid hosts
         self.processor.report_platform_id = self.uuid2
         self.processor.account_number = '12345'
+        self.processor.report_or_slice = self.report_record
         hosts = [{'bios_uuid': 'value', 'name': 'value', 'facts': []},
                  {'insights_client_id': 'value', 'name': 'foo', 'facts': []},
                  {'ip_addresses': 'value', 'name': 'foo', 'facts': []},
@@ -826,7 +829,8 @@ class ReportProcessorTests(TransactionTestCase):
                                    'facts': {'yupana_host_id': host_id,
                                              'report_platform_id': self.uuid2,
                                              'report_slice_id': self.uuid,
-                                             'account': '12345'}}])
+                                             'account': '12345',
+                                             'source': 'qpc'}}])
         for invalid_host in actual_invalid:
             for host_id, host in invalid_host.items():
                 if host_id != 'cause':
@@ -837,7 +841,8 @@ class ReportProcessorTests(TransactionTestCase):
                                        'facts': {'yupana_host_id': host_id,
                                                  'report_platform_id': self.uuid2,
                                                  'report_slice_id': self.uuid,
-                                                 'account': '12345'}}])
+                                                 'account': '12345',
+                                                 'source': 'qpc'}}])
 
         # test that invalid hosts are removed
         invalid_host = {'no': 'canonical facts', 'metadata': []}

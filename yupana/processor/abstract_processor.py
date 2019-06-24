@@ -513,7 +513,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     'last_update_time': report_slice.last_update_time,
                     'report_slice_id': report_slice.report_slice_id,
                     'report': archived_rep.id,
-                    'hosts_count': report_slice.hosts_count
+                    'hosts_count': report_slice.hosts_count,
+                    'source': report_slice.source
                 }
                 if report_slice.report_platform_id:
                     archived_slice_data['report_platform_id'] = report_slice.report_platform_id
@@ -635,7 +636,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                                'facts': {'yupana_host_id': host_uuid,
                                          'report_platform_id': self.report_platform_id,
                                          'report_slice_id': report_slice_id,
-                                         'account': self.account_number}})
+                                         'account': self.account_number,
+                                         'source': self.report_or_slice.source}})
             host['facts'] = host_facts
             found_facts = False
             for fact in CANONICAL_FACTS:

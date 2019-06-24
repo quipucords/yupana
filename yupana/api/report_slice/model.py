@@ -25,6 +25,7 @@ class AbstractReportSlice(models.Model):
     report_json = models.TextField(null=True)
     git_commit = models.CharField(max_length=50, null=True)
     ready_to_archive = models.BooleanField(null=False, default=False)
+    source = models.CharField(max_length=15, null=False)
 
     PENDING = 'pending'
     NEW = 'new'
@@ -74,6 +75,8 @@ class AbstractReportSlice(models.Model):
             'account: {}, ' \
             'report_json: {}, '\
             'git_commit: {}, '\
+            'ready_to_archive: {}, '\
+            'source: {}, '\
             'state: {}, '\
             'state_info: {}, '\
             'retry_count: {}, '\
@@ -87,6 +90,8 @@ class AbstractReportSlice(models.Model):
                 self.account,
                 self.report_json,
                 self.git_commit,
+                self.ready_to_archive,
+                self.source,
                 self.state,
                 self.state_info,
                 self.retry_count,

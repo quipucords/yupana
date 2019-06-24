@@ -20,15 +20,16 @@ class InventoryUploadError(models.Model):
     report_platform_id = models.UUIDField(null=False)
     report_slice_id = models.UUIDField(null=False)
     account = models.CharField(max_length=50, null=False)
+    source = models.CharField(max_length=15, null=False)
 
     HTTP = 'http'
     KAFKA = 'kafka'
-    SOURCE_CHOICES = ((HTTP, HTTP),
-                      (KAFKA, KAFKA))
+    UPLOAD_TYPE_CHOICES = ((HTTP, HTTP),
+                           (KAFKA, KAFKA))
 
-    source = models.CharField(
+    upload_type = models.CharField(
         max_length=10,
-        choices=SOURCE_CHOICES
+        choices=UPLOAD_TYPE_CHOICES
     )
 
     details = models.TextField(null=False)
@@ -39,9 +40,11 @@ class InventoryUploadError(models.Model):
             'report_slice_id: {}, '\
             'account: {}, '\
             'source: {}, '\
+            'upload_type: {}, '\
             'details: {}'.format(
                 self.report_platform_id,
                 self.report_slice_id,
                 self.account,
                 self.source,
+                self.upload_type,
                 self.details) + '}'

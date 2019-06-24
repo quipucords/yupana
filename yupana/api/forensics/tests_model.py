@@ -46,24 +46,26 @@ class InventoryUploadErrorModelTest(TestCase):
             'response_body': self.response_body,
             'response_code': 200,
             'identity_header': self.identity_header,
-            'failure_catagory': 'INVENTORY FAILURE'
+            'failure_category': 'INVENTORY FAILURE'
         }
-        self.inventoryerror = InventoryUploadError(
+        self.inventory_error = InventoryUploadError(
             report_platform_id=self.uuid,
             report_slice_id=self.uuid2,
             account='12345',
             details=json.dumps(self.details),
-            source=InventoryUploadError.HTTP
+            upload_type=InventoryUploadError.HTTP,
+            source='qpc'
         )
-        self.inventoryerror.save()
+        self.inventory_error.save()
 
     def test_inventory_upload_error_fields(self):
         """Test the InventoryUploadError fields."""
-        self.assertEqual(self.inventoryerror.source, InventoryUploadError.HTTP)
-        self.assertEqual(self.inventoryerror.report_platform_id, self.uuid)
-        self.assertEqual(self.inventoryerror.report_slice_id, self.uuid2)
-        self.assertEqual(self.inventoryerror.account, '12345')
-        self.assertEqual(json.loads(self.inventoryerror.details), self.details)
+        self.assertEqual(self.inventory_error.source, 'qpc')
+        self.assertEqual(self.inventory_error.upload_type, InventoryUploadError.HTTP)
+        self.assertEqual(self.inventory_error.report_platform_id, self.uuid)
+        self.assertEqual(self.inventory_error.report_slice_id, self.uuid2)
+        self.assertEqual(self.inventory_error.account, '12345')
+        self.assertEqual(json.loads(self.inventory_error.details), self.details)
         # pylint: disable=line-too-long
-        expected = '{report_platform_id: %s, report_slice_id: %s, account: 12345, source: http, details: {"request_body": {"host_id": "foo", "ip_addresses": "bar"}, "response_body": {"foo": "bar"}, "response_code": 200, "identity_header": {"account": "123456"}, "failure_catagory": "INVENTORY FAILURE"}}' % (self.uuid, self.uuid2)  # noqa
-        self.assertEqual(expected, str(self.inventoryerror))
+        expected = '{report_platform_id: %s, report_slice_id: %s, account: 12345, source: qpc, upload_type: http, details: {"request_body": {"host_id": "foo", "ip_addresses": "bar"}, "response_body": {"foo": "bar"}, "response_code": 200, "identity_header": {"account": "123456"}, "failure_category": "INVENTORY FAILURE"}}' % (self.uuid, self.uuid2)  # noqa
+        self.assertEqual(expected, str(self.inventory_error))

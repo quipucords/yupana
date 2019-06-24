@@ -22,6 +22,7 @@ import concurrent.futures
 import json
 import logging
 import threading
+from datetime import datetime
 from http import HTTPStatus
 
 import requests
@@ -242,13 +243,15 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         """
         details = options.get('details')
         source = options.get('source')
+        upload_type = options.get('upload_type')
 
         inventory_upload_error = {
             'report_platform_id': self.report_platform_id,
             'report_slice_id': self.report_slice_id,
             'account': self.account_number,
             'details': json.dumps(details),
-            'source': source
+            'source': source,
+            'upload_type': upload_type
         }
         error_serializer = InventoryUploadErrorSerializer(data=inventory_upload_error)
         if error_serializer.is_valid(raise_exception=True):
@@ -279,7 +282,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         retry_commit_candidates = []  # storing hosts to retry after commit change
         error_messages = []
         details = {'identity_header': identity_header}
-        inventory_error_info = {'source': InventoryUploadError.HTTP}
+        inventory_error_info = {'upload_type': InventoryUploadError.HTTP,
+                                'source': self.report_or_slice.source}
         retry_exception = False
         inventory_error = False
         UPLOAD_GROUP_SIZE.set(len(hosts_list))
@@ -298,14 +302,14 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     error_messages.append(json_error)
                     details['additional_info'] = json_error
                     inventory_error = True
-                    details['failure_catagory'] = INVENTORY_FAILURE
+                    details['failure_category'] = INVENTORY_FAILURE
                     raise RetryUploadTimeException()
 
                 errors = json_body.get('errors')
                 if errors != 0:
                     details['response_body'] = json_body
                     inventory_error = True
-                    details['failure_catagory'] = UPLOAD_DATA_FAILURE
+                    details['failure_category'] = UPLOAD_DATA_FAILURE
                     all_data = json_body.get('data', [])
                     host_index = 0
                     for host_data in all_data:
@@ -357,13 +361,13 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     error_messages.append(json_error)
                     error_messages.append('Unexpected response code %s' % str(response.status_code))
                 if str(response.status_code).startswith('5'):
-                    details['failure_catagory'] = INVENTORY_FAILURE
+                    details['failure_category'] = INVENTORY_FAILURE
                     # something went wrong on host inventory side and we should regenerate after
                     # some time has passed
                     raise RetryUploadTimeException()
                 # else something went wrong possibly on our side (if its a 400)
                 # and we should regenerate the hosts dictionary and re-upload after a commit
-                details['failure_catagory'] = UPLOAD_DATA_FAILURE
+                details['failure_category'] = UPLOAD_DATA_FAILURE
                 raise RetryUploadCommitException()
 
         except RetryUploadCommitException:
@@ -374,7 +378,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             retry_list = retry_time_candidates
         except requests.exceptions.RequestException as err:
             inventory_error = True
-            details['failure_catagory'] = INVENTORY_FAILURE
+            details['failure_category'] = INVENTORY_FAILURE
             request_error = 'A request exception occurred: %s ' % str(err)
             details['additional_info'] = request_error
             error_messages.append(request_error)
@@ -408,6 +412,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             'failed_hosts': failed_hosts,
             'error_messages': error_messages
         }
+        details['date'] = datetime.now()
         inventory_error_info['details'] = details
         if inventory_error:
             response['inventory_error'] = inventory_error_info
