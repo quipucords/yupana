@@ -101,7 +101,7 @@ class KafkaMsgHandlerTest(TestCase):
     async def save_and_ack(self):
         """Test the save and ack message method."""
         test_consumer = AIOKafkaConsumer(
-            msg_handler.AVAILABLE_TOPIC, msg_handler.QPC_TOPIC,
+            msg_handler.QPC_TOPIC,
             loop=msg_handler.EVENT_LOOP, bootstrap_servers=msg_handler.INSIGHTS_KAFKA_ADDRESS,
             group_id='qpc-group', enable_auto_commit=False
         )
@@ -115,10 +115,6 @@ class KafkaMsgHandlerTest(TestCase):
             self.assertEqual(json.loads(report.upload_srv_kafka_msg),
                              {'account': '8910'})
             self.assertEqual(report.state, Report.NEW)
-
-        # test available topic
-        available_msg = KafkaMsg(msg_handler.AVAILABLE_TOPIC, self.payload_url)
-        await msg_handler.save_message_and_ack(test_consumer, available_msg)
 
         # test no rh_account
         with patch('processor.kafka_msg_handler.unpack_consumer_record',
