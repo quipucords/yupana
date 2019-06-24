@@ -65,7 +65,7 @@ make reinit-db
 
 Assuming the default .env file values are used, to access the database directly using psql run:
 ```
-psql postgres -U postgres -h localhost -p 15432
+psql postgres -U postgres -h localhost -p 5432
 ```
 
 There is a known limitation with docker-compose and Linux environments with SELinux enabled. You may see the following error during the postgres container deployment:
