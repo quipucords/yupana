@@ -7,7 +7,7 @@ name = "pypi"
 
 [packages]
 
-aiokafka = "==0.5.1"
+aiokafka = "==0.5.2"
 djangorestframework = "==3.9.4"
 Django = "==2.2.2"
 django-environ = "==0.4.5"
