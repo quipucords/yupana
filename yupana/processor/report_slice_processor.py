@@ -412,7 +412,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             'failed_hosts': failed_hosts,
             'error_messages': error_messages
         }
-        details['date'] = datetime.now()
+        details['date'] = str(datetime.now())
         inventory_error_info['details'] = details
         if inventory_error:
             response['inventory_error'] = inventory_error_info

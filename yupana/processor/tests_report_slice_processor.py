@@ -923,6 +923,7 @@ class ReportProcessorTests(TestCase):
             'identity_header': identity_header,
             'failure_category': 'INVENTORY FAILURE'
         }
+        details['date'] = str(datetime.now())
         self.processor.report_platform_id = str(self.uuid)
         self.processor.report_slice_id = str(self.uuid2)
         self.processor.account_number = '123456'
