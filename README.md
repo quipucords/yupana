@@ -65,7 +65,7 @@ make reinit-db
 
 Assuming the default .env file values are used, to access the database directly using psql run:
 ```
-psql postgres -U postgres -h localhost -p 15432
+psql postgres -U postgres -h localhost -p 5432
 ```
 
 There is a known limitation with docker-compose and Linux environments with SELinux enabled. You may see the following error during the postgres container deployment:
@@ -232,7 +232,7 @@ This command will use the `sample.tar.gz` file in the Yupana repository, change 
 ## Preparing Custom Data for Upload
 In addition to preparing a sample `tar.gz` file, you also have the option to prepare your own data for uploading to Insights. To prepare your custom data for upload, simply run:
 ```
-make custom-data data_file=<path/to/your-data.tar.gz>
+make custom-data file=<path/to/your-data.tar.gz>
 ```
 
 Replace the `<path/to/your-data.tar.gz>` with either the absolute or relative path to the `tar.gz` file holding your data. This command will copy your data files into the `temp/` directory, change the UUIDs and place the files into a new `tar.gz` file inside the `temp/` directory.

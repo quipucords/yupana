@@ -35,7 +35,6 @@ LOG = logging.getLogger(__name__)
 EVENT_LOOP = asyncio.get_event_loop()
 MSG_PENDING_QUEUE = asyncio.Queue()
 QPC_TOPIC = 'platform.upload.qpc'
-AVAILABLE_TOPIC = 'platform.upload.available'
 
 MSG_UPLOADS = Counter('uploaded_messages', 'Number of messages uploaded to qpc topic')
 
@@ -168,7 +167,7 @@ async def loop_save_message_and_ack(consumer):
 
 async def listen_for_messages(consumer):  # pragma: no cover
     """
-    Listen for messages on the available and qpc topics.
+    Listen for messages on the qpc topic.
 
     Once a message from one of these topics arrives, we add
     them to the MSG_PENDING_QUEUE.
@@ -199,7 +198,7 @@ def asyncio_worker_thread(loop):  # pragma: no cover
     :returns None
     """
     consumer = AIOKafkaConsumer(
-        AVAILABLE_TOPIC, QPC_TOPIC,
+        QPC_TOPIC,
         loop=EVENT_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS,
         group_id='qpc-group', enable_auto_commit=False
     )
