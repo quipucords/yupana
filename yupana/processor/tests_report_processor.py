@@ -982,7 +982,13 @@ class ReportProcessorTests(TransactionTestCase):
         slice_id = '1234556'
         hosts_count = 1
         with self.assertRaises(Exception):
-            self.processor.create_report_slice(report_json, slice_id, hosts_count)
+            options = {
+                'report_json': report_json,
+                'report_slice_id': slice_id,
+                'hosts_count': hosts_count,
+                'source': 'qpc',
+            }
+            self.processor.create_report_slice(options)
 
     def test_extract_and_create_slices_two_reps_copy(self):
         """Testing the extract method with valid buffer content."""
