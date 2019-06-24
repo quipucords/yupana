@@ -21,10 +21,11 @@ class AbstractReportSlice(models.Model):
 
     report_platform_id = models.UUIDField(null=True)
     report_slice_id = models.UUIDField(null=True)
-    rh_account = models.CharField(max_length=50, null=True)
+    account = models.CharField(max_length=50, null=True)
     report_json = models.TextField(null=True)
     git_commit = models.CharField(max_length=50, null=True)
     ready_to_archive = models.BooleanField(null=False, default=False)
+    source = models.CharField(max_length=15, null=False)
 
     PENDING = 'pending'
     NEW = 'new'
@@ -71,9 +72,11 @@ class AbstractReportSlice(models.Model):
         """Convert to string."""
         return '{' + 'report_platform_id:{}, '\
             'report_slice_id: {}, '\
-            'rh_account: {}, ' \
+            'account: {}, ' \
             'report_json: {}, '\
             'git_commit: {}, '\
+            'ready_to_archive: {}, '\
+            'source: {}, '\
             'state: {}, '\
             'state_info: {}, '\
             'retry_count: {}, '\
@@ -84,9 +87,11 @@ class AbstractReportSlice(models.Model):
             'hosts_count: {}'.format(
                 self.report_platform_id,
                 self.report_slice_id,
-                self.rh_account,
+                self.account,
                 self.report_json,
                 self.git_commit,
+                self.ready_to_archive,
+                self.source,
                 self.state,
                 self.state_info,
                 self.retry_count,

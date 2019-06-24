@@ -21,7 +21,7 @@ class AbstractReport(models.Model):
     host_inventory_api_version = models.CharField(max_length=10, null=True)
     source = models.CharField(max_length=15, null=True)
     source_metadata = models.TextField(null=True)
-    rh_account = models.CharField(max_length=50, null=True)
+    account = models.CharField(max_length=50, null=True)
     upload_ack_status = models.CharField(max_length=10, null=True)
     upload_srv_kafka_msg = models.TextField(null=True)
     git_commit = models.CharField(max_length=50, null=True)
@@ -71,7 +71,7 @@ class AbstractReport(models.Model):
             'host_inventory_api_version: {}, '\
             'source: {}, '\
             'source_metadata: {}, '\
-            'rh_account: {}, ' \
+            'account: {}, ' \
             'upload_ack_status: {}, ' \
             'upload_srv_kafka_msg: {}, ' \
             'git_commit: {}, '\
@@ -84,7 +84,7 @@ class AbstractReport(models.Model):
                 self.host_inventory_api_version,
                 self.source,
                 self.source_metadata,
-                self.rh_account,
+                self.account,
                 self.upload_ack_status,
                 self.upload_srv_kafka_msg,
                 self.git_commit,
