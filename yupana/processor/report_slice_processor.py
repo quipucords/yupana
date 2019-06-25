@@ -39,7 +39,8 @@ from config.settings.base import (HOSTS_PER_REQ,
                                   INSIGHTS_HOST_INVENTORY_URL,
                                   MAX_THREADS,
                                   RETRIES_ALLOWED,
-                                  RETRY_TIME)
+                                  RETRY_TIME,
+                                  UPLOAD_MODE)
 
 LOG = logging.getLogger(__name__)
 SLICE_PROCESSING_LOOP = asyncio.new_event_loop()
@@ -143,13 +144,19 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         self.prefix = 'ATTEMPTING HOST UPLOAD'
         LOG.info(format_message(
             self.prefix,
-            'Uploading hosts to inventory. State is "%s".' % self.report_or_slice.state,
+            'Uploading hosts to inventory. State is "%s". UPLOAD_MODE is %s' %
+                (self.report_or_slice.state, UPLOAD_MODE)
             account_number=self.account_number, report_platform_id=self.report_platform_id))
         try:
             if self.candidate_hosts:
                 candidates = self.generate_upload_candidates()
-                retry_time_candidates, retry_commit_candidates = \
-                    await self._upload_to_host_inventory(candidates)
+                if UPLOAD_MODE.lower() == 'http':
+                    retry_time_candidates, retry_commit_candidates = \
+                        await self._upload_to_host_inventory(candidates)
+                else:
+                    # placeholder for upload via Kafka function
+                    retry_time_candidates, retry_commit_candidates = \
+                        await self._upload_to_host_inventory(candidates)
                 if not retry_time_candidates and not retry_commit_candidates:
                     LOG.info(format_message(self.prefix, 'All hosts were successfully uploaded.',
                                             account_number=self.account_number,

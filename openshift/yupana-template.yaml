@@ -101,6 +101,7 @@ objects:
     maximum-replicas: ${MAXIMUM_REPLICAS}
     target-cpu-utilization: ${TARGET_CPU_UTILIZATION}
     pause-kafka-for-file-upload-service: ${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE}
+    upload-mode: ${UPLOAD_MODE}
     log-level: INFO
 - apiVersion: v1
   kind: Service
@@ -373,6 +374,12 @@ objects:
                   name: yupana-env
                   key: pause-kafka-for-file-upload-service
                   optional: true
+            - name: UPLOAD_MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: yupana-env
+                  key: upload-mode
+                  optional: false
           livenessProbe:
             failureThreshold: 3
             httpGet:
@@ -735,3 +742,8 @@ parameters:
   displayName: Pause Kafka for file upload
   name: PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE
   required: false
+- description: Mode for uploading to the host inventory
+  displayName: Upload mode for host inventory
+  name: UPLOAD_MODE
+  required: true
+  value: "http"
