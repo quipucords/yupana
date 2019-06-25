@@ -307,12 +307,11 @@ class ReportProcessorTests(TestCase):
         self.processor.candidate_hosts = hosts
         self.processor._upload_to_host_inventory = CoroutineMock(
             return_value=([], []))
-        with patch('base.UPLOAD_MODE',
-                   value='kafka'):
-            await self.processor.transition_to_hosts_uploaded()
-            self.assertEqual(json.loads(self.report_slice.candidate_hosts), [])
-            self.assertEqual(self.report_slice.state, ReportSlice.HOSTS_UPLOADED)
+        await self.processor.transition_to_hosts_uploaded()
+        self.assertEqual(json.loads(self.report_slice.candidate_hosts), [])
+        self.assertEqual(self.report_slice.state, ReportSlice.HOSTS_UPLOADED)
 
+    @patch('processor.report_slice_processor.UPLOAD_MODE', 'kafka')
     def test_transition_to_hosts_uploaded_kafka_mode(self):
         """Test the async hosts uploaded successful."""
         event_loop = asyncio.new_event_loop()
