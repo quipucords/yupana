@@ -144,8 +144,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         self.prefix = 'ATTEMPTING HOST UPLOAD'
         LOG.info(format_message(
             self.prefix,
-            'Uploading hosts to inventory. State is "%s". UPLOAD_MODE is %s' %
-                (self.report_or_slice.state, UPLOAD_MODE)
+            'Uploading hosts to inventory. State is "%s". UPLOAD_MODE is "%s".' %
+            (self.report_or_slice.state, UPLOAD_MODE),
             account_number=self.account_number, report_platform_id=self.report_platform_id))
         try:
             if self.candidate_hosts:
