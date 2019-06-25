@@ -61,6 +61,11 @@ help:
 	@echo "custom-data file=<path/to/file>             ready given data for upload to Insights"
 	@echo "upload-data file=<path/to/file>             upload data to Insights"
 	@echo ""
+	@echo "--- Commands for local development ---"
+	@echo "local-dev-up                                bring up yupana with all required services"
+	@echo "local-dev-down                              bring down yupana with all required services"
+	@echo "local-upload-data file=<path/to/file>       upload data to local file upload service for yupana processing"
+	@echo ""
 
 clean:
 	git clean -fdx -e .idea/ -e *env/ $(PYDIR)/db.sqlite3
@@ -260,5 +265,8 @@ local-dev-down:
 	cd ../insights-upload/docker/;docker-compose down
 	docker-compose down
 
-send:
-	curl -vvvv -H "x-rh-identity: eyJpZGVudGl0eSI6IHsiYWNjb3VudF9udW1iZXIiOiAiMTIzNDUiLCAiaW50ZXJuYWwiOiB7Im9yZ19pZCI6ICI1NDMyMSJ9fX0=" -F "file=@sample.tar.gz;type=application/vnd.redhat.qpc.tar+tgz" -H "x-rh-insights-request-id: 52df9f748eabcfea" localhost:8080/api/ingress/v1/upload
+local-upload-data:
+	curl -vvvv -H "x-rh-identity: eyJpZGVudGl0eSI6IHsiYWNjb3VudF9udW1iZXIiOiAiMTIzNDUiLCAiaW50ZXJuYWwiOiB7Im9yZ19pZCI6ICI1NDMyMSJ9fX0=" \
+		-F "file=@$(file);type=application/vnd.redhat.qpc.tar+tgz" \
+		-H "x-rh-insights-request-id: 52df9f748eabcfea" \
+		localhost:8080/api/ingress/v1/upload

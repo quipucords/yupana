@@ -57,10 +57,33 @@ Then project dependencies and a virtual environment can be created using:
 pipenv install --dev
 ```
 ### Bringing up yupana with all services
+
 To locally run the file upload service, yupana, and host inventory service run the following command:
 ```
 make local-dev-up
 ```
+
+### Sending data to local yupana
+To send the sample data, run the following commands:
+1. Prepare the sample for sending
+    ```
+    make sample-data
+    ```
+
+2. Locate the temp file name.  You will see a message like the following:
+    ```
+    The updated report was written to temp/sample_data_ready_1561410754.tar.gz
+    ```
+3. Send the temp file to your local yupana.  Copy the name of this file to the upload command as shown below:
+    ```
+    make local-upload-data file=temp/sample_data_ready_1561410754.tar.gz
+    ```
+4. Watch the kafka consumer for a message to arrive.  You will see something like this in the consumer iTerm.
+    ```
+    {"account": "12345", "rh_account": "12345", "principal": "54321", "request_id": "52df9f748eabcfea", "payload_id": "52df9f748eabcfea", "size": 1132, "service": "qpc", "category": "tar", "b64_identity": "eyJpZGVudGl0eSI6IHsiYWNjb3VudF9udW1iZXIiOiAiMTIzNDUiLCAiaW50ZXJuYWwiOiB7Im9yZ19pZCI6ICI1NDMyMSJ9fX0=", "url": "http://minio:9000/insights-upload-perm-test/52df9f748eabcfea?AWSAccessKeyId=BQA2GEXO711FVBVXDWKM&Signature=WEgFnnKzUTsSJsQ5ouiq9HZG5pI%3D&Expires=1561586445"}
+
+5. Look at the yupana logs to follow the report processing to completion.
+    ```
 
 ### Bringing down yupana and all services
 To bring down all services run:
