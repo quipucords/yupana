@@ -112,7 +112,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         If the function is async, make sure to await it.
         """
         self.state = self.report_or_slice.state
-        self.account_number = self.report_or_slice.rh_account
+        self.account_number = self.report_or_slice.account
         self.upload_message = json.loads(self.report_or_slice.upload_srv_kafka_msg)
         if self.report_or_slice.report_platform_id:
             self.report_platform_id = self.report_or_slice.report_platform_id
@@ -228,7 +228,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 report_platform_id=self.report_platform_id))
             self.determine_retry(Report.FAILED_VALIDATION_REPORTING, Report.VALIDATED)
 
-    def create_report_slice(self, report_json, report_slice_id, hosts_count):
+    def create_report_slice(self, options):
         """Create report slice.
 
         :param report_json: <dict> the report info in json format
@@ -236,6 +236,10 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         :param hosts_count: <int> the number of hosts inside the report slice
         :returns boolean regarding whether or not the slice was created.
         """
+        report_json = options.get('report_json')
+        report_slice_id = options.get('report_slice_id')
+        hosts_count = options.get('hosts_count')
+        source = options.get('source')
         LOG.info(
             format_message(
                 self.prefix, 'Creating report slice %s' % report_slice_id,
@@ -256,7 +260,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
 
         report_slice = {
             'state': ReportSlice.PENDING,
-            'rh_account': self.account_number,
+            'account': self.account_number,
             'state_info': json.dumps([ReportSlice.PENDING]),
             'last_update_time': datetime.now(pytz.utc),
             'retry_count': 0,
@@ -266,7 +270,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             'candidate_hosts': json.dumps({}),
             'report_slice_id': report_slice_id,
             'report': self.report_or_slice.id,
-            'hosts_count': hosts_count
+            'hosts_count': hosts_count,
+            'source': source
         }
         slice_serializer = ReportSliceSerializer(data=report_slice)
         if slice_serializer.is_valid(raise_exception=True):
@@ -277,8 +282,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     'Successfully created report slice %s' % report_slice_id,
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id))
-        created = True
-        return created
+        return True
 
     # pylint: disable=too-many-arguments,too-many-locals
     def update_slice_state(self, options, report_slice):  # noqa: C901 (too-complex)
@@ -588,10 +592,14 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                                                        account_number=self.account_number,
                                                        report_platform_id=self.report_platform_id))
                                     continue
+                                slice_options = {
+                                    'report_json': report_slice_json,
+                                    'report_slice_id': report_slice_id,
+                                    'hosts_count': num_hosts,
+                                    'source': options.get('source')
+                                }
                                 created = self.create_report_slice(
-                                    report_json=report_slice_json,
-                                    report_slice_id=report_slice_id,
-                                    hosts_count=num_hosts)
+                                    slice_options)
                                 if created:
                                     report_names.append(report_id)
 

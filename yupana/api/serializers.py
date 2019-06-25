@@ -18,6 +18,7 @@
 """API models for import organization."""
 # flake8: noqa
 # pylint: disable=unused-import
+from api.forensics.serializer import InventoryUploadErrorSerializer
 from api.status.serializer import StatusSerializer
 from api.report.serializer import ReportSerializer, ReportArchiveSerializer
 from api.report_slice.serializer import ReportSliceSerializer, ReportSliceArchiveSerializer

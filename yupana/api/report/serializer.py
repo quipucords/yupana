@@ -30,7 +30,7 @@ class AbstractReportSerializer(ModelSerializer):
     host_inventory_api_version = CharField(max_length=10, required=False)
     source = CharField(max_length=15, required=False)
     source_metadata = JSONField(allow_null=True, required=False)
-    rh_account = CharField(max_length=50, required=False)
+    account = CharField(max_length=50, required=False)
     upload_ack_status = CharField(max_length=10, required=False)
     upload_srv_kafka_msg = JSONField(required=True)
     git_commit = CharField(max_length=50, required=False)

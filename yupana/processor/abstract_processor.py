@@ -93,6 +93,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         self.account_number = None
         self.upload_message = None
         self.report_platform_id = None
+        self.report_slice_id = None
         self.report_json = None
         self.candidate_hosts = None
         self.failed_hosts = None
@@ -107,6 +108,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         self.account_number = None
         self.upload_message = None
         self.report_platform_id = None
+        self.report_slice_id = None
         self.report_json = None
         self.candidate_hosts = None
         self.failed_hosts = None
@@ -467,7 +469,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                                     account_number=self.account_number,
                                     report_platform_id=self.report_platform_id))
             archived_rep_data = {
-                'rh_account': report.rh_account,
+                'account': report.account,
                 'retry_count': report.retry_count,
                 'retry_type': report.retry_type,
                 'state': report.state,
@@ -500,7 +502,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             # loop through the associated reports & archive them
             for report_slice in all_report_slices:
                 archived_slice_data = {
-                    'rh_account': report_slice.rh_account,
+                    'account': report_slice.account,
                     'retry_count': report_slice.retry_count,
                     'retry_type': report_slice.retry_type,
                     'candidate_hosts': report_slice.candidate_hosts,
@@ -511,7 +513,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     'last_update_time': report_slice.last_update_time,
                     'report_slice_id': report_slice.report_slice_id,
                     'report': archived_rep.id,
-                    'hosts_count': report_slice.hosts_count
+                    'hosts_count': report_slice.hosts_count,
+                    'source': report_slice.source
                 }
                 if report_slice.report_platform_id:
                     archived_slice_data['report_platform_id'] = report_slice.report_platform_id
@@ -631,9 +634,10 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             host_facts = host.get('facts', [])
             host_facts.append({'namespace': 'yupana',
                                'facts': {'yupana_host_id': host_uuid,
-                                         'report_platform_id': self.report_platform_id,
-                                         'report_slice_id': report_slice_id,
-                                         'account': self.account_number}})
+                                         'report_platform_id': str(self.report_platform_id),
+                                         'report_slice_id': str(report_slice_id),
+                                         'account': self.account_number,
+                                         'source': self.report_or_slice.source}})
             host['facts'] = host_facts
             found_facts = False
             for fact in CANONICAL_FACTS:
