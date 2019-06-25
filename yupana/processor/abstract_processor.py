@@ -35,7 +35,9 @@ from api.models import (Report,
                         Status)
 from api.serializers import (ReportArchiveSerializer,
                              ReportSliceArchiveSerializer)
-from config.settings.base import (RETRIES_ALLOWED, RETRY_TIME)
+from config.settings.base import (EMPTY_QUEUE_SLEEP,
+                                  RETRIES_ALLOWED,
+                                  RETRY_TIME)
 
 LOG = logging.getLogger(__name__)
 FAILURE_CONFIRM_STATUS = 'failure'
@@ -43,7 +45,7 @@ CANONICAL_FACTS = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addre
                    'vm_uuid', 'etc_machine_id', 'subscription_manager_id']
 
 FAILED_VALIDATION = 'VALIDATION'
-EMPTY_QUEUE_SLEEP = 60
+EMPTY_QUEUE_SLEEP = int(EMPTY_QUEUE_SLEEP)
 RETRY = Enum('RETRY', 'clear increment keep_same')
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
