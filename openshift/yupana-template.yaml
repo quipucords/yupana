@@ -746,3 +746,4 @@ parameters:
   displayName: Time in between db queries for reports and slices
   name: EMPTY_QUEUE_SLEEP
   required: false
+  value: "60"
