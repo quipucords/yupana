@@ -113,26 +113,26 @@ sample-data:
 	mkdir -p temp/old_reports_temp
 	tar -xvzf sample.tar.gz -C temp/old_reports_temp
 	python scripts/change_uuids.py
-	@echo sample_data_ready_$(shell date +%s).tar.gz > filename_temp.txt
-	@cd temp; COPYFILE_DISABLE=1 tar -zcvf ${shell cat filename_temp.txt} reports
-	rm -rf temp/reports
-	rm -rf temp/old_reports_temp
-	@echo ""
-	@echo "The updated report was written to" temp/${shell cat filename_temp.txt}
-	@echo ""
+	@NEW_FILENAME="sample_data_ready_$(shell date +%s).tar.gz"; \
+	cd temp; COPYFILE_DISABLE=1 tar -zcvf $$NEW_FILENAME reports; \
+	echo ""; \
+	echo "The updated report was written to" temp/$$NEW_FILENAME; \
+	echo ""; \
+	rm -rf reports; \
+	rm -rf old_reports_temp
 
 custom-data:
 	mkdir -p temp/reports
 	mkdir -p temp/old_reports_temp
 	tar -xvzf $(file) -C temp/old_reports_temp
 	python scripts/change_uuids.py
-	@echo sample_data_ready_$(shell date +%s).tar.gz > filename_temp.txt
-	@cd temp; COPYFILE_DISABLE=1 tar -zcvf ${shell cat filename_temp.txt} reports
-	rm -rf temp/reports
-	rm -rf temp/old_reports_temp
-	@echo ""
-	@echo "The updated report was written to" temp/${shell cat filename_temp.txt}
-	@echo ""
+	@NEW_FILENAME="sample_data_ready_$(shell date +%s).tar.gz"; \
+	cd temp; COPYFILE_DISABLE=1 tar -zcvf $$NEW_FILENAME reports; \
+	echo ""; \
+	echo "The updated report was written to" temp/$$NEW_FILENAME; \
+	echo ""; \
+	rm -rf reports; \
+	rm -rf old_reports_temp
 
 upload-data:
 	curl -vvvv -H "x-rh-identity: $(shell echo '{"identity": {"account_number": $(RH_ACCOUNT_NUMBER), "internal": {"org_id": $(RH_ORG_ID)}}}' | base64)" \
