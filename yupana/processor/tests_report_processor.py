@@ -135,6 +135,7 @@ class ReportProcessorTests(TransactionTestCase):
         # assert the report archive does exist
         archived = ReportArchive.objects.get(account='4321')
         self.assertEqual(json.loads(archived.state_info), [Report.NEW])
+        self.assertIsNotNone(archived.processing_end_time)
         # assert the processor was reset
         self.check_variables_are_reset()
 

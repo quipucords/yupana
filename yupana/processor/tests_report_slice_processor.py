@@ -854,6 +854,7 @@ class ReportProcessorTests(TestCase):
             report_slice_id=self.report_slice.report_slice_id)
         self.assertEqual(str(archived.report_platform_id), str(self.uuid))
         self.assertEqual(str(archived_slice.report_platform_id), str(self.uuid))
+        self.assertIsNotNone(archived_slice.processing_end_time)
         # assert the processor was reset
         self.check_variables_are_reset()
 
