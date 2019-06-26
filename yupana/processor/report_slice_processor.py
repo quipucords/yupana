@@ -35,12 +35,12 @@ from processor.kafka_msg_handler import (QPCReportException,
 
 from api.models import InventoryUploadError, ReportSlice
 from api.serializers import InventoryUploadErrorSerializer, ReportSliceSerializer
-from config.settings.base import (HOSTS_PER_REQ,
+from config.settings.base import (HOST_INVENTORY_UPLOAD_MODE,
+                                  HOSTS_PER_REQ,
                                   INSIGHTS_HOST_INVENTORY_URL,
                                   MAX_THREADS,
                                   RETRIES_ALLOWED,
-                                  RETRY_TIME,
-                                  UPLOAD_MODE)
+                                  RETRY_TIME)
 
 LOG = logging.getLogger(__name__)
 SLICE_PROCESSING_LOOP = asyncio.new_event_loop()
@@ -144,13 +144,13 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         self.prefix = 'ATTEMPTING HOST UPLOAD'
         LOG.info(format_message(
             self.prefix,
-            'Uploading hosts to inventory. State is "%s". UPLOAD_MODE is "%s".' %
-            (self.report_or_slice.state, UPLOAD_MODE),
+            'Uploading hosts to inventory. State is "%s". HOST_INVENTORY_UPLOAD_MODE is "%s".' %
+            (self.report_or_slice.state, HOST_INVENTORY_UPLOAD_MODE),
             account_number=self.account_number, report_platform_id=self.report_platform_id))
         try:
             if self.candidate_hosts:
                 candidates = self.generate_upload_candidates()
-                if UPLOAD_MODE.lower() == 'http':
+                if HOST_INVENTORY_UPLOAD_MODE.lower() == 'http':
                     retry_time_candidates, retry_commit_candidates = \
                         await self._upload_to_host_inventory(candidates)
                 else:
