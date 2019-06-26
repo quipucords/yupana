@@ -5,4 +5,5 @@ cp -f config/.upload_env ../../insights-upload/docker/.env
 
 cd ../../insights-upload/docker/
 . .env
-docker-compose up
+pipenv install --dev
+pipenv run docker-compose up
