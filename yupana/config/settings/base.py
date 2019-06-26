@@ -66,6 +66,9 @@ MAX_HOSTS_PER_REP = ENVIRONMENT.get_value('MAX_HOSTS_PER_REP', default=10000)
 # default is 25
 MAX_THREADS = ENVIRONMENT.get_value('MAX_THREADS', default=10)
 
+# this is how long we want to sleep in between looking for reports or slices
+# to be processed
+NEW_REPORT_QUERY_INTERVAL = ENVIRONMENT.get_value('NEW_REPORT_QUERY_INTERVAL', default=60)
 
 # Logging
 # https://docs.djangoproject.com/en/dev/topics/logging/

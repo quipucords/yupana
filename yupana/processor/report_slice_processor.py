@@ -35,8 +35,8 @@ from processor.kafka_msg_handler import (QPCReportException,
 
 from api.models import InventoryUploadError, ReportSlice
 from api.serializers import InventoryUploadErrorSerializer, ReportSliceSerializer
-from config.settings.base import (HOST_INVENTORY_UPLOAD_MODE,
-                                  HOSTS_PER_REQ,
+from config.settings.base import (HOSTS_PER_REQ,
+                                  HOST_INVENTORY_UPLOAD_MODE,
                                   INSIGHTS_HOST_INVENTORY_URL,
                                   MAX_THREADS,
                                   RETRIES_ALLOWED,

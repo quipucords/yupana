@@ -102,6 +102,7 @@ objects:
     target-cpu-utilization: ${TARGET_CPU_UTILIZATION}
     pause-kafka-for-file-upload-service: ${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE}
     host-inventory-upload-mode: ${HOST_INVENTORY_UPLOAD_MODE}
+    new-report-query-interval: ${NEW_REPORT_QUERY_INTERVAL}
     log-level: INFO
 - apiVersion: v1
   kind: Service
@@ -380,6 +381,12 @@ objects:
                   name: yupana-env
                   key: host-inventory-upload-mode
                   optional: false
+            - name: NEW_REPORT_QUERY_INTERVAL
+              valueFrom:
+                configMapKeyRef:
+                  name: yupana-env
+                  key: new-report-query-interval
+                  optional: true
           livenessProbe:
             failureThreshold: 3
             httpGet:
@@ -747,3 +754,8 @@ parameters:
   name: HOST_INVENTORY_UPLOAD_MODE
   required: true
   value: "http"
+- description: Time to sleep between looking for reports
+  displayName: Time in between db queries for reports and slices
+  name: NEW_REPORT_QUERY_INTERVAL
+  required: false
+  value: "60"
