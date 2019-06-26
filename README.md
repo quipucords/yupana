@@ -30,7 +30,7 @@ git clone https://github.com/RedHatInsights/insights-host-inventory.git
 ```
 
 ### Configure environment variables
-This project is developed using the Django web framework. Many configuration settings can be read in from a `.env` file. An example file `.env.dev.example` is provided in the repository. To use the defaults simply:
+This project is developed using the Django web framework. Many configuration settings can be read in from a `.env` file. An example file `.env.dev.example` is provided in the repository. To use the defaults simply run:
 ```
 cp .env.dev.example .env
 ```
@@ -57,10 +57,32 @@ Then project dependencies and a virtual environment can be created using:
 pipenv install --dev
 ```
 ### Bringing up yupana with all services
+First, make sure you have no zombie docker containers that could conflict with the services you are bring up.  Run:
+```
+docker ps -a
+```
+
+Make sure there are no docker containers that will conflict.  It is best to have none at all but if you know what you are doing you can leave some.
 
 To locally run the file upload service, yupana, and host inventory service run the following command:
 ```
 make local-dev-up
+```
+
+You will need to wait for the services to come up (this can take some time).  Once you think they are up run:
+
+```
+docker ps --format '{{.Names}}'
+```
+You should see the following services up and running.
+```
+docker_upload-service_1
+docker_consumer_1
+docker_kafka_1
+docker_minio_1
+docker_zookeeper_1
+yupana_db_1
+yupana_db-host-inventory_1
 ```
 
 ### Sending data to local yupana
@@ -81,9 +103,9 @@ To send the sample data, run the following commands:
 4. Watch the kafka consumer for a message to arrive.  You will see something like this in the consumer iTerm.
     ```
     {"account": "12345", "rh_account": "12345", "principal": "54321", "request_id": "52df9f748eabcfea", "payload_id": "52df9f748eabcfea", "size": 1132, "service": "qpc", "category": "tar", "b64_identity": "eyJpZGVudGl0eSI6IHsiYWNjb3VudF9udW1iZXIiOiAiMTIzNDUiLCAiaW50ZXJuYWwiOiB7Im9yZ19pZCI6ICI1NDMyMSJ9fX0=", "url": "http://minio:9000/insights-upload-perm-test/52df9f748eabcfea?AWSAccessKeyId=BQA2GEXO711FVBVXDWKM&Signature=WEgFnnKzUTsSJsQ5ouiq9HZG5pI%3D&Expires=1561586445"}
+    ```
 
 5. Look at the yupana logs to follow the report processing to completion.
-    ```
 
 ### Bringing down yupana and all services
 To bring down all services run:

@@ -257,7 +257,7 @@ upload-data:
 		$(FILE_UPLOAD_URL) \
 		-u $(RH_USERNAME):$(RH_PASSWORD)
 
-local-dev-up:
+local-dev-up: local-dev-down
 	./scripts/bring_up_all.sh
 	clear
 
