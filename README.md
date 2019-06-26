@@ -38,7 +38,7 @@ cp .env.dev.example .env
 Modify as you see fit.
 
 ### Update /etc/hosts
-The `/etc/hosts` file must be updated for Kafka and Minio.  Open your `/etc/hosts` file and add these lines to the end.
+The `/etc/hosts` file must be updated for Kafka and Minio.  Open your `/etc/hosts` file and add the following lines to the end:
 
 ```
 127.0.0.1       kafka
@@ -57,19 +57,19 @@ Then project dependencies and a virtual environment can be created using:
 pipenv install --dev
 ```
 ### Bringing up yupana with all services
-First, make sure you have no zombie docker containers that could conflict with the services you are bring up.  Run:
+First, make sure you have no zombie docker containers that could conflict with the services you are bringing up.  Run:
 ```
 docker ps -a
 ```
 
-Make sure there are no docker containers that will conflict.  It is best to have none at all but if you know what you are doing you can leave some.
+Make sure that there are no docker containers that will conflict with the services that are about to be brought up. It is safest if you have none at all, but containers that will not conflict can be left.
 
-To locally run the file upload service, yupana, and host inventory service run the following command:
+To run the file upload service, yupana, and host inventory service locally, use the following command:
 ```
 make local-dev-up
 ```
 
-You will need to wait for the services to come up (this can take some time).  Once you think they are up run:
+Once you think they are up run: to To check if the services are up, run:
 
 ```
 docker ps --format '{{.Names}}'
@@ -232,7 +232,7 @@ make custom-data file=<path/to/your-data.tar.gz>
 Replace the `<path/to/your-data.tar.gz>` with either the absolute or relative path to the `tar.gz` file holding your data. This command will copy your data files into the `temp/` directory, change the UUIDs and place the files into a new `tar.gz` file inside the `temp/` directory.
 
 ## Uploading Data
-After preparing the data with new UUIDs through either of the above steps, you can upload it to Insights. Additionally, you must export the following required information as environment variables or add them to your `.env` file:
+After preparing the data with new UUIDs through either of the above steps, you can upload it to Insights.  Additionally, you must export the following required information as environment variables or add them to your `.env` file.  See `.env.external.example`.
 ```
 RH_ACCOUNT_NUMBER=<your-account-number>
 RH_ORG_ID=<your-org-id>

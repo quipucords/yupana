@@ -114,8 +114,6 @@ validate-swagger:
 	npm install swagger-cli
 	node_modules/swagger-cli/bin/swagger-cli.js validate docs/swagger.yml
 
-
-
 build:
 	docker build -t $(IMAGE_NAME) .
 
