@@ -25,6 +25,7 @@ import threading
 from datetime import datetime
 from http import HTTPStatus
 
+import pytz
 import requests
 from processor.abstract_processor import (AbstractProcessor, FAILED_TO_VALIDATE,
                                           HOSTS_UPLOADED_FAILED, HOSTS_UPLOADED_SUCCESS,
@@ -412,7 +413,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             'failed_hosts': failed_hosts,
             'error_messages': error_messages
         }
-        details['date'] = str(datetime.now())
+        details['date'] = str(datetime.now(pytz.utc))
         inventory_error_info['details'] = details
         if inventory_error:
             response['inventory_error'] = inventory_error_info

@@ -64,6 +64,9 @@ class AbstractReport(models.Model):
     state_info = models.TextField(null=True)
     retry_count = models.PositiveSmallIntegerField(null=True)
     last_update_time = models.DateTimeField(null=True)
+    arrival_time = models.DateTimeField(null=True)
+    processing_start_time = models.DateTimeField(null=True)
+    processing_end_time = models.DateTimeField(null=True)
 
     def __str__(self):
         """Convert to string."""
@@ -79,7 +82,10 @@ class AbstractReport(models.Model):
             'state_info: {}, '\
             'retry_count: {}, '\
             'retry_type: {}, '\
-            'last_update_time: {} '.format(
+            'last_update_time: {}, '\
+            'arrival_time: {}, '\
+            'processing_start_time: {}, '\
+            'processing_end_time: {} '.format(
                 self.report_platform_id,
                 self.host_inventory_api_version,
                 self.source,
@@ -92,7 +98,10 @@ class AbstractReport(models.Model):
                 self.state_info,
                 self.retry_count,
                 self.retry_type,
-                self.last_update_time) + '}'
+                self.last_update_time,
+                self.arrival_time,
+                self.processing_start_time,
+                self.processing_end_time) + '}'
 
     class Meta:
         """Metadata for abstract report model."""

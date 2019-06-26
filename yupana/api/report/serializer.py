@@ -40,6 +40,9 @@ class AbstractReportSerializer(ModelSerializer):
     retry_count = IntegerField(default=0)
     last_update_time = DateTimeField(allow_null=True)
     ready_to_archive = BooleanField(default=False)
+    arrival_time = DateTimeField(allow_null=False)
+    processing_start_time = DateTimeField(allow_null=True, required=False)
+    processing_end_time = DateTimeField(allow_null=True, required=False)
 
     class Meta:
         """Meta class for ReportSerializer."""
