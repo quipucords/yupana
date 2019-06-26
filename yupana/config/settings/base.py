@@ -68,7 +68,7 @@ MAX_THREADS = ENVIRONMENT.get_value('MAX_THREADS', default=10)
 
 # this is how long we want to sleep in between looking for reports or slices
 # to be processed
-EMPTY_QUEUE_SLEEP = ENVIRONMENT.get_value('EMPTY_QUEUE_SLEEP', default=60)
+NEW_REPORT_QUERY_INTERVAL = ENVIRONMENT.get_value('NEW_REPORT_QUERY_INTERVAL', default=60)
 
 # Logging
 # https://docs.djangoproject.com/en/dev/topics/logging/
