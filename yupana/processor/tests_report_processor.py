@@ -180,7 +180,8 @@ class ReportProcessorTests(TransactionTestCase):
                                  last_update_time=datetime.now(pytz.utc),
                                  retry_count=0,
                                  ready_to_archive=True,
-                                 arrival_time=datetime.now(pytz.utc))
+                                 arrival_time=datetime.now(pytz.utc),
+                                 processing_start_time=datetime.now(pytz.utc))
         report_to_dedup.save()
         self.processor.report_or_slice = report_to_dedup
         self.processor.account_number = '4321'
@@ -617,7 +618,8 @@ class ReportProcessorTests(TransactionTestCase):
                                    retry_count=0,
                                    retry_type=Report.TIME,
                                    ready_to_archive=True,
-                                   arrival_time=datetime.now(pytz.utc))
+                                   arrival_time=datetime.now(pytz.utc),
+                                   processing_start_time=datetime.now(pytz.utc))
         report_to_archive.upload_ack_status = report_processor.FAILURE_CONFIRM_STATUS
         report_to_archive.save()
         self.processor.report_or_slice = report_to_archive

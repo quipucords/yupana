@@ -556,6 +556,21 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 LOG.info(format_message(self.prefix, 'Report slices successfully archived.',
                                         account_number=self.account_number,
                                         report_platform_id=self.report_platform_id))
+            arrival_time = archived_rep.arrival_time
+            processing_start_time = archived_rep.processing_start_time
+            processing_end_time = archived_rep.processing_end_time
+            # time in queue & processing in minutes
+            time_in_queue = int((processing_start_time - arrival_time).total_seconds() / 60)
+            total_processing_time = int(
+                (processing_end_time - processing_start_time).total_seconds() / 60)
+            time_facts_message = 'Report & associated slices arrived at %s '\
+                'and finished processing at %s. '\
+                'Report spent %s minutes in the queue and took %s minutes '\
+                'to process.' % (arrival_time, processing_end_time,
+                                 time_in_queue, total_processing_time)
+            LOG.info(format_message(self.prefix, time_facts_message,
+                                    account_number=self.account_number,
+                                    report_platform_id=self.report_platform_id))
             self.reset_variables()
 
         else:
