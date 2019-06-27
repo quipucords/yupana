@@ -251,3 +251,6 @@ INSIGHTS_KAFKA_PORT = os.getenv('INSIGHTS_KAFKA_PORT', '29092')
 
 # Insights Kafka server address
 INSIGHTS_KAFKA_ADDRESS = f'{INSIGHTS_KAFKA_HOST}:{INSIGHTS_KAFKA_PORT}'
+
+# Mode to use when uploading (REST vs. Kafka)
+HOST_INVENTORY_UPLOAD_MODE = os.getenv('HOST_INVENTORY_UPLOAD_MODE', 'http')

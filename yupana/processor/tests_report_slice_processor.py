@@ -284,6 +284,42 @@ class ReportProcessorTests(TestCase):
         event_loop.run_until_complete(coro())
         event_loop.close()
 
+    async def async_test_transition_to_hosts_uploaded_kafka_mode(self):
+        """Test the transition to hosts being uploaded."""
+        hosts = [{str(self.uuid): {'bios_uuid': 'value', 'name': 'value',
+                                   'system_platform_id': str(self.uuid)}},
+                 {str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo',
+                                    'system_platform_id': str(self.uuid2)}},
+                 {str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo',
+                                    'system_platform_id': str(self.uuid3)}},
+                 {str(self.uuid4): {'mac_addresses': 'value', 'name': 'foo',
+                                    'system_platform_id': str(self.uuid4)}},
+                 {str(self.uuid5): {'vm_uuid': 'value', 'name': 'foo',
+                                    'system_platform_id': str(self.uuid5)}},
+                 {str(self.uuid6): {'etc_machine_id': 'value',
+                                    'system_platform_id': str(self.uuid6)}},
+                 {str(self.uuid7): {'subscription_manager_id': 'value',
+                                    'system_platform_id': str(self.uuid7)}}]
+        self.report_slice.failed_hosts = []
+        self.report_slice.candidate_hosts = json.dumps(hosts)
+        self.report_slice.save()
+        self.processor.report_or_slice = self.report_slice
+        self.processor.candidate_hosts = hosts
+        self.processor._upload_to_host_inventory = CoroutineMock(
+            return_value=([], []))
+        await self.processor.transition_to_hosts_uploaded()
+        self.assertEqual(json.loads(self.report_slice.candidate_hosts), [])
+        self.assertEqual(self.report_slice.state, ReportSlice.HOSTS_UPLOADED)
+
+    @patch('processor.report_slice_processor.HOST_INVENTORY_UPLOAD_MODE', 'kafka')
+    def test_transition_to_hosts_uploaded_kafka_mode(self):
+        """Test the async hosts uploaded successful."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.async_test_transition_to_hosts_uploaded)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
+
     async def async_test_transition_to_hosts_uploaded_unsuccessful(self):
         """Test the transition to hosts being uploaded."""
         hosts = [{str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
