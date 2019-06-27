@@ -69,7 +69,7 @@ To run the file upload service, yupana, and host inventory service locally, use 
 make local-dev-up
 ```
 
-Once you think they are up run: to To check if the services are up, run:
+To check if the services are up, run:
 
 ```
 docker ps --format '{{.Names}}'
