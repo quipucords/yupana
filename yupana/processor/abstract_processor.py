@@ -562,14 +562,16 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             processing_start_time = archived_rep.processing_start_time
             processing_end_time = archived_rep.processing_end_time
             # format arrival_time
-            arrival_date_time = '%s: %s:%s:%s' % (arrival_time.date(),
-                                                  arrival_time.hour,
-                                                  arrival_time.minute,
-                                                  arrival_time.second)
-            completion_date_time = '%s: %s:%s:%s' % (processing_end_time.date(),
-                                                     processing_end_time.hour,
-                                                     processing_end_time.minute,
-                                                     processing_end_time.second)
+            arrival_date_time = '{}: {}:{}:{:.2f}'.format(
+                arrival_time.date(),
+                arrival_time.hour,
+                arrival_time.minute,
+                arrival_time.second)
+            completion_date_time = '{}: {}:{}:{:.2f}'.format(
+                processing_end_time.date(),
+                processing_end_time.hour,
+                processing_end_time.minute,
+                processing_end_time.second)
             # time in queue & processing in minutes
             total_hours_in_queue = int(
                 (processing_start_time - arrival_time).total_seconds() / 3600)
@@ -577,22 +579,22 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 (processing_start_time - arrival_time).total_seconds() / 60)
             total_seconds_in_queue = int(
                 (processing_start_time - arrival_time).total_seconds() % 60)
-            time_in_queue = '%s h %s m %s s' % (total_hours_in_queue,
-                                                total_minutes_in_queue,
-                                                total_seconds_in_queue)
+            time_in_queue = '%sh %sm %ss' % (total_hours_in_queue,
+                                             total_minutes_in_queue,
+                                             total_seconds_in_queue)
             total_processing_hours = int(
                 (processing_end_time - processing_start_time).total_seconds() / 3600)
             total_processing_minutes = int(
                 (processing_end_time - processing_start_time).total_seconds() / 60)
             total_processing_seconds = int(
                 (processing_end_time - processing_start_time).total_seconds() % 60)
-            time_processing = '%s h %s m %s s' % (
+            time_processing = '%sh %sm %ss' % (
                 total_processing_hours, total_processing_minutes, total_processing_seconds)
 
             report_time_facts = '\nArrival date & time: %s '\
-                                '\nTime in queue: %s'\
-                                '\nTime to process report: %s'\
-                                '\nCompletion time & time: %s' % (
+                                '\nTime spent in queue: %s'\
+                                '\nTime spent processing report: %s'\
+                                '\nCompletion date & time: %s' % (
                                     arrival_date_time,
                                     time_in_queue, time_processing,
                                     completion_date_time)
