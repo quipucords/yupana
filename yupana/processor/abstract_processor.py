@@ -35,7 +35,9 @@ from api.models import (Report,
                         Status)
 from api.serializers import (ReportArchiveSerializer,
                              ReportSliceArchiveSerializer)
-from config.settings.base import (RETRIES_ALLOWED, RETRY_TIME)
+from config.settings.base import (NEW_REPORT_QUERY_INTERVAL,
+                                  RETRIES_ALLOWED,
+                                  RETRY_TIME)
 
 LOG = logging.getLogger(__name__)
 FAILURE_CONFIRM_STATUS = 'failure'
@@ -43,7 +45,7 @@ CANONICAL_FACTS = ['insights_client_id', 'bios_uuid', 'ip_addresses', 'mac_addre
                    'vm_uuid', 'etc_machine_id', 'subscription_manager_id']
 
 FAILED_VALIDATION = 'VALIDATION'
-EMPTY_QUEUE_SLEEP = 60
+NEW_REPORT_QUERY_INTERVAL = int(NEW_REPORT_QUERY_INTERVAL)
 RETRY = Enum('RETRY', 'clear increment keep_same')
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
@@ -134,7 +136,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                         'The following error occurred: %s.' % str(error)))
                     self.reset_variables()
             else:
-                await asyncio.sleep(EMPTY_QUEUE_SLEEP)
+                await asyncio.sleep(NEW_REPORT_QUERY_INTERVAL)
 
     def calculate_queued_objects(self, current_time, status_info):
         """Calculate the number of reports waiting to be processed.
@@ -254,7 +256,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 object_not_found_message = \
                     'No %s to be processed at this time. '\
                     'Checking again in %s seconds.' \
-                    % (self.object_prefix.lower() + 's', str(EMPTY_QUEUE_SLEEP))
+                    % (self.object_prefix.lower() + 's', str(NEW_REPORT_QUERY_INTERVAL))
                 LOG.info(format_message(self.prefix, object_not_found_message))
 
     async def delegate_state(self):

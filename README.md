@@ -9,6 +9,7 @@
 - [Development](#development)
 - [Formatting Data for Yupana (without QPC)](#formatting_data)
 - [Sending Data to Insights Upload service for Yupana (without QPC)](#sending_data)
+- [Advanced Topics](#advanced)
 
 Full documentation is available through [readthedocs](https://yupana.readthedocs.io/en/latest/).
 
@@ -18,12 +19,34 @@ This is a Python project developed using Python 3.6. Make sure you have at least
 
 # <a name="development"></a> Development
 
+## Setup
+
+### Obtain source for local projects
 To get started developing against Yupana first clone a local copy of the git repository.
 ```
 git clone https://github.com/quipucords/yupana
+git clone https://github.com/RedHatInsights/insights-upload.git
+git clone https://github.com/RedHatInsights/insights-host-inventory.git
 ```
 
-Developing inside a virtual environment is recommended. A Pipfile is provided. Pipenv is recommended for combining virtual environment (virtualenv) and dependency management (pip). To install pipenv, use pip :
+### Configure environment variables
+This project is developed using the Django web framework. Many configuration settings can be read in from a `.env` file. An example file `.env.dev.example` is provided in the repository. To use the defaults simply run:
+```
+cp .env.dev.example .env
+```
+
+Modify as you see fit.
+
+### Update /etc/hosts
+The `/etc/hosts` file must be updated for Kafka and Minio.  Open your `/etc/hosts` file and add the following lines to the end:
+
+```
+127.0.0.1       kafka
+127.0.0.1       minio
+```
+
+### Using pipenv
+A Pipfile is provided. Pipenv is recommended for combining virtual environment (virtualenv) and dependency management (pip). To install pipenv, use pip :
 
 ```
 pip3 install pipenv
@@ -33,92 +56,62 @@ Then project dependencies and a virtual environment can be created using:
 ```
 pipenv install --dev
 ```
-
-To activate the virtual environment run:
+### Bringing up yupana with all services
+First, make sure you have no zombie docker containers that could conflict with the services you are bringing up.  Run:
 ```
-pipenv shell
-```
-## Configuration
-
-This project is developed using the Django web framework. Many configuration settings can be read in from a `.env` file. An example file `.env.example` is provided in the repository. To use the defaults simply:
-```
-cp .env.example .env
+docker ps -a
 ```
 
-Modify as you see fit.
+Make sure that there are no docker containers that will conflict with the services that are about to be brought up. It is safest if you have none at all, but containers that will not conflict can be left.
 
-## Database
-
-PostgreSQL is used as the database backend for Yupana. A docker-compose file is provided for creating a local database container. If modifications were made to the .env file the docker-compose file will need to be modified to ensure matching database credentials. Several commands are available for interacting with the database.
-
+To run the file upload service, yupana, and host inventory service locally, use the following command:
 ```
-# This will launch a Postgres container
-make start-db
-
-# This will run Django's migrations against the database
-make server-migrate
-```
-This will stop and remove a currently running database and run the above commands. If this command fails, try running each command it combines separately, using `docker ps` in between to track the existence of the db.  You can reinit with:
-```
-make reinit-db
+make local-dev-up
 ```
 
-Assuming the default .env file values are used, to access the database directly using psql run:
+To check if the services are up, run:
+
 ```
-psql postgres -U postgres -h localhost -p 15432
+docker ps --format '{{.Names}}'
+```
+You should see the following services up and running.
+```
+docker_upload-service_1
+docker_consumer_1
+docker_kafka_1
+docker_minio_1
+docker_zookeeper_1
+yupana_db_1
+yupana_db-host-inventory_1
 ```
 
-There is a known limitation with docker-compose and Linux environments with SELinux enabled. You may see the following error during the postgres container deployment:
-```
-"mkdir: cannot create directory '/var/lib/pgsql/data/userdata': Permission denied" can be resolved by granting ./pg_data ownership permissions to uid:26 (postgres user in centos/postgresql-96-centos7)
-```
+### Sending data to local yupana
+To send the sample data, run the following commands:
+1. Prepare the sample for sending
+    ```
+    make sample-data
+    ```
 
-If this error is encountered, the following command can be used to grant `pg_data` ownership permissions to uid:26 as the error suggests:
-```
-setfacl -m u:26:-wx ./pg_data/
-```
+2. Locate the temp file name.  You will see a message like the following:
+    ```
+    The updated report was written to temp/sample_data_ready_1561410754.tar.gz
+    ```
+3. Send the temp file to your local yupana.  Copy the name of this file to the upload command as shown below:
+    ```
+    make local-upload-data file=temp/sample_data_ready_1561410754.tar.gz
+    ```
+4. Watch the kafka consumer for a message to arrive.  You will see something like this in the consumer iTerm.
+    ```
+    {"account": "12345", "rh_account": "12345", "principal": "54321", "request_id": "52df9f748eabcfea", "payload_id": "52df9f748eabcfea", "size": 1132, "service": "qpc", "category": "tar", "b64_identity": "eyJpZGVudGl0eSI6IHsiYWNjb3VudF9udW1iZXIiOiAiMTIzNDUiLCAiaW50ZXJuYWwiOiB7Im9yZ19pZCI6ICI1NDMyMSJ9fX0=", "url": "http://minio:9000/insights-upload-perm-test/52df9f748eabcfea?AWSAccessKeyId=BQA2GEXO711FVBVXDWKM&Signature=WEgFnnKzUTsSJsQ5ouiq9HZG5pI%3D&Expires=1561586445"}
+    ```
 
-If a docker container running Postgres is not feasible, it is possible to run Postgres locally as documented in the [Postgres tutorial](https://www.postgresql.org/docs/10/static/tutorial-start.html). The default port for local Postgres installations is ``5432``. Make sure to modify the `.env` file accordingly. To initialize the database run:
+5. Look at the yupana logs to follow the report processing to completion.
+
+### Bringing down yupana and all services
+To bring down all services run:
 ```
-make server-migrate
+make local-dev-down
 ```
-
-## Server
-
-To run a local dev Django server you can use:
-```
-make server-init
-make serve
-```
-## Run Server with gunicorn
-
-To run a local gunicorn server with yupana do the following:
-```
-make server-init
-gunicorn config.wsgi -c ./yupana/config/gunicorn.py --chdir=./yupana/
-```
-
-## Preferred Environment
-
-Please refer to [Working with Openshift](https://yupana.readthedocs.io/en/latest/openshift.html).
-
-
-## API Documentation Generation
-
-To generate and host the API documentation locally you need to [Install APIDoc](http://apidocjs.com/#install).
-
-Generate the project API documentation by running the following command:
-```
-make gen-apidoc
-```
-
-In order to host the docs locally you need to collect the static files:
-```
-make server-static
-```
-
-Now start the server as described above and point your browser to
-http://127.0.0.1:8001/apidoc/index.html
 
 ## Testing and Linting
 
@@ -144,6 +137,7 @@ To lint the code base:
 ```
 tox -e lint
 ```
+
 
 # <a name="formatting_data"></a> Formatting Data for Yupana (without QPC)
 Below is a description of how to create data formatted for the yupana service.
@@ -238,7 +232,7 @@ make custom-data file=<path/to/your-data.tar.gz>
 Replace the `<path/to/your-data.tar.gz>` with either the absolute or relative path to the `tar.gz` file holding your data. This command will copy your data files into the `temp/` directory, change the UUIDs and place the files into a new `tar.gz` file inside the `temp/` directory.
 
 ## Uploading Data
-After preparing the data with new UUIDs through either of the above steps, you can upload it to Insights. Additionally, you must export the following required information as environment variables or add them to your `.env` file:
+After preparing the data with new UUIDs through either of the above steps, you can upload it to Insights.  Additionally, you must export the following required information as environment variables or add them to your `.env` file.  See `.env.external.example`.
 ```
 RH_ACCOUNT_NUMBER=<your-account-number>
 RH_ORG_ID=<your-org-id>
@@ -259,3 +253,43 @@ After running this command if you see `HTTP 202` like the following lines in you
 * Connection state changed (MAX_CONCURRENT_STREAMS updated)!
 < HTTP/2 202
 ```
+
+# <a name="advanced"></a> Advanced Topics
+## Database
+
+PostgreSQL is used as the database backend for Yupana. If modifications were made to the .env file the docker-compose file will need to be modified to ensure matching database credentials. Several commands are available for interacting with the database.
+
+Assuming the default .env file values are used, to access the database directly using psql run:
+```
+psql postgres -U postgres -h localhost -p 15432
+```
+
+## Run Server with gunicorn
+
+To run a local gunicorn server with yupana do the following:
+```
+make server-init
+gunicorn config.wsgi -c ./yupana/config/gunicorn.py --chdir=./yupana/
+```
+
+## Preferred Environment
+
+Please refer to [Working with Openshift](https://yupana.readthedocs.io/en/latest/openshift.html).
+
+
+## API Documentation Generation
+
+To generate and host the API documentation locally you need to [Install APIDoc](http://apidocjs.com/#install).
+
+Generate the project API documentation by running the following command:
+```
+make gen-apidoc
+```
+
+In order to host the docs locally you need to collect the static files:
+```
+make server-static
+```
+
+Now start the server as described above and point your browser to
+http://127.0.0.1:8001/apidoc/index.html
