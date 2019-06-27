@@ -559,16 +559,37 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             arrival_time = archived_rep.arrival_time
             processing_start_time = archived_rep.processing_start_time
             processing_end_time = archived_rep.processing_end_time
+            # format arrival_time
+            arrival_date_time = '%s: %s:%s:%s' % (arrival_time.date(),
+                                                  arrival_time.hours,
+                                                  arrival_time.minutes,
+                                                  arrival_time.seconds)
+            completion_date_time = '%s: %s:%s:%s' % (processing_end_time.date(),
+                                                     processing_end_time.hours,
+                                                     processing_end_time.minutes,
+                                                     processing_end_time.seconds)
             # time in queue & processing in minutes
-            time_in_queue = int((processing_start_time - arrival_time).total_seconds() / 60)
-            total_processing_time = int(
-                (processing_end_time - processing_start_time).total_seconds() / 60)
-            time_facts_message = 'Report & associated slices arrived at %s '\
-                'and finished processing at %s. '\
-                'Report spent %s minutes in the queue and took %s minutes '\
-                'to process.' % (arrival_time, processing_end_time,
-                                 time_in_queue, total_processing_time)
-            LOG.info(format_message(self.prefix, time_facts_message,
+            total_hours_in_queue = int((processing_start_time - arrival_time).total_seconds() / 3600)
+            total_minutes_in_queue = int((processing_start_time - arrival_time).total_seconds() % 3600) / 60
+            total_seconds_in_queue = int((processing_start_time - arrival_time).total_seconds() % 3600) % 60
+            time_in_queue = '%s h %s m %s s' % (total_hours_in_queue, total_minutes_in_queue, total_seconds_in_queue)
+            total_processing_hours = int(
+                (processing_end_time - processing_start_time).total_seconds() / 3600)
+            total_processing_minutes = int(
+                (processing_end_time - processing_start_time).total_seconds() % 3600) / 60
+            total_processing_seconds = int(
+                (processing_end_time - processing_start_time).total_seconds() % 3600) % 60
+            time_processing = '%s h %s m %s s' % (
+                total_processing_hours, total_processing_minutes, total_processing_seconds)
+
+            report_time_facts = '\nArrival date & time: %s '\
+                                '\nTime in queue: %s'\
+                                '\nTime to process report: %s'\
+                                '\nCompletion time & time: %s' % (
+                                    arrival_date_time,
+                                    time_in_queue, time_processing,
+                                    completion_date_time)
+            LOG.info(format_message('REPORT TIME STATS', report_time_facts,
                                     account_number=self.account_number,
                                     report_platform_id=self.report_platform_id))
             self.reset_variables()
