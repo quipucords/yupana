@@ -66,6 +66,9 @@ MAX_HOSTS_PER_REP = ENVIRONMENT.get_value('MAX_HOSTS_PER_REP', default=10000)
 # default is 25
 MAX_THREADS = ENVIRONMENT.get_value('MAX_THREADS', default=10)
 
+# this is how long we want to sleep in between looking for reports or slices
+# to be processed
+NEW_REPORT_QUERY_INTERVAL = ENVIRONMENT.get_value('NEW_REPORT_QUERY_INTERVAL', default=60)
 
 # Logging
 # https://docs.djangoproject.com/en/dev/topics/logging/
@@ -248,3 +251,6 @@ INSIGHTS_KAFKA_PORT = os.getenv('INSIGHTS_KAFKA_PORT', '29092')
 
 # Insights Kafka server address
 INSIGHTS_KAFKA_ADDRESS = f'{INSIGHTS_KAFKA_HOST}:{INSIGHTS_KAFKA_PORT}'
+
+# Mode to use when uploading (REST vs. Kafka)
+HOST_INVENTORY_UPLOAD_MODE = os.getenv('HOST_INVENTORY_UPLOAD_MODE', 'http')
