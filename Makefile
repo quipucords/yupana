@@ -1,5 +1,6 @@
 PYTHON=$(shell which python)
 IMAGE_NAME=yupana-centos7
+.PHONY: build
 
 TOPDIR=$(shell pwd)
 PYDIR=yupana
@@ -60,6 +61,11 @@ help:
 	@echo "custom-data file=<path/to/file>             ready given data for upload to Insights"
 	@echo "upload-data file=<path/to/file>             upload data to Insights"
 	@echo ""
+	@echo "--- Commands for local development ---"
+	@echo "local-dev-up                                bring up yupana with all required services"
+	@echo "local-dev-down                              bring down yupana with all required services"
+	@echo "local-upload-data file=<path/to/file>       upload data to local file upload service for yupana processing"
+	@echo ""
 
 clean:
 	git clean -fdx -e .idea/ -e *env/ $(PYDIR)/db.sqlite3
@@ -108,40 +114,6 @@ validate-swagger:
 	npm install swagger-cli
 	node_modules/swagger-cli/bin/swagger-cli.js validate docs/swagger.yml
 
-sample-data:
-	mkdir -p temp/reports
-	mkdir -p temp/old_reports_temp
-	tar -xvzf sample.tar.gz -C temp/old_reports_temp
-	python scripts/change_uuids.py
-	@NEW_FILENAME="sample_data_ready_$(shell date +%s).tar.gz"; \
-	cd temp; COPYFILE_DISABLE=1 tar -zcvf $$NEW_FILENAME reports; \
-	echo ""; \
-	echo "The updated report was written to" temp/$$NEW_FILENAME; \
-	echo ""; \
-	rm -rf reports; \
-	rm -rf old_reports_temp
-
-custom-data:
-	mkdir -p temp/reports
-	mkdir -p temp/old_reports_temp
-	tar -xvzf $(file) -C temp/old_reports_temp
-	python scripts/change_uuids.py
-	@NEW_FILENAME="sample_data_ready_$(shell date +%s).tar.gz"; \
-	cd temp; COPYFILE_DISABLE=1 tar -zcvf $$NEW_FILENAME reports; \
-	echo ""; \
-	echo "The updated report was written to" temp/$$NEW_FILENAME; \
-	echo ""; \
-	rm -rf reports; \
-	rm -rf old_reports_temp
-
-upload-data:
-	curl -vvvv -H "x-rh-identity: $(shell echo '{"identity": {"account_number": $(RH_ACCOUNT_NUMBER), "internal": {"org_id": $(RH_ORG_ID)}}}' | base64)" \
-		-F "file=@$(file);type=application/vnd.redhat.qpc.tar+tgz" \
-		-H "x-rh-insights-request-id: 52df9f748eabcfea" \
-		$(FILE_UPLOAD_URL) \
-		-u $(RH_USERNAME):$(RH_PASSWORD)
-
-.PHONY: build
 build:
 	docker build -t $(IMAGE_NAME) .
 
@@ -248,3 +220,50 @@ serve-with-oc: oc-forward-ports
 	sleep 3
 	DJANGO_READ_DOT_ENV_FILE=True $(PYTHON) $(PYDIR)/manage.py runserver
 	make oc-stop-forwarding-ports
+
+sample-data:
+	mkdir -p temp/reports
+	mkdir -p temp/old_reports_temp
+	tar -xvzf sample.tar.gz -C temp/old_reports_temp
+	python scripts/change_uuids.py
+	@NEW_FILENAME="sample_data_ready_$(shell date +%s).tar.gz"; \
+	cd temp; COPYFILE_DISABLE=1 tar -zcvf $$NEW_FILENAME reports; \
+	echo ""; \
+	echo "The updated report was written to" temp/$$NEW_FILENAME; \
+	echo ""; \
+	rm -rf reports; \
+	rm -rf old_reports_temp
+
+custom-data:
+	mkdir -p temp/reports
+	mkdir -p temp/old_reports_temp
+	tar -xvzf $(file) -C temp/old_reports_temp
+	python scripts/change_uuids.py
+	@NEW_FILENAME="sample_data_ready_$(shell date +%s).tar.gz"; \
+	cd temp; COPYFILE_DISABLE=1 tar -zcvf $$NEW_FILENAME reports; \
+	echo ""; \
+	echo "The updated report was written to" temp/$$NEW_FILENAME; \
+	echo ""; \
+	rm -rf reports; \
+	rm -rf old_reports_temp
+
+upload-data:
+	curl -vvvv -H "x-rh-identity: $(shell echo '{"identity": {"account_number": $(RH_ACCOUNT_NUMBER), "internal": {"org_id": $(RH_ORG_ID)}}}' | base64)" \
+		-F "file=@$(file);type=application/vnd.redhat.qpc.tar+tgz" \
+		-H "x-rh-insights-request-id: 52df9f748eabcfea" \
+		$(FILE_UPLOAD_URL) \
+		-u $(RH_USERNAME):$(RH_PASSWORD)
+
+local-dev-up:
+	./scripts/bring_up_all.sh
+	clear
+
+local-dev-down:
+	cd ../insights-upload/docker/;docker-compose down
+	docker-compose down
+
+local-upload-data:
+	curl -vvvv -H "x-rh-identity: eyJpZGVudGl0eSI6IHsiYWNjb3VudF9udW1iZXIiOiAiMTIzNDUiLCAiaW50ZXJuYWwiOiB7Im9yZ19pZCI6ICI1NDMyMSJ9fX0=" \
+		-F "file=@$(file);type=application/vnd.redhat.qpc.tar+tgz" \
+		-H "x-rh-insights-request-id: 52df9f748eabcfea" \
+		localhost:8080/api/ingress/v1/upload
