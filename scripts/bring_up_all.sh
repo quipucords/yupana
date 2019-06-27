@@ -10,7 +10,7 @@ function iterm () {
     local wd="$1"
     local args="$@"
 
-    cmd="echo Launching Vagrant VM"
+    cmd="echo Launching iTerm window"
     for var in "$@"
     do
         cmd="$cmd;$var"
