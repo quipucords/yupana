@@ -26,13 +26,6 @@ MAX_THREADS=10
 BUILD_VERSION=0.0.0
 PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=False
 
-# OC variables from env
-OPENSHIFT_PROJECT=$OPENSHIFT_PROJECT
-KAFKA_HOST=$KAFKA_HOST
-KAFKA_PORT=$KAFKA_PORT
-KAFKA_NAMESPACE=$KAFKA_NAMESPACE
-INSIGHTS_HOST_INVENTORY_URL=$INSIGHTS_HOST_INVENTORY_URL
-
 OS := $(shell uname)
 ifeq ($(OS),Darwin)
 	PREFIX	=
@@ -70,7 +63,8 @@ help:
 	@echo "oc-login-developer       login to openshift as developer"
 	@echo "oc-server-migrate        run migrations"
 	@echo "oc-update-template       update template and build"
-	@echo "oc-delete-yupana         delete the yupana app and data"
+	@echo "oc-delete-yupana         delete the yupana project, app, and data"
+	@echo "oc-delete-yupana-data    delete the yupana app and data"
 	@echo "oc-dev-new-app           create new app to local openshift"
 	@echo "oc-new-app               create new app in openshift dedicated"
 	@echo "oc-dev-refresh           apply template changes to locally deployed app"
@@ -164,8 +158,8 @@ oc-project:
 oc-new-app:
 	oc new-app --template ${OPENSHIFT_PROJECT}/${TEMPLATE} \
 		--param NAMESPACE=${OPENSHIFT_PROJECT} \
-		--param SOURCE_REPOSITORY_URL=${GIT_URL} \
-		--param SOURCE_REPOSITORY_REF=${GIT_BRANCH} \
+		--param SOURCE_REPOSITORY_URL=${CODE_REPO} \
+		--param SOURCE_REPOSITORY_REF=${REPO_BRANCH} \
 		--param KAFKA_HOST=${KAFKA_HOST} \
 		--param KAFKA_PORT=${KAFKA_PORT} \
 		--param KAFKA_NAMESPACE=${KAFKA_NAMESPACE} \
@@ -175,14 +169,14 @@ oc-new-app:
 		--param TARGET_CPU_UTILIZATION=${TARGET_CPU_UTILIZATION} \
 		--param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
 		--param MAX_THREADS=${MAX_THREADS} \
-		--param BUILD_VERSION=${BUILD_VERSION} \
+		--param BUILD_VERSION=${DEPLOY_BUILD_VERSION} \
 		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
 
 oc-refresh:
 	oc process -f ${OPENSHIFT_TEMPLATE_PATH} \
 		--param NAMESPACE=${OPENSHIFT_PROJECT} \
-		--param SOURCE_REPOSITORY_URL=${GIT_URL} \
-		--param SOURCE_REPOSITORY_REF=${GIT_BRANCH} \
+		--param SOURCE_REPOSITORY_URL=${CODE_REPO} \
+		--param SOURCE_REPOSITORY_REF=${REPO_BRANCH} \
 		--param KAFKA_HOST=${KAFKA_HOST} \
 		--param KAFKA_PORT=${KAFKA_PORT} \
 		--param KAFKA_NAMESPACE=${KAFKA_NAMESPACE} \
@@ -192,10 +186,10 @@ oc-refresh:
 		--param TARGET_CPU_UTILIZATION=${TARGET_CPU_UTILIZATION} \
 		--param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
 		--param MAX_THREADS=${MAX_THREADS} \
-		--param BUILD_VERSION=${BUILD_VERSION} \
+		--param BUILD_VERSION=${DEPLOY_BUILD_VERSION} \
 		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
 		| oc apply -f -
-	oc start-build yupana -n yupana
+	oc start-build yupana
 
 oc-dev-new-app:
 	oc new-app --template ${OPENSHIFT_PROJECT_DEV}/${TEMPLATE} \
