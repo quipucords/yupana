@@ -44,6 +44,9 @@ class AbstractReportSliceSerializer(ModelSerializer):
     failed_hosts = JSONField(allow_null=True)
     candidate_hosts = JSONField(allow_null=True)
     ready_to_archive = BooleanField(default=False)
+    creation_time = DateTimeField(allow_null=False)
+    processing_start_time = DateTimeField(allow_null=True, required=False)
+    processing_end_time = DateTimeField(allow_null=True, required=False)
 
     class Meta:
         """Meta class for AbstractReportSliceSerializer."""

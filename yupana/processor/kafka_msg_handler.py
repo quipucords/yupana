@@ -134,6 +134,7 @@ async def save_message_and_ack(consumer, consumer_record):
                     'state': Report.NEW,
                     'state_info': json.dumps([Report.NEW]),
                     'last_update_time': datetime.now(pytz.utc),
+                    'arrival_time': datetime.now(pytz.utc),
                     'retry_count': 0
                 }
                 report_serializer = ReportSerializer(data=uploaded_report)

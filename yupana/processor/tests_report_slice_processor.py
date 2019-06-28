@@ -73,7 +73,9 @@ class ReportProcessorTests(TestCase):
             last_update_time=datetime.now(pytz.utc),
             retry_count=0,
             ready_to_archive=False,
-            source='satellite')
+            source='satellite',
+            arrival_time=datetime.now(pytz.utc),
+            processing_start_time=datetime.now(pytz.utc))
         self.report_record.save()
 
         self.report_slice = ReportSlice(
@@ -90,7 +92,9 @@ class ReportProcessorTests(TestCase):
             report=self.report_record,
             ready_to_archive=True,
             hosts_count=2,
-            source='satellite')
+            source='satellite',
+            creation_time=datetime.now(pytz.utc),
+            processing_start_time=datetime.now(pytz.utc))
         self.report_slice.save()
         self.report_record.save()
         self.processor = report_slice_processor.ReportSliceProcessor()
@@ -886,6 +890,7 @@ class ReportProcessorTests(TestCase):
             report_slice_id=self.report_slice.report_slice_id)
         self.assertEqual(str(archived.report_platform_id), str(self.uuid))
         self.assertEqual(str(archived_slice.report_platform_id), str(self.uuid))
+        self.assertIsNotNone(archived_slice.processing_end_time)
         # assert the processor was reset
         self.check_variables_are_reset()
 

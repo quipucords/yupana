@@ -271,7 +271,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             'report_slice_id': report_slice_id,
             'report': self.report_or_slice.id,
             'hosts_count': hosts_count,
-            'source': source
+            'source': source,
+            'creation_time': datetime.now(pytz.utc)
         }
         slice_serializer = ReportSliceSerializer(data=report_slice)
         if slice_serializer.is_valid(raise_exception=True):
