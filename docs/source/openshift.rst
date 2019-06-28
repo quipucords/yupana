@@ -45,6 +45,12 @@ If you'd like to start the cluster, deploy Yupana, and deploy PostgreSQL, run th
 
     make oc-up-dev
 
+If you'd like to refresh the deployed app with your local changes, run the following:
+
+.. code-block:: bash
+
+    make oc-dev-refresh
+
 To stop the local cluster run the following:
 
 .. code-block:: bash
