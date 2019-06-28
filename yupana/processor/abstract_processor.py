@@ -277,7 +277,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
     def transition_to_started(self):
         """Attempt to change the state to started."""
         self.next_state = self.object_class.STARTED
-        self.update_object_state(options={})
+        options = {'start_processing': True}
+        self.update_object_state(options=options)
 
     #  pylint: disable=too-many-locals, too-many-branches, too-many-statements
     def update_object_state(self, options):  # noqa: C901 (too-complex)
@@ -316,12 +317,17 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             source = options.get('source')
             source_metadata = options.get('source_metadata')
             ready_to_archive = options.get('ready_to_archive')
+            start_processing = options.get('start_processing')
 
             update_data = {
                 'last_update_time': datetime.now(pytz.utc),
                 'state': self.next_state,
                 'git_commit': status_info.git_commit
             }
+            # if this is the start of the processing, update the processing
+            # start time
+            if start_processing:
+                update_data['processing_start_time'] = datetime.now(pytz.utc)
 
             if retry == RETRY.clear:
                 # After a successful transaction when we have reached the update
@@ -445,6 +451,53 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         if self.state in self.state_to_metric.keys():
             self.state_to_metric.get(self.state)()
 
+    def log_time_stats(self, archived_rep):
+        """Log the start/completion and processing times of the report."""
+        arrival_time = archived_rep.arrival_time
+        processing_start_time = archived_rep.processing_start_time
+        processing_end_time = archived_rep.processing_end_time
+        # format arrival_time
+        arrival_date_time = '{}: {}:{}:{:.2f}'.format(
+            arrival_time.date(),
+            arrival_time.hour,
+            arrival_time.minute,
+            arrival_time.second)
+        completion_date_time = '{}: {}:{}:{:.2f}'.format(
+            processing_end_time.date(),
+            processing_end_time.hour,
+            processing_end_time.minute,
+            processing_end_time.second)
+        # time in queue & processing in minutes
+        total_hours_in_queue = int(
+            (processing_start_time - arrival_time).total_seconds() / 3600)
+        total_minutes_in_queue = int(
+            (processing_start_time - arrival_time).total_seconds() / 60)
+        total_seconds_in_queue = int(
+            (processing_start_time - arrival_time).total_seconds() % 60)
+        time_in_queue = '{}h {}m {}s'.format(
+            total_hours_in_queue,
+            total_minutes_in_queue,
+            total_seconds_in_queue)
+        total_processing_hours = int(
+            (processing_end_time - processing_start_time).total_seconds() / 3600)
+        total_processing_minutes = int(
+            (processing_end_time - processing_start_time).total_seconds() / 60)
+        total_processing_seconds = int(
+            (processing_end_time - processing_start_time).total_seconds() % 60)
+        time_processing = '{}h {}m {}s'.format(
+            total_processing_hours, total_processing_minutes, total_processing_seconds)
+
+        report_time_facts = '\nArrival date & time: {} '\
+                            '\nTime spent in queue: {}'\
+                            '\nTime spent processing report: {}'\
+                            '\nCompletion date & time: {}'.format(
+                                arrival_date_time,
+                                time_in_queue, time_processing,
+                                completion_date_time)
+        LOG.info(format_message('REPORT TIME STATS', report_time_facts,
+                                account_number=self.account_number,
+                                report_platform_id=self.report_platform_id))
+
     @transaction.atomic  # noqa: C901 (too-complex)
     def archive_report_and_slices(self):  # pylint: disable=too-many-statements
         """Archive the report slice objects & associated report."""
@@ -479,6 +532,9 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 'ready_to_archive': report.ready_to_archive,
                 'last_update_time': report.last_update_time,
                 'upload_srv_kafka_msg': report.upload_srv_kafka_msg,
+                'arrival_time': report.arrival_time,
+                'processing_start_time': report.processing_start_time,
+                'processing_end_time': datetime.now(pytz.utc)
             }
             if report.upload_ack_status:
                 if report.upload_ack_status == FAILURE_CONFIRM_STATUS:
@@ -516,7 +572,10 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     'report_slice_id': report_slice.report_slice_id,
                     'report': archived_rep.id,
                     'hosts_count': report_slice.hosts_count,
-                    'source': report_slice.source
+                    'source': report_slice.source,
+                    'creation_time': report_slice.creation_time,
+                    'processing_start_time': report_slice.processing_start_time,
+                    'processing_end_time': datetime.now(pytz.utc)
                 }
                 if report_slice.report_platform_id:
                     archived_slice_data['report_platform_id'] = report_slice.report_platform_id
@@ -546,6 +605,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 LOG.info(format_message(self.prefix, 'Report slices successfully archived.',
                                         account_number=self.account_number,
                                         report_platform_id=self.report_platform_id))
+            self.log_time_stats(archived_rep)
             self.reset_variables()
 
         else:

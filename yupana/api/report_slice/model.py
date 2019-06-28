@@ -67,6 +67,9 @@ class AbstractReportSlice(models.Model):
     failed_hosts = models.TextField(null=True)
     candidate_hosts = models.TextField(null=True)
     hosts_count = models.PositiveIntegerField(null=False)
+    creation_time = models.DateTimeField(null=True)
+    processing_start_time = models.DateTimeField(null=True)
+    processing_end_time = models.DateTimeField(null=True)
 
     def __str__(self):
         """Convert to string."""
@@ -83,8 +86,11 @@ class AbstractReportSlice(models.Model):
             'retry_type: {}, '\
             'last_update_time: {}, '\
             'failed_hosts: {}, '\
-            'candidate_hosts: {} '\
-            'hosts_count: {}'.format(
+            'candidate_hosts: {}, '\
+            'hosts_count: {}, '\
+            'creation_time: {}, '\
+            'processing_start_time: {}, '\
+            'processing_end_time: {} '.format(
                 self.report_platform_id,
                 self.report_slice_id,
                 self.account,
@@ -99,7 +105,10 @@ class AbstractReportSlice(models.Model):
                 self.last_update_time,
                 self.failed_hosts,
                 self.candidate_hosts,
-                self.hosts_count) + '}'
+                self.hosts_count,
+                self.creation_time,
+                self.processing_start_time,
+                self.processing_end_time) + '}'
 
     class Meta:
         """Metadata for abstract report slice model."""

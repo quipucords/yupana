@@ -44,7 +44,9 @@ class ReportSliceModelTest(TestCase):
                              state_info=[Report.NEW],
                              retry_count=0,
                              last_update_time=self.date,
-                             ready_to_archive=False)
+                             ready_to_archive=False,
+                             arrival_time=self.date,
+                             processing_start_time=self.date)
         self.report_slice = ReportSlice(
             report_platform_id=self.uuid,
             report_slice_id=self.uuid2,
@@ -58,7 +60,9 @@ class ReportSliceModelTest(TestCase):
             candidate_hosts=[],
             ready_to_archive=False,
             report=self.report,
-            hosts_count=10)
+            hosts_count=10,
+            creation_time=self.date,
+            processing_start_time=self.date)
 
     def test_report_slice_fields(self):
         """Test the report slice fields."""
@@ -69,5 +73,5 @@ class ReportSliceModelTest(TestCase):
         self.assertEqual(self.report_slice.last_update_time, self.date)
         self.assertEqual(self.report_slice.report, self.report)
         # pylint: disable=line-too-long
-        expected = "{report_platform_id:%s, report_slice_id: %s, account: 13423, report_json: {'report_platform_id': '%s', 'report_type': 'insights', 'hosts': {}}, git_commit: None, ready_to_archive: False, source: , state: new, state_info: ['new'], retry_count: 0, retry_type: time, last_update_time: %s, failed_hosts: [], candidate_hosts: [] hosts_count: 10}" % (str(self.uuid), str(self.uuid2), str(self.uuid), self.date)  # noqa
+        expected = "{report_platform_id:%s, report_slice_id: %s, account: 13423, report_json: {'report_platform_id': '%s', 'report_type': 'insights', 'hosts': {}}, git_commit: None, ready_to_archive: False, source: , state: new, state_info: ['new'], retry_count: 0, retry_type: time, last_update_time: %s, failed_hosts: [], candidate_hosts: [], hosts_count: 10, creation_time: %s, processing_start_time: %s, processing_end_time: None }" % (str(self.uuid), str(self.uuid2), str(self.uuid), self.date, self.date, self.date)  # noqa
         self.assertEqual(str(self.report_slice), expected)

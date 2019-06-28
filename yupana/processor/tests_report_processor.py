@@ -68,7 +68,9 @@ class ReportProcessorTests(TransactionTestCase):
             last_update_time=datetime.now(pytz.utc),
             retry_count=0,
             ready_to_archive=False,
-            source='qpc')
+            source='qpc',
+            arrival_time=datetime.now(pytz.utc),
+            processing_start_time=datetime.now(pytz.utc))
         self.report_record.save()
 
         self.report_slice = ReportSlice(
@@ -84,7 +86,9 @@ class ReportProcessorTests(TransactionTestCase):
             candidate_hosts=[],
             report=self.report_record,
             ready_to_archive=True,
-            hosts_count=2)
+            hosts_count=2,
+            creation_time=datetime.now(pytz.utc),
+            processing_start_time=datetime.now(pytz.utc))
         self.report_slice.save()
 
         self.processor = report_processor.ReportProcessor()
@@ -113,7 +117,9 @@ class ReportProcessorTests(TransactionTestCase):
                                    state_info=json.dumps([Report.NEW]),
                                    last_update_time=datetime.now(pytz.utc),
                                    retry_count=0,
-                                   ready_to_archive=True)
+                                   ready_to_archive=True,
+                                   arrival_time=datetime.now(pytz.utc),
+                                   processing_start_time=datetime.now(pytz.utc))
         report_to_archive.save()
         self.processor.report_or_slice = report_to_archive
         self.processor.account_number = '4321'
@@ -129,6 +135,7 @@ class ReportProcessorTests(TransactionTestCase):
         # assert the report archive does exist
         archived = ReportArchive.objects.get(account='4321')
         self.assertEqual(json.loads(archived.state_info), [Report.NEW])
+        self.assertIsNotNone(archived.processing_end_time)
         # assert the processor was reset
         self.check_variables_are_reset()
 
@@ -172,7 +179,9 @@ class ReportProcessorTests(TransactionTestCase):
                                  state_info=json.dumps([Report.NEW]),
                                  last_update_time=datetime.now(pytz.utc),
                                  retry_count=0,
-                                 ready_to_archive=True)
+                                 ready_to_archive=True,
+                                 arrival_time=datetime.now(pytz.utc),
+                                 processing_start_time=datetime.now(pytz.utc))
         report_to_dedup.save()
         self.processor.report_or_slice = report_to_dedup
         self.processor.account_number = '4321'
@@ -608,7 +617,9 @@ class ReportProcessorTests(TransactionTestCase):
                                    last_update_time=datetime.now(pytz.utc),
                                    retry_count=0,
                                    retry_type=Report.TIME,
-                                   ready_to_archive=True)
+                                   ready_to_archive=True,
+                                   arrival_time=datetime.now(pytz.utc),
+                                   processing_start_time=datetime.now(pytz.utc))
         report_to_archive.upload_ack_status = report_processor.FAILURE_CONFIRM_STATUS
         report_to_archive.save()
         self.processor.report_or_slice = report_to_archive
