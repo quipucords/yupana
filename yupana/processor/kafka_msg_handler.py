@@ -121,6 +121,7 @@ async def save_message_and_ack(consumer, consumer_record):
             # rh_account is being deprecated so we use it as a backup if
             # account is not there
             rh_account = upload_service_message.get('rh_account')
+            request_id = upload_service_message.get('request_id')
             account_number = upload_service_message.get('account', rh_account)
             if not account_number:
                 raise QPCKafkaMsgException(
@@ -131,6 +132,7 @@ async def save_message_and_ack(consumer, consumer_record):
                 uploaded_report = {
                     'upload_srv_kafka_msg': json.dumps(upload_service_message),
                     'account': account_number,
+                    'request_id': request_id,
                     'state': Report.NEW,
                     'state_info': json.dumps([Report.NEW]),
                     'last_update_time': datetime.now(pytz.utc),
