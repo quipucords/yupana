@@ -666,6 +666,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         try:
             validation = {
                 'hash': file_hash,
+                'request_id': self.report_or_slice.request_id,
                 'validation': self.status
             }
             msg = bytes(json.dumps(validation), 'utf-8')
