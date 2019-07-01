@@ -32,7 +32,7 @@ Deploying without Jenkins
 
 If for any reason Jenkins is not working, we have provided make commands that will create and deploy a new app, or refresh an existing one.
 
-First make sure that you are logged into the correct cluster and project. Next, export the following environment variables with the correct values for the project you are deploying to. ::
+First make sure that you are logged into the correct cluster and project. Next, export the following environment variables with the correct values for the project you are deploying to::
 
     OPENSHIFT_PROJECT=<OPENSHIFT_PROJECT>
     KAFKA_HOST=<KAFKA_HOST>
