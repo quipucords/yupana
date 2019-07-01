@@ -116,7 +116,7 @@ class KafkaMsgHandlerTest(TestCase):
                              {'account': '8910', 'request_id': '1234'})
             self.assertEqual(report.state, Report.NEW)
 
-        # test no rh_account
+        # test no rh_account or request_id
         with patch('processor.kafka_msg_handler.unpack_consumer_record',
                    return_value={'foo': 'bar'}):
             await msg_handler.save_message_and_ack(test_consumer, qpc_msg)
