@@ -6,16 +6,25 @@ TOPDIR=$(shell pwd)
 PYDIR=yupana
 APIDOC=apidoc
 STATIC=staticfiles
+
+# OC dev variables
 OC_SOURCE=registry.access.redhat.com/openshift3/ose
 OC_VERSION=v3.9
 OC_DATA_DIR=${HOME}/.oc/openshift.local.data
-OPENSHIFT_PROJECT='yupana'
+OPENSHIFT_PROJECT_DEV='yupana'
 OPENSHIFT_TEMPLATE_PATH='openshift/yupana-template.yaml'
 TEMPLATE='yupana-template'
 CODE_REPO='https://github.com/quipucords/yupana.git'
 REPO_BRANCH='master'
 EMAIL_SERVICE_PASSWORD=$EMAIL_SERVICE_PASSWORD
 PGSQL_VERSION=9.6
+MINIMUM_REPLICAS=1
+MAXIMUM_REPLICAS=3
+TARGET_CPU_UTILIZATION=75
+HOSTS_PER_REQ=250
+MAX_THREADS=10
+BUILD_VERSION=0.0.0
+PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=False
 
 OS := $(shell uname)
 ifeq ($(OS),Darwin)
@@ -47,14 +56,19 @@ help:
 	@echo "--- Commands using an OpenShift Cluster ---"
 	@echo "oc-clean                 stop openshift cluster & remove local config data"
 	@echo "oc-up                    initialize an openshift cluster"
-	@echo "oc-up-dev                run app in openshift cluster"
+	@echo "oc-up-dev                run yupana app in openshift cluster"
 	@echo "oc-down                  stop app & openshift cluster"
 	@echo "oc-create-yupana         create the Yupana app in an initialized openshift cluster"
 	@echo "oc-login-admin           login to openshift as admin"
 	@echo "oc-login-developer       login to openshift as developer"
 	@echo "oc-server-migrate        run migrations"
 	@echo "oc-update-template       update template and build"
-	@echo "oc-delete-yupana         delete the yupana app and data"
+	@echo "oc-delete-yupana         delete the yupana project, app, and data"
+	@echo "oc-delete-yupana-data    delete the yupana app and data"
+	@echo "oc-dev-new-app           create new app to local openshift"
+	@echo "oc-new-app               create new app in openshift dedicated"
+	@echo "oc-dev-refresh           apply template changes to locally deployed app"
+	@echo "oc-refresh               apply template changes to openshift dedicated"
 	@echo ""
 	@echo "--- Commands to upload data to Insights ---"
 	@echo "sample-data                                 ready sample data for upload to Insights"
@@ -138,18 +152,72 @@ oc-login-developer:
 	oc login -u developer -p developer --insecure-skip-tls-verify
 
 oc-project:
-	oc new-project ${OPENSHIFT_PROJECT}
-	oc project ${OPENSHIFT_PROJECT}
+	oc new-project ${OPENSHIFT_PROJECT_DEV}
+	oc project ${OPENSHIFT_PROJECT_DEV}
 
 oc-new-app:
 	oc new-app --template ${OPENSHIFT_PROJECT}/${TEMPLATE} \
-        --param NAMESPACE=${OPENSHIFT_PROJECT} \
+		--param NAMESPACE=${OPENSHIFT_PROJECT} \
+		--param SOURCE_REPOSITORY_URL=${CODE_REPO} \
+		--param SOURCE_REPOSITORY_REF=${REPO_BRANCH} \
+		--param KAFKA_HOST=${KAFKA_HOST} \
+		--param KAFKA_PORT=${KAFKA_PORT} \
+		--param KAFKA_NAMESPACE=${KAFKA_NAMESPACE} \
+		--param INSIGHTS_HOST_INVENTORY_URL=${INSIGHTS_HOST_INVENTORY_URL} \
+		--param MINIMUM_REPLICAS=${MINIMUM_REPLICAS} \
+		--param MAXIMUM_REPLICAS=${MAXIMUM_REPLICAS} \
+		--param TARGET_CPU_UTILIZATION=${TARGET_CPU_UTILIZATION} \
+		--param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
+		--param MAX_THREADS=${MAX_THREADS} \
+		--param BUILD_VERSION=${DEPLOY_BUILD_VERSION} \
+		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
+
+oc-refresh:
+	oc process -f ${OPENSHIFT_TEMPLATE_PATH} \
+		--param NAMESPACE=${OPENSHIFT_PROJECT} \
+		--param SOURCE_REPOSITORY_URL=${CODE_REPO} \
+		--param SOURCE_REPOSITORY_REF=${REPO_BRANCH} \
+		--param KAFKA_HOST=${KAFKA_HOST} \
+		--param KAFKA_PORT=${KAFKA_PORT} \
+		--param KAFKA_NAMESPACE=${KAFKA_NAMESPACE} \
+		--param INSIGHTS_HOST_INVENTORY_URL=${INSIGHTS_HOST_INVENTORY_URL} \
+		--param MINIMUM_REPLICAS=${MINIMUM_REPLICAS} \
+		--param MAXIMUM_REPLICAS=${MAXIMUM_REPLICAS} \
+		--param TARGET_CPU_UTILIZATION=${TARGET_CPU_UTILIZATION} \
+		--param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
+		--param MAX_THREADS=${MAX_THREADS} \
+		--param BUILD_VERSION=${DEPLOY_BUILD_VERSION} \
+		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
+		| oc apply -f -
+	oc start-build yupana
+
+oc-dev-new-app:
+	oc new-app --template ${OPENSHIFT_PROJECT_DEV}/${TEMPLATE} \
+        --param NAMESPACE=${OPENSHIFT_PROJECT_DEV} \
         --param SOURCE_REPOSITORY_URL=${CODE_REPO} \
         --param SOURCE_REPOSITORY_REF=${REPO_BRANCH} \
-        --param MINIMUM_REPLICAS=1 \
-        --param MAXIMUM_REPLICAS=1 \
-        --param BUILD_VERSION='1.0.0' \
-        --param MAX_THREADS=10
+        --param MINIMUM_REPLICAS=${MINIMUM_REPLICAS} \
+      	--param MAXIMUM_REPLICAS=${MAXIMUM_REPLICAS} \
+		--param TARGET_CPU_UTILIZATION=${TARGET_CPU_UTILIZATION} \
+		--param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
+		--param MAX_THREADS=${MAX_THREADS} \
+		--param BUILD_VERSION=${BUILD_VERSION} \
+		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
+
+oc-dev-refresh:
+	oc process -f ${OPENSHIFT_TEMPLATE_PATH} \
+		--param NAMESPACE=${OPENSHIFT_PROJECT_DEV} \
+        --param SOURCE_REPOSITORY_URL=${CODE_REPO} \
+        --param SOURCE_REPOSITORY_REF=${REPO_BRANCH} \
+        --param MINIMUM_REPLICAS=${MINIMUM_REPLICAS} \
+      	--param MAXIMUM_REPLICAS=${MAXIMUM_REPLICAS} \
+		--param TARGET_CPU_UTILIZATION=${TARGET_CPU_UTILIZATION} \
+		--param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
+		--param MAX_THREADS=${MAX_THREADS} \
+		--param BUILD_VERSION=${BUILD_VERSION} \
+		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
+		| oc apply -f -
+	oc start-build yupana -n yupana
 
 oc-apply:
 	oc apply -f ${OPENSHIFT_TEMPLATE_PATH}
@@ -171,11 +239,11 @@ oc-delete-project:
 oc-delete-yupana:
 	oc-delete-yupana-data oc-delete-project
 
-oc-up-dev: oc-up oc-project oc-apply oc-new-app
+oc-up-dev: oc-up oc-project oc-apply oc-dev-new-app
 
-oc-create-all: oc-login-developer oc-project oc-create-tags oc-apply oc-new-app
+oc-create-all: oc-login-developer oc-project oc-create-tags oc-apply oc-dev-new-app
 
-oc-create-yupana: oc-login-developer oc-project oc-apply oc-new-app
+oc-create-yupana: oc-login-developer oc-project oc-apply oc-dev-new-app
 
 oc-create-tags:
 	oc get istag postgresql:$(PGSQL_VERSION) || oc create istag postgresql:$(PGSQL_VERSION) --from-image=centos/postgresql-96-centos7
