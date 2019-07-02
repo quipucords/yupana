@@ -70,7 +70,7 @@ There are also other make targets available to step through the project deployme
 .. code-block:: bash
 
     # Run everything through Openshift
-    make oc-up-all
+    make oc-up-dev
 
     # Run just a database in Openshift, while running the server locally
     make oc-up-db
