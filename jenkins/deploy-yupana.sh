@@ -37,6 +37,7 @@ if [ -z "$BUILD_CONFIG" ]; then
       --param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
       --param MAX_THREADS=${MAX_THREADS} \
       --param BUILD_VERSION=${BUILD_VERSION} \
+      --param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
 
   echo "Find build id"
   BUILD_ID=`oc get builds | grep ${APP_NAME} | tail -1 | awk '{print $1}'`
@@ -79,6 +80,7 @@ else
       --param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
       --param MAX_THREADS=${MAX_THREADS} \
       --param BUILD_VERSION=${BUILD_VERSION} \
+      --param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
       | oc apply -f -
   BUILD_ID=`oc start-build ${BUILD_CONFIG} | awk '{print $2}' | sed -e 's/^"//' -e 's/"$//'`
 fi

@@ -25,7 +25,29 @@ If it is ever necessary to delete the yupana deployment in any of the projects, 
     oc project NAME_OF_PROJECT
     make oc-delete-yupana-data
 
-After deleting the app, you can redeploy by rerunning the jenkins job, or you can visit `Jenkins`_ and choose ``Build Now`` for the ``deploy-yupana-ci/qa/stage/prod`` projects.
+After deleting the app, you can redeploy by rerunning the jenkins job by visiting `Jenkins`_ and choosing ``Build Now`` for the ``deploy-yupana-ci/qa/stage/prod`` projects.
+
+Deploying without Jenkins
+=========================
+
+If for any reason Jenkins is not working, we have provided make commands that will create and deploy a new app, or refresh an existing one.
+
+First make sure that you are logged into the correct cluster and project. Next, export the following environment variables with the correct values for the project you are deploying to::
+
+    OPENSHIFT_PROJECT=<OPENSHIFT_PROJECT>
+    KAFKA_HOST=<KAFKA_HOST>
+    KAFKA_PORT=<KAFKA_PORT>
+    KAFKA_NAMESPACE=<KAFKA_NAMESPACE>
+    INSIGHTS_HOST_INVENTORY_URL=<INSIGHTS_HOST_INVENTORY_URL>
+    DEPLOY_BUILD_VERSION=<DEPLOY_BUILD_VERSION>
+
+To deploy a new app to the project, run::
+
+    make oc-new-app
+
+To refresh an existing app, run::
+
+    make oc-refresh
 
 .. _Jenkins: https://sonar-jenkins.rhev-ci-vms.eng.rdu2.redhat.com/
 .. |license| image:: https://img.shields.io/github/license/quipucords/yupana.svg

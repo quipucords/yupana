@@ -1,7 +1,7 @@
 Working with OpenShift
 ======================
 
-We are currently developing using OpenShift version 3.9. There are different setup requirements for Mac OS and Linux (instructions are provided for Fedora). To install the openshift client, visit https://access.redhat.com/downloads/content/290/ver=3.9/rhel---7/3.9.43/x86_64/product-software and follow the instructions to download the oc archive. Once you have downloaded the archive, unpack it and move the oc binary to a location such as ``/Users/your-user/dev/bin/openshift/``. Now edit your .bash_profile to define ``PATH`` as the following::
+We are currently developing using OpenShift version 3.9. There are different setup requirements for Mac OS and Linux (instructions are provided for Fedora). To install the openshift client, visit https://access.redhat.com/downloads/content/290/ver=3.9/rhel---7/3.9.43/x86_64/product-software and follow the instructions to download the oc archive. Once you have downloaded the archive, unpack it and move the oc binary to a location such as ``/Users/your-user/dev/bin/openshift/``. Now edit your ``~/.bash_profile`` to define ``PATH`` as the following::
 
     PATH="PATH_TO_OPENSHIFT_OC/:${PATH}"
     export PATH
@@ -45,6 +45,12 @@ If you'd like to start the cluster, deploy Yupana, and deploy PostgreSQL, run th
 
     make oc-up-dev
 
+If you'd like to refresh the deployed app with your local changes, run the following:
+
+.. code-block:: bash
+
+    make oc-dev-refresh
+
 To stop the local cluster run the following:
 
 .. code-block:: bash
@@ -64,7 +70,7 @@ There are also other make targets available to step through the project deployme
 .. code-block:: bash
 
     # Run everything through Openshift
-    make oc-up-all
+    make oc-up-dev
 
     # Run just a database in Openshift, while running the server locally
     make oc-up-db
