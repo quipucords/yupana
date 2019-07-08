@@ -210,7 +210,7 @@ Report slices are a slice of the host inventory data for a given report. A slice
 }
 ```
 
-An API specification of the report slices can be found in [report_slices.yml](https://github.com/quipucords/yupana/blob/master/docs/report_slices.yml). The host based inventory api specification includes a mandatory `account` field. Yupana will extract the `account` number from the kafka message it receives from the Insights platform file upload service and populate the `account` field of each host.
+An API specification of the report slices can be found in [report_slices.yml](https://github.com/quipucords/yupana/blob/master/docs/report_slices.yml). Yupana expects each host to be formatted according to the Insights host based inventory API [spec](https://github.com/RedHatInsights/insights-host-inventory/blob/master/swagger/api.spec.yaml#L383). The host based inventory API specification includes a mandatory `account` field. Yupana will extract the `account` number from the kafka message it receives from the Insights platform file upload service and populate the `account` field of each host.
 
 # <a name="sending_data"></a> Sending Data to Insights Upload service for Yupana (without QPC)
 Data being uploaded to Insights must be in `tar.gz` format containing the `.json` files with the given JSON structure above. It is important to note that Yupana processes & tracks reports based on their UUIDS, which means that data with a specific UUID cannot be uploaded more than once, or else the second upload will be archived and not processed. Therefore, before every upload we need to generate a new UUID and replace the current one with it if we want to upload the same data more than once. Use the following instructions to prepare and upload a sample or custom report.
