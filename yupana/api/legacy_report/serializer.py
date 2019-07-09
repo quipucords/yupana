@@ -9,7 +9,7 @@
 # https://www.gnu.org/licenses/gpl-3.0.txt.
 #
 
-"""Serializer for report progress."""
+"""Serializer for legacy report progress."""
 
 from rest_framework.serializers import (BooleanField,
                                         CharField,
@@ -20,11 +20,11 @@ from rest_framework.serializers import (BooleanField,
                                         ModelSerializer,
                                         UUIDField)
 
-from api.models import Report, ReportArchive
+from api.models import LegacyReport, LegacyReportArchive
 
 
-class AbstractReportSerializer(ModelSerializer):
-    """Abstract serializer for the Report models."""
+class LegacyAbstractReportSerializer(ModelSerializer):
+    """Abstract serializer for the LegacyReport models."""
 
     report_platform_id = UUIDField(format='hex_verbose', required=False)
     host_inventory_api_version = CharField(max_length=10, required=False)
@@ -35,8 +35,8 @@ class AbstractReportSerializer(ModelSerializer):
     upload_ack_status = CharField(max_length=10, required=False)
     upload_srv_kafka_msg = JSONField(required=True)
     git_commit = CharField(max_length=50, required=False)
-    state = ChoiceField(choices=Report.STATE_CHOICES)
-    retry_type = ChoiceField(choices=Report.RETRY_CHOICES, default=Report.TIME)
+    state = ChoiceField(choices=LegacyReport.STATE_CHOICES)
+    retry_type = ChoiceField(choices=LegacyReport.RETRY_CHOICES, default=LegacyReport.TIME)
     state_info = JSONField(allow_null=True)
     retry_count = IntegerField(default=0)
     last_update_time = DateTimeField(allow_null=True)
@@ -46,27 +46,27 @@ class AbstractReportSerializer(ModelSerializer):
     processing_end_time = DateTimeField(allow_null=True, required=False)
 
     class Meta:
-        """Meta class for ReportSerializer."""
+        """Meta class for LegacyReportSerializer."""
 
         abstract = True
         fields = '__all__'
 
 
-class ReportSerializer(AbstractReportSerializer):
-    """Serializer for the Report model."""
+class LegacyReportSerializer(LegacyAbstractReportSerializer):
+    """Serializer for the LegacyReport model."""
 
     class Meta:
-        """Meta class for the ReportSerializer."""
+        """Meta class for the LegacyReportSerializer."""
 
-        model = Report
+        model = LegacyReport
         fields = '__all__'
 
 
-class ReportArchiveSerializer(AbstractReportSerializer):
-    """Serializer for the ReportArchive model."""
+class LegacyReportArchiveSerializer(LegacyAbstractReportSerializer):
+    """Serializer for the LegacyReportArchive model."""
 
     class Meta:
-        """Meta class for the ReportArchiveSerializer."""
+        """Meta class for the LegacyReportArchiveSerializer."""
 
-        model = ReportArchive
+        model = LegacyReportArchive
         fields = '__all__'

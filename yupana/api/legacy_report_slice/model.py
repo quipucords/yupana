@@ -9,41 +9,40 @@
 # https://www.gnu.org/licenses/gpl-3.0.txt.
 #
 
-"""Model for report progress."""
+"""Model for legacy report slice progress."""
 
 from django.db import models
 
+from api.legacy_report.model import LegacyReport, LegacyReportArchive
 
-class AbstractReport(models.Model):
-    """Represents report information."""
+
+class LegacyAbstractReportSlice(models.Model):
+    """Represents legacy report slice information."""
 
     report_platform_id = models.UUIDField(null=True)
-    host_inventory_api_version = models.CharField(max_length=10, null=True)
-    source = models.CharField(max_length=15, null=True)
-    source_metadata = models.TextField(null=True)
+    report_slice_id = models.UUIDField(null=True)
     account = models.CharField(max_length=50, null=True)
-    request_id = models.CharField(max_length=50, null=True)
-    upload_ack_status = models.CharField(max_length=10, null=True)
-    upload_srv_kafka_msg = models.TextField(null=True)
+    report_json = models.TextField(null=True)
     git_commit = models.CharField(max_length=50, null=True)
     ready_to_archive = models.BooleanField(null=False, default=False)
+    source = models.CharField(max_length=15, null=False)
 
+    PENDING = 'pending'
     NEW = 'new'
-    STARTED = 'started'
-    DOWNLOADED = 'downloaded'
-    FAILED_DOWNLOAD = 'failed to download'
+    RETRY_VALIDATION = 'retry_validation'
+    FAILED_VALIDATION = 'failed_validation'
     VALIDATED = 'validated'
-    FAILED_VALIDATION = 'failed validation'
-    VALIDATION_REPORTED = 'validation reported'
-    FAILED_VALIDATION_REPORTING = 'failed to report validation'
-    STATE_CHOICES = ((NEW, NEW),
-                     (STARTED, STARTED),
-                     (DOWNLOADED, DOWNLOADED),
-                     (FAILED_DOWNLOAD, FAILED_DOWNLOAD),
-                     (VALIDATED, VALIDATED),
+    STARTED = 'started'
+    HOSTS_UPLOADED = 'hosts uploaded'
+    FAILED_HOSTS_UPLOAD = 'failed to upload hosts'
+    STATE_CHOICES = ((PENDING, PENDING),
+                     (NEW, NEW),
+                     (RETRY_VALIDATION, RETRY_VALIDATION),
                      (FAILED_VALIDATION, FAILED_VALIDATION),
-                     (VALIDATION_REPORTED, VALIDATION_REPORTED),
-                     (FAILED_VALIDATION_REPORTING, FAILED_VALIDATION_REPORTING))
+                     (VALIDATED, VALIDATED),
+                     (STARTED, STARTED),
+                     (HOSTS_UPLOADED, HOSTS_UPLOADED),
+                     (FAILED_HOSTS_UPLOAD, FAILED_HOSTS_UPLOAD))
 
     state = models.CharField(
         max_length=28,
@@ -65,60 +64,65 @@ class AbstractReport(models.Model):
     state_info = models.TextField(null=True)
     retry_count = models.PositiveSmallIntegerField(null=True)
     last_update_time = models.DateTimeField(null=True)
-    arrival_time = models.DateTimeField(null=True)
+    failed_hosts = models.TextField(null=True)
+    candidate_hosts = models.TextField(null=True)
+    hosts_count = models.PositiveIntegerField(null=False)
+    creation_time = models.DateTimeField(null=True)
     processing_start_time = models.DateTimeField(null=True)
     processing_end_time = models.DateTimeField(null=True)
 
     def __str__(self):
         """Convert to string."""
         return '{' + 'report_platform_id:{}, '\
-            'host_inventory_api_version: {}, '\
-            'source: {}, '\
-            'source_metadata: {}, '\
+            'report_slice_id: {}, '\
             'account: {}, ' \
-            'request_id: {}, '\
-            'upload_ack_status: {}, ' \
-            'upload_srv_kafka_msg: {}, ' \
+            'report_json: {}, '\
             'git_commit: {}, '\
+            'ready_to_archive: {}, '\
+            'source: {}, '\
             'state: {}, '\
             'state_info: {}, '\
             'retry_count: {}, '\
             'retry_type: {}, '\
             'last_update_time: {}, '\
-            'arrival_time: {}, '\
+            'failed_hosts: {}, '\
+            'candidate_hosts: {}, '\
+            'hosts_count: {}, '\
+            'creation_time: {}, '\
             'processing_start_time: {}, '\
             'processing_end_time: {} '.format(
                 self.report_platform_id,
-                self.host_inventory_api_version,
-                self.source,
-                self.source_metadata,
+                self.report_slice_id,
                 self.account,
-                self.request_id,
-                self.upload_ack_status,
-                self.upload_srv_kafka_msg,
+                self.report_json,
                 self.git_commit,
+                self.ready_to_archive,
+                self.source,
                 self.state,
                 self.state_info,
                 self.retry_count,
                 self.retry_type,
                 self.last_update_time,
-                self.arrival_time,
+                self.failed_hosts,
+                self.candidate_hosts,
+                self.hosts_count,
+                self.creation_time,
                 self.processing_start_time,
                 self.processing_end_time) + '}'
 
     class Meta:
-        """Metadata for abstract report model."""
+        """Metadata for legacy abstract report slice model."""
 
         abstract = True
 
 
-class Report(AbstractReport):
-    """Represents report records."""
+class LegacyReportSlice(LegacyAbstractReportSlice):  # pylint: disable=too-many-instance-attributes
+    """Represents legacy report slice records."""
 
-    pass
+    report = models.ForeignKey(LegacyReport, null=True, on_delete=models.CASCADE)
 
 
-class ReportArchive(AbstractReport):
-    """Represents report archives."""
+class LegacyReportSliceArchive(LegacyAbstractReportSlice):
+    """Represents legacy report slice archives."""
 
-    pass
+    report = models.ForeignKey(LegacyReportArchive, null=True, on_delete=models.CASCADE)

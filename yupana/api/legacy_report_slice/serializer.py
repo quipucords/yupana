@@ -9,7 +9,7 @@
 # https://www.gnu.org/licenses/gpl-3.0.txt.
 #
 
-"""Serializer for report slice progress."""
+"""Serializer for legacy report slice progress."""
 
 from rest_framework.serializers import (BooleanField,
                                         CharField,
@@ -20,14 +20,14 @@ from rest_framework.serializers import (BooleanField,
                                         ModelSerializer,
                                         UUIDField)
 
-from api.models import ReportSlice, ReportSliceArchive
+from api.models import LegacyReportSlice, LegacyReportSliceArchive
 from config.settings.base import MAX_HOSTS_PER_REP
 
 MAX_HOSTS_PER_REP = int(MAX_HOSTS_PER_REP)
 
 
-class AbstractReportSliceSerializer(ModelSerializer):
-    """Abstract serializer for the ReportSlice models."""
+class LegacyAbstractReportSliceSerializer(ModelSerializer):
+    """Abstract serializer for the LegacyReportSlice models."""
 
     report_platform_id = UUIDField(format='hex_verbose', required=False)
     report_slice_id = UUIDField(format='hex_verbose', required=False)
@@ -35,8 +35,8 @@ class AbstractReportSliceSerializer(ModelSerializer):
     report_json = JSONField(allow_null=False)
     git_commit = CharField(max_length=50, required=False)
     source = CharField(max_length=15, required=True)
-    state = ChoiceField(choices=ReportSlice.STATE_CHOICES)
-    retry_type = ChoiceField(choices=ReportSlice.RETRY_CHOICES, default=ReportSlice.TIME)
+    state = ChoiceField(choices=LegacyReportSlice.STATE_CHOICES)
+    retry_type = ChoiceField(choices=LegacyReportSlice.RETRY_CHOICES, default=LegacyReportSlice.TIME)
     state_info = JSONField(allow_null=False)
     retry_count = IntegerField(default=0)
     hosts_count = IntegerField(min_value=1, max_value=MAX_HOSTS_PER_REP)
@@ -49,27 +49,27 @@ class AbstractReportSliceSerializer(ModelSerializer):
     processing_end_time = DateTimeField(allow_null=True, required=False)
 
     class Meta:
-        """Meta class for AbstractReportSliceSerializer."""
+        """Meta class for LegacyAbstractReportSliceSerializer."""
 
         abstract = True
         fields = '__all__'
 
 
-class ReportSliceSerializer(AbstractReportSliceSerializer):
-    """Serializer for the ReportSlice Model."""
+class LegacyReportSliceSerializer(LegacyAbstractReportSliceSerializer):
+    """Serializer for the LegacyReportSlice Model."""
 
     class Meta:
-        """Meta class for the ReportSliceSerializer."""
+        """Meta class for the LegacyReportSliceSerializer."""
 
-        model = ReportSlice
+        model = LegacyReportSlice
         fields = '__all__'
 
 
-class ReportSliceArchiveSerializer(AbstractReportSliceSerializer):
-    """Serializer for the ReportSliceArchive Model."""
+class LegacyReportSliceArchiveSerializer(LegacyAbstractReportSliceSerializer):
+    """Serializer for the LegacyReportSliceArchive Model."""
 
     class Meta:
-        """Meta class for the ReportSliceArchiveSerializer."""
+        """Meta class for the LegacyReportSliceArchiveSerializer."""
 
-        model = ReportSliceArchive
+        model = LegacyReportSliceArchive
         fields = '__all__'

@@ -26,15 +26,15 @@ from enum import Enum
 
 import pytz
 from django.db import transaction
-from processor.kafka_msg_handler import (QPCReportException,
-                                         format_message)
+from processor.legacy_report_consumer import (QPCReportException,
+                                              format_message)
 from prometheus_client import Counter, Gauge, Summary
 
-from api.models import (Report,
-                        ReportSlice,
+from api.models import (LegacyReport,
+                        LegacyReportSlice,
                         Status)
-from api.serializers import (ReportArchiveSerializer,
-                             ReportSliceArchiveSerializer)
+from api.serializers import (LegacyReportArchiveSerializer,
+                             LegacyReportSliceArchiveSerializer)
 from config.settings.base import (NEW_REPORT_QUERY_INTERVAL,
                                   RETRIES_ALLOWED,
                                   RETRY_TIME)
@@ -73,7 +73,7 @@ HOSTS_UPLOADED_FAILED = Gauge('hosts_failed', 'The total number of hosts that fa
 
 
 # pylint: disable=broad-except, too-many-lines, too-many-public-methods
-class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
+class LegacyAbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
     """Class for processing saved reports that have been uploaded."""
 
     # pylint: disable=too-many-arguments
@@ -170,7 +170,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         try:
             report_or_slice = queryset.earliest('last_update_time')
             return report_or_slice
-        except (Report.DoesNotExist, ReportSlice.DoesNotExist):
+        except (LegacyReport.DoesNotExist, LegacyReportSlice.DoesNotExist):
             return None
 
     def get_oldest_object_to_retry(self):
@@ -396,7 +396,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         self.candidate_hosts = []
 
     def determine_retry(self, fail_state, current_state,
-                        candidate_hosts=None, retry_type=Report.TIME):
+                        candidate_hosts=None, retry_type=LegacyReport.TIME):
         """Determine if yupana should archive a report based on retry count.
 
         :param fail_state: <str> the final state if we have reached max retries
@@ -502,19 +502,19 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
     def archive_report_and_slices(self):  # pylint: disable=too-many-statements
         """Archive the report slice objects & associated report."""
         self.prefix = 'ARCHIVING'
-        if self.object_class == Report:
+        if self.object_class == LegacyReport:
             report = self.report_or_slice
         else:
             report = self.report_or_slice.report
         all_report_slices = []
         all_slices_ready = True
         try:
-            all_report_slices = ReportSlice.objects.all().filter(report=report)
+            all_report_slices = LegacyReportSlice.objects.all().filter(report=report)
             for report_slice in all_report_slices:
                 if not report_slice.ready_to_archive:
                     all_slices_ready = False
                     break
-        except ReportSlice.DoesNotExist:
+        except LegacyReportSlice.DoesNotExist:
             pass
 
         if report.ready_to_archive and all_slices_ready:
@@ -543,15 +543,15 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 archived_rep_data['upload_ack_status'] = report.upload_ack_status
             if report.report_platform_id:
                 archived_rep_data['report_platform_id'] = report.report_platform_id
-            rep_serializer = ReportArchiveSerializer(data=archived_rep_data)
+            rep_serializer = LegacyReportArchiveSerializer(data=archived_rep_data)
             rep_serializer.is_valid(raise_exception=True)
             archived_rep = rep_serializer.save()
             LOG.info(format_message(self.prefix, 'Report successfully archived.',
                                     account_number=self.account_number,
                                     report_platform_id=self.report_platform_id))
 
-            failed_states = [Report.FAILED_DOWNLOAD, Report.FAILED_VALIDATION,
-                             Report.FAILED_VALIDATION_REPORTING]
+            failed_states = [LegacyReport.FAILED_DOWNLOAD, LegacyReport.FAILED_VALIDATION,
+                             LegacyReport.FAILED_VALIDATION_REPORTING]
             if report.state in failed_states or failed:
                 ARCHIVED_FAIL.inc()
             else:
@@ -581,10 +581,10 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     archived_slice_data['report_platform_id'] = report_slice.report_platform_id
                 if report_slice.report_json:
                     archived_slice_data['report_json'] = report_slice.report_json
-                slice_serializer = ReportSliceArchiveSerializer(data=archived_slice_data)
+                slice_serializer = LegacyReportSliceArchiveSerializer(data=archived_slice_data)
                 slice_serializer.is_valid(raise_exception=True)
                 slice_serializer.save()
-                failed_states = [ReportSlice.FAILED_VALIDATION, ReportSlice.FAILED_HOSTS_UPLOAD]
+                failed_states = [LegacyReportSlice.FAILED_VALIDATION, LegacyReportSlice.FAILED_HOSTS_UPLOAD]
                 if report_slice.state in failed_states:
                     ARCHIVED_FAIL.inc()
                 else:
@@ -598,8 +598,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             # now delete the report object and it will delete all of the associated
             # report slices
             try:
-                Report.objects.get(id=report.id).delete()
-            except Report.DoesNotExist:
+                LegacyReport.objects.get(id=report.id).delete()
+            except LegacyReport.DoesNotExist:
                 pass
             if all_report_slices:
                 LOG.info(format_message(self.prefix, 'Report slices successfully archived.',

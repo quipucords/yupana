@@ -20,5 +20,5 @@
 # pylint: disable=unused-import
 from api.forensics.serializer import InventoryUploadErrorSerializer
 from api.status.serializer import StatusSerializer
-from api.report.serializer import ReportSerializer, ReportArchiveSerializer
-from api.report_slice.serializer import ReportSliceSerializer, ReportSliceArchiveSerializer
+from api.legacy_report.serializer import LegacyReportSerializer, LegacyReportArchiveSerializer
+from api.legacy_report_slice.serializer import LegacyReportSliceSerializer, LegacyReportSliceArchiveSerializer

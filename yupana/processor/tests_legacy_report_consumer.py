@@ -22,12 +22,12 @@ import json
 import tarfile
 from unittest.mock import patch
 
-import processor.kafka_msg_handler as msg_handler
+import processor.legacy_report_consumer as msg_handler
 from aiokafka import AIOKafkaConsumer
 from asynctest import CoroutineMock
 from django.test import TestCase
 
-from api.models import Report
+from api.models import LegacyReport
 
 
 def create_tar_buffer(files_data, encoding='utf-8', meta_encoding='utf-8'):
@@ -108,20 +108,20 @@ class KafkaMsgHandlerTest(TestCase):
         test_consumer.commit = CoroutineMock()
         qpc_msg = KafkaMsg(msg_handler.QPC_TOPIC, self.payload_url)
         # test happy case
-        with patch('processor.kafka_msg_handler.unpack_consumer_record',
+        with patch('processor.legacy_report_consumer.unpack_consumer_record',
                    return_value={'account': '8910', 'request_id': '1234'}):
             await msg_handler.save_message_and_ack(test_consumer, qpc_msg)
-            report = Report.objects.get(account='8910')
+            report = LegacyReport.objects.get(account='8910')
             self.assertEqual(json.loads(report.upload_srv_kafka_msg),
                              {'account': '8910', 'request_id': '1234'})
-            self.assertEqual(report.state, Report.NEW)
+            self.assertEqual(report.state, LegacyReport.NEW)
 
         # test no rh_account or request_id
-        with patch('processor.kafka_msg_handler.unpack_consumer_record',
+        with patch('processor.legacy_report_consumer.unpack_consumer_record',
                    return_value={'foo': 'bar'}):
             await msg_handler.save_message_and_ack(test_consumer, qpc_msg)
-            with self.assertRaises(Report.DoesNotExist):
-                Report.objects.get(upload_srv_kafka_msg=json.dumps({'foo': 'bar'}))
+            with self.assertRaises(LegacyReport.DoesNotExist):
+                LegacyReport.objects.get(upload_srv_kafka_msg=json.dumps({'foo': 'bar'}))
 
         # test general exception
         def raise_error():
@@ -129,13 +129,13 @@ class KafkaMsgHandlerTest(TestCase):
             raise Exception('Test')
 
         test_consumer.commit = CoroutineMock(side_effect=raise_error)
-        with patch('processor.kafka_msg_handler.unpack_consumer_record',
+        with patch('processor.legacy_report_consumer.unpack_consumer_record',
                    return_value={'rh_account': '1112', 'request_id': '1234'}):
             await msg_handler.save_message_and_ack(test_consumer, qpc_msg)
-            report = Report.objects.get(account='1112')
+            report = LegacyReport.objects.get(account='1112')
             self.assertEqual(json.loads(report.upload_srv_kafka_msg),
                              {'rh_account': '1112', 'request_id': '1234'})
-            self.assertEqual(report.state, Report.NEW)
+            self.assertEqual(report.state, LegacyReport.NEW)
 
     def test_save_and_ack_success(self):
         """Test the async save and ack function."""

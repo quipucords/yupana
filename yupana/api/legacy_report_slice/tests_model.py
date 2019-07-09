@@ -14,18 +14,18 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-"""Test the Report API."""
+"""Test the LegacyReport API."""
 
 import uuid
 from datetime import datetime
 
 from django.test import TestCase
 
-from api.report_slice.model import Report, ReportSlice
+from api.legacy_report_slice.model import LegacyReport, LegacyReportSlice
 
 
-class ReportSliceModelTest(TestCase):
-    """Tests against the ReportSlice model."""
+class LegacyReportSliceModelTest(TestCase):
+    """Tests against the LegacyReportSlice model."""
 
     def setUp(self):
         """Create test case setup."""
@@ -37,23 +37,24 @@ class ReportSliceModelTest(TestCase):
                             'report_type': 'insights',
                             'hosts': {}}
         self.date = datetime.now()
-        self.report = Report(report_platform_id=self.uuid,
-                             upload_srv_kafka_msg=self.upload_srv_msg,
-                             account='13423',
-                             state=Report.NEW,
-                             state_info=[Report.NEW],
-                             retry_count=0,
-                             last_update_time=self.date,
-                             ready_to_archive=False,
-                             arrival_time=self.date,
-                             processing_start_time=self.date)
-        self.report_slice = ReportSlice(
+        self.report = LegacyReport(
+            report_platform_id=self.uuid,
+            upload_srv_kafka_msg=self.upload_srv_msg,
+            account='13423',
+            state=LegacyReport.NEW,
+            state_info=[LegacyReport.NEW],
+            retry_count=0,
+            last_update_time=self.date,
+            ready_to_archive=False,
+            arrival_time=self.date,
+            processing_start_time=self.date)
+        self.report_slice = LegacyReportSlice(
             report_platform_id=self.uuid,
             report_slice_id=self.uuid2,
             account='13423',
             report_json=self.report_json,
-            state=ReportSlice.NEW,
-            state_info=[ReportSlice.NEW],
+            state=LegacyReportSlice.NEW,
+            state_info=[LegacyReportSlice.NEW],
             retry_count=0,
             last_update_time=self.date,
             failed_hosts=[],
@@ -68,8 +69,8 @@ class ReportSliceModelTest(TestCase):
         """Test the report slice fields."""
         self.assertEqual(self.report_slice.report_platform_id, self.uuid)
         self.assertEqual(self.report_slice.report_json, self.report_json)
-        self.assertEqual(self.report_slice.state, ReportSlice.NEW)
-        self.assertEqual(self.report_slice.state_info, [ReportSlice.NEW])
+        self.assertEqual(self.report_slice.state, LegacyReportSlice.NEW)
+        self.assertEqual(self.report_slice.state_info, [LegacyReportSlice.NEW])
         self.assertEqual(self.report_slice.last_update_time, self.date)
         self.assertEqual(self.report_slice.report, self.report)
         # pylint: disable=line-too-long

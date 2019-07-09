@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-"""Report Slice Processor."""
+"""Legacy Report Slice Processor."""
 
 import asyncio
 import base64
@@ -27,15 +27,17 @@ from http import HTTPStatus
 
 import pytz
 import requests
-from processor.abstract_processor import (AbstractProcessor, FAILED_TO_VALIDATE,
-                                          HOSTS_UPLOADED_FAILED, HOSTS_UPLOADED_SUCCESS,
-                                          HOST_UPLOAD_REQUEST_LATENCY, INVALID_HOSTS,
-                                          UPLOAD_GROUP_SIZE, VALID_HOSTS)
-from processor.kafka_msg_handler import (QPCReportException,
-                                         format_message)
+from processor.legacy_abstract_processor import (
+    LegacyAbstractProcessor, FAILED_TO_VALIDATE,
+    HOSTS_UPLOADED_FAILED, HOSTS_UPLOADED_SUCCESS,
+    HOST_UPLOAD_REQUEST_LATENCY, INVALID_HOSTS,
+    UPLOAD_GROUP_SIZE, VALID_HOSTS)
+from processor.legacy_report_consumer import (
+    QPCReportException,
+    format_message)
 
-from api.models import InventoryUploadError, ReportSlice
-from api.serializers import InventoryUploadErrorSerializer, ReportSliceSerializer
+from api.models import InventoryUploadError, LegacyReportSlice
+from api.serializers import InventoryUploadErrorSerializer, LegacyReportSliceSerializer
 from config.settings.base import (HOSTS_PER_REQ,
                                   HOST_INVENTORY_UPLOAD_MODE,
                                   INSIGHTS_HOST_INVENTORY_URL,
@@ -67,29 +69,29 @@ class RetryUploadCommitException(Exception):
     pass
 
 
-class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-attributes
+class LegacyReportSliceProcessor(LegacyAbstractProcessor):  # pylint: disable=too-many-instance-attributes
     """Class for processing report slices that have been created."""
 
     def __init__(self):
         """Create a report slice state machine."""
         state_functions = {
-            ReportSlice.RETRY_VALIDATION: self.transition_to_validated,
-            ReportSlice.NEW: self.transition_to_started,
-            ReportSlice.STARTED: self.transition_to_hosts_uploaded,
-            ReportSlice.VALIDATED: self.transition_to_hosts_uploaded,
-            ReportSlice.HOSTS_UPLOADED: self.archive_report_and_slices,
-            ReportSlice.FAILED_VALIDATION: self.archive_report_and_slices,
-            ReportSlice.FAILED_HOSTS_UPLOAD: self.archive_report_and_slices}
+            LegacyReportSlice.RETRY_VALIDATION: self.transition_to_validated,
+            LegacyReportSlice.NEW: self.transition_to_started,
+            LegacyReportSlice.STARTED: self.transition_to_hosts_uploaded,
+            LegacyReportSlice.VALIDATED: self.transition_to_hosts_uploaded,
+            LegacyReportSlice.HOSTS_UPLOADED: self.archive_report_and_slices,
+            LegacyReportSlice.FAILED_VALIDATION: self.archive_report_and_slices,
+            LegacyReportSlice.FAILED_HOSTS_UPLOAD: self.archive_report_and_slices}
         state_metrics = {
-            ReportSlice.FAILED_VALIDATION: FAILED_TO_VALIDATE.inc
+            LegacyReportSlice.FAILED_VALIDATION: FAILED_TO_VALIDATE.inc
         }
         super().__init__(pre_delegate=self.pre_delegate,
                          state_functions=state_functions,
                          state_metrics=state_metrics,
-                         async_states=[ReportSlice.STARTED, ReportSlice.VALIDATED],
+                         async_states=[LegacyReportSlice.STARTED, LegacyReportSlice.VALIDATED],
                          object_prefix='REPORT SLICE',
-                         object_class=ReportSlice,
-                         object_serializer=ReportSliceSerializer
+                         object_class=LegacyReportSlice,
+                         object_serializer=LegacyReportSliceSerializer
                          )
 
     def pre_delegate(self):
@@ -122,7 +124,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             self.candidate_hosts, self.failed_hosts = self._validate_report_details()
             INVALID_HOSTS.set(len(self.failed_hosts))
             # Here we want to update the report state of the actual report slice & when finished
-            self.next_state = ReportSlice.VALIDATED
+            self.next_state = LegacyReportSlice.VALIDATED
             options = {'candidate_hosts': self.candidate_hosts,
                        'failed_hosts': self.failed_hosts}
             self.update_object_state(options=options)
@@ -130,15 +132,15 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             # if any QPCReportExceptions occur, we know that the report is not valid but has been
             # successfully validated
             # that means that this slice is invalid and only awaits being archived
-            self.next_state = ReportSlice.FAILED_VALIDATION
+            self.next_state = LegacyReportSlice.FAILED_VALIDATION
             self.update_object_state(options={})
         except Exception as error:  # pylint: disable=broad-except
             # This slice blew up validation - we want to retry it later,
             # which means it enters our odd state
             # of requiring validation
             LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error)))
-            self.determine_retry(ReportSlice.FAILED_VALIDATION, ReportSlice.RETRY_VALIDATION,
-                                 retry_type=ReportSlice.GIT_COMMIT)
+            self.determine_retry(LegacyReportSlice.FAILED_VALIDATION, LegacyReportSlice.RETRY_VALIDATION,
+                                 retry_type=LegacyReportSlice.GIT_COMMIT)
 
     async def transition_to_hosts_uploaded(self):
         """Upload the host candidates to inventory & move to hosts_uploaded state."""
@@ -162,7 +164,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     LOG.info(format_message(self.prefix, 'All hosts were successfully uploaded.',
                                             account_number=self.account_number,
                                             report_platform_id=self.report_platform_id))
-                    self.next_state = ReportSlice.HOSTS_UPLOADED
+                    self.next_state = LegacyReportSlice.HOSTS_UPLOADED
                     options = {'candidate_hosts': [], 'ready_to_archive': True}
                     self.update_object_state(options=options)
                 else:
@@ -173,15 +175,15 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     # they will succeed and leave behind the retry_commit hosts
                     if retry_commit_candidates:
                         candidates += retry_commit_candidates
-                        retry_type = ReportSlice.GIT_COMMIT
+                        retry_type = LegacyReportSlice.GIT_COMMIT
                     if retry_time_candidates:
                         candidates += retry_time_candidates
-                        retry_type = ReportSlice.TIME
+                        retry_type = LegacyReportSlice.TIME
                     LOG.info(format_message(self.prefix, 'Hosts were not successfully uploaded',
                                             account_number=self.account_number,
                                             report_platform_id=self.report_platform_id))
-                    self.determine_retry(ReportSlice.FAILED_HOSTS_UPLOAD,
-                                         ReportSlice.VALIDATED,
+                    self.determine_retry(LegacyReportSlice.FAILED_HOSTS_UPLOAD,
+                                         LegacyReportSlice.VALIDATED,
                                          candidate_hosts=candidates,
                                          retry_type=retry_type)
             else:
@@ -189,7 +191,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 LOG.info(format_message(self.prefix, 'There are no valid hosts to upload',
                                         account_number=self.account_number,
                                         report_platform_id=self.report_platform_id))
-                self.next_state = ReportSlice.FAILED_VALIDATION
+                self.next_state = LegacyReportSlice.FAILED_VALIDATION
                 options = {'ready_to_archive': True}
                 self.update_object_state(options=options)
                 self.archive_report_and_slices()
@@ -197,8 +199,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error),
                                      account_number=self.account_number,
                                      report_platform_id=self.report_platform_id))
-            self.determine_retry(ReportSlice.FAILED_HOSTS_UPLOAD, ReportSlice.VALIDATED,
-                                 retry_type=ReportSlice.GIT_COMMIT)
+            self.determine_retry(LegacyReportSlice.FAILED_HOSTS_UPLOAD, LegacyReportSlice.VALIDATED,
+                                 retry_type=LegacyReportSlice.GIT_COMMIT)
 
     @staticmethod
     def generate_bulk_upload_list(hosts):  # pylint:disable=too-many-locals
@@ -520,7 +522,7 @@ def asyncio_report_processor_thread(loop):  # pragma: no cover
     :param loop: event loop
     :returns None
     """
-    processor = ReportSliceProcessor()
+    processor = LegacyReportSliceProcessor()
     loop.run_until_complete(processor.run())
 
 

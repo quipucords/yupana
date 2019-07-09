@@ -76,7 +76,7 @@ class ApiConfig(AppConfig):
     @staticmethod
     def start_kafka_consumer():
         """Start the kafka consumer."""
-        from processor.kafka_msg_handler import initialize_kafka_handler
+        from processor.legacy_report_consumer import initialize_kafka_handler
         pause_kafka_for_file_upload = ENVIRONMENT.get_value(
             'PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE', default=False)
         if not pause_kafka_for_file_upload:
@@ -88,14 +88,14 @@ class ApiConfig(AppConfig):
     @staticmethod
     def start_report_processor():
         """Start the report processor."""
-        from processor.report_processor import initialize_report_processor
+        from processor.legacy_report_processor import initialize_report_processor
         logger.info('Initializing the report processor.')
         initialize_report_processor()
 
     @staticmethod
     def start_report_slice_processor():
         """Start the report slice processor."""
-        from processor.report_slice_processor import initialize_report_slice_processor
+        from processor.legacy_report_slice_processor import initialize_report_slice_processor
         logger.info('Initializing the report slice processor.')
         initialize_report_slice_processor()
 

@@ -27,22 +27,22 @@ import requests
 import requests_mock
 from asynctest import CoroutineMock
 from django.test import TestCase
-from processor import (abstract_processor,
-                       kafka_msg_handler as msg_handler,
-                       report_slice_processor,
-                       tests_kafka_msg_handler as test_handler)
+from processor import (legacy_abstract_processor,
+                       legacy_report_consumer as msg_handler,
+                       legacy_report_slice_processor,
+                       tests_legacy_report_consumer as test_handler)
 from prometheus_client import REGISTRY
 
 from api.models import (InventoryUploadError,
-                        Report,
-                        ReportArchive,
-                        ReportSlice,
-                        ReportSliceArchive)
+                        LegacyReport,
+                        LegacyReportArchive,
+                        LegacyReportSlice,
+                        LegacyReportSliceArchive)
 
 
 # pylint: disable=too-many-public-methods
 # pylint: disable=protected-access,too-many-lines,too-many-instance-attributes
-class ReportProcessorTests(TestCase):
+class LegacyReportProcessorTests(TestCase):
     """Test Cases for the Message processor."""
 
     def setUp(self):
@@ -65,11 +65,11 @@ class ReportProcessorTests(TestCase):
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'hosts': [{'bios_uuid': 'value'},
                       {'invalid': 'value'}]}
-        self.report_record = Report(
+        self.report_record = LegacyReport(
             upload_srv_kafka_msg=json.dumps(self.msg),
             account='1234',
-            state=Report.NEW,
-            state_info=json.dumps([Report.NEW]),
+            state=LegacyReport.NEW,
+            state_info=json.dumps([LegacyReport.NEW]),
             last_update_time=datetime.now(pytz.utc),
             retry_count=0,
             ready_to_archive=False,
@@ -78,13 +78,13 @@ class ReportProcessorTests(TestCase):
             processing_start_time=datetime.now(pytz.utc))
         self.report_record.save()
 
-        self.report_slice = ReportSlice(
+        self.report_slice = LegacyReportSlice(
             report_platform_id=self.uuid,
             report_slice_id=self.uuid2,
             account='13423',
             report_json=json.dumps(self.report_json),
-            state=ReportSlice.NEW,
-            state_info=json.dumps([ReportSlice.NEW]),
+            state=LegacyReportSlice.NEW,
+            state_info=json.dumps([LegacyReportSlice.NEW]),
             retry_count=0,
             last_update_time=datetime.now(pytz.utc),
             failed_hosts=[],
@@ -97,7 +97,7 @@ class ReportProcessorTests(TestCase):
             processing_start_time=datetime.now(pytz.utc))
         self.report_slice.save()
         self.report_record.save()
-        self.processor = report_slice_processor.ReportSliceProcessor()
+        self.processor = legacy_report_slice_processor.LegacyReportSliceProcessor()
         self.processor.report = self.report_slice
 
     def check_variables_are_reset(self):
@@ -116,32 +116,32 @@ class ReportProcessorTests(TestCase):
 
     async def async_test_delegate_state(self):
         """Set up the test for delegate state."""
-        self.report_slice.state = ReportSlice.VALIDATED
+        self.report_slice.state = LegacyReportSlice.VALIDATED
         self.report_slice.report_platform_id = self.uuid
         self.report_slice.candidate_hosts = json.dumps([
             {str(self.uuid3): {'ip_addresses': 'value', 'name': 'value'},
-             'cause': report_slice_processor.FAILED_UPLOAD}])
+             'cause': legacy_report_slice_processor.FAILED_UPLOAD}])
         self.report_slice.failed_hosts = json.dumps(
             [{str(self.uuid2): {'ip_addresses': 'value', 'name': 'value'},
-              'cause': abstract_processor.FAILED_VALIDATION}])
+              'cause': legacy_abstract_processor.FAILED_VALIDATION}])
         self.report_slice.save()
         self.processor.report_or_slice = self.report_slice
 
         def upload_side_effect():
             """Transition the state to uploaded."""
-            self.processor.state = ReportSlice.HOSTS_UPLOADED
-            self.report_slice.state = ReportSlice.HOSTS_UPLOADED
+            self.processor.state = LegacyReportSlice.HOSTS_UPLOADED
+            self.report_slice.state = LegacyReportSlice.HOSTS_UPLOADED
             self.report_slice.save()
 
         with patch(
-                'processor.report_slice_processor.'
-                'ReportSliceProcessor.transition_to_hosts_uploaded',
+                'processor.legacy_report_slice_processor.'
+                'LegacyReportSliceProcessor.transition_to_hosts_uploaded',
                 side_effect=upload_side_effect):
             await self.processor.delegate_state()
             self.check_variables_are_reset()
 
         # test pending state for delegate
-        self.report_slice.state = ReportSlice.PENDING
+        self.report_slice.state = LegacyReportSlice.PENDING
         self.processor.report_or_slice = self.report_slice
         await self.processor.delegate_state()
         self.check_variables_are_reset()
@@ -168,7 +168,7 @@ class ReportProcessorTests(TestCase):
         failed_hosts = [{str(self.uuid6): {'etc_machine_id': 'value'}},
                         {str(self.uuid7): {'subscription_manager_id': 'value'}}]
         self.processor.report_or_slice = self.report_slice
-        self.processor.next_state = ReportSlice.VALIDATED
+        self.processor.next_state = LegacyReportSlice.VALIDATED
         options = {'report_json': report_json,
                    'failed_hosts': failed_hosts}
         self.processor.update_object_state(options=options)
@@ -177,7 +177,7 @@ class ReportProcessorTests(TestCase):
 
     def test_transition_to_validated_general_exception(self):
         """Test that when a general exception is raised, we don't pass validation."""
-        self.report_slice.state = ReportSlice.RETRY_VALIDATION
+        self.report_slice.state = LegacyReportSlice.RETRY_VALIDATION
         self.report_slice.save()
         self.processor.report_or_slice = self.report_slice
 
@@ -185,15 +185,15 @@ class ReportProcessorTests(TestCase):
             """Transition the state to downloaded."""
             raise Exception('Test')
 
-        with patch('processor.report_slice_processor.ReportSliceProcessor._validate_report_details',
+        with patch('processor.legacy_report_slice_processor.LegacyReportSliceProcessor._validate_report_details',
                    side_effect=validate_side_effect):
             self.processor.transition_to_validated()
-            self.assertEqual(self.report_slice.state, ReportSlice.RETRY_VALIDATION)
+            self.assertEqual(self.report_slice.state, LegacyReportSlice.RETRY_VALIDATION)
             self.assertEqual(self.report_slice.retry_count, 1)
 
     def test_transition_to_validated(self):
         """Test that when a general exception is raised, we don't pass validation."""
-        self.report_slice.state = ReportSlice.RETRY_VALIDATION
+        self.report_slice.state = LegacyReportSlice.RETRY_VALIDATION
         report_json = {
             'report_slice_id': '384794738',
             'hosts': [{'ip_addresses': 'value'}]}
@@ -201,12 +201,12 @@ class ReportProcessorTests(TestCase):
         self.report_slice.save()
         self.processor.report_or_slice = self.report_slice
         self.processor.transition_to_validated()
-        self.assertEqual(self.report_slice.state, ReportSlice.VALIDATED)
+        self.assertEqual(self.report_slice.state, LegacyReportSlice.VALIDATED)
         self.assertEqual(self.report_slice.retry_count, 0)
 
     def test_transition_to_validated_failed(self):
         """Test report missing slice id."""
-        self.report_slice.state = ReportSlice.RETRY_VALIDATION
+        self.report_slice.state = LegacyReportSlice.RETRY_VALIDATION
         report_json = {
             'report_id': 1,
             'report_type': 'insights',
@@ -218,7 +218,7 @@ class ReportProcessorTests(TestCase):
         self.report_slice.save()
         self.processor.report_or_slice = self.report_slice
         self.processor.transition_to_validated()
-        self.assertEqual(self.report_slice.state, ReportSlice.FAILED_VALIDATION)
+        self.assertEqual(self.report_slice.state, LegacyReportSlice.FAILED_VALIDATION)
         self.assertEqual(self.report_slice.retry_count, 0)
         self.assertEqual(self.report_slice.ready_to_archive, True)
 
@@ -228,7 +228,7 @@ class ReportProcessorTests(TestCase):
         self.processor.candidate_hosts = candidates
         self.processor.failed_hosts = [
             {self.uuid2: {'bios_uuid': 'value', 'name': 'value'},
-             'cause': abstract_processor.FAILED_VALIDATION}]
+             'cause': legacy_abstract_processor.FAILED_VALIDATION}]
         self.processor.move_candidates_to_failed()
         self.assertEqual(self.processor.candidate_hosts, [])
         for host in candidates:
@@ -237,8 +237,8 @@ class ReportProcessorTests(TestCase):
     def test_determine_retry_limit(self):
         """Test the determine retry method when the retry is at the limit."""
         candidates = [{str(self.uuid3): {'ip_addresses': 'value', 'name': 'value'},
-                       'cause': report_slice_processor.FAILED_UPLOAD}]
-        self.report_slice.state = ReportSlice.VALIDATED
+                       'cause': legacy_report_slice_processor.FAILED_UPLOAD}]
+        self.report_slice.state = LegacyReportSlice.VALIDATED
         self.report_slice.retry_count = 4
         self.report_slice.candidate_hosts = json.dumps(candidates)
         self.report_slice.failed_hosts = json.dumps([])
@@ -246,9 +246,9 @@ class ReportProcessorTests(TestCase):
         self.processor.report_or_slice = self.report_slice
         self.processor.candidate_hosts = candidates
         self.processor.failed_hosts = []
-        self.processor.determine_retry(ReportSlice.FAILED_HOSTS_UPLOAD,
-                                       ReportSlice.VALIDATED)
-        self.assertEqual(self.report_slice.state, ReportSlice.FAILED_HOSTS_UPLOAD)
+        self.processor.determine_retry(LegacyReportSlice.FAILED_HOSTS_UPLOAD,
+                                       LegacyReportSlice.VALIDATED)
+        self.assertEqual(self.report_slice.state, LegacyReportSlice.FAILED_HOSTS_UPLOAD)
         self.assertEqual(json.loads(self.report_slice.candidate_hosts), [])
         for host in candidates:
             self.assertIn(host, json.loads(self.report_slice.failed_hosts))
@@ -278,7 +278,7 @@ class ReportProcessorTests(TestCase):
             return_value=([], []))
         await self.processor.transition_to_hosts_uploaded()
         self.assertEqual(json.loads(self.report_slice.candidate_hosts), [])
-        self.assertEqual(self.report_slice.state, ReportSlice.HOSTS_UPLOADED)
+        self.assertEqual(self.report_slice.state, LegacyReportSlice.HOSTS_UPLOADED)
 
     def test_transition_to_hosts_uploaded(self):
         """Test the async hosts uploaded successful."""
@@ -313,9 +313,9 @@ class ReportProcessorTests(TestCase):
             return_value=([], []))
         await self.processor.transition_to_hosts_uploaded()
         self.assertEqual(json.loads(self.report_slice.candidate_hosts), [])
-        self.assertEqual(self.report_slice.state, ReportSlice.HOSTS_UPLOADED)
+        self.assertEqual(self.report_slice.state, LegacyReportSlice.HOSTS_UPLOADED)
 
-    @patch('processor.report_slice_processor.HOST_INVENTORY_UPLOAD_MODE', 'kafka')
+    @patch('processor.legacy_report_slice_processor.HOST_INVENTORY_UPLOAD_MODE', 'kafka')
     def test_transition_to_hosts_uploaded_kafka_mode(self):
         """Test the async hosts uploaded successful."""
         event_loop = asyncio.new_event_loop()
@@ -327,7 +327,7 @@ class ReportProcessorTests(TestCase):
     async def async_test_transition_to_hosts_uploaded_unsuccessful(self):
         """Test the transition to hosts being uploaded."""
         hosts = [{str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
-                  'cause': report_slice_processor.FAILED_UPLOAD,
+                  'cause': legacy_report_slice_processor.FAILED_UPLOAD,
                   'status_code': '500'},
                  {str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'}},
                  {str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'}},
@@ -335,7 +335,7 @@ class ReportProcessorTests(TestCase):
                  {str(self.uuid5): {'vm_uuid': 'value', 'name': 'foo'}},
                  {str(self.uuid6): {'etc_machine_id': 'value'}}]
         retry_commit_hosts = [{str(self.uuid7): {'subscription_manager_id': 'value'},
-                               'cause': report_slice_processor.FAILED_UPLOAD,
+                               'cause': legacy_report_slice_processor.FAILED_UPLOAD,
                                'status_code': '400'}]
         self.report_slice.failed_hosts = []
         self.report_slice.candidate_hosts = json.dumps(hosts)
@@ -349,7 +349,7 @@ class ReportProcessorTests(TestCase):
         for host in total_hosts:
             self.assertIn(host,
                           json.loads(self.report_slice.candidate_hosts))
-        self.assertEqual(self.report_slice.state, ReportSlice.VALIDATED)
+        self.assertEqual(self.report_slice.state, LegacyReportSlice.VALIDATED)
         self.assertEqual(self.report_slice.retry_count, 1)
 
     def test_transition_to_hosts_uploaded_unsuccessful(self):
@@ -364,13 +364,13 @@ class ReportProcessorTests(TestCase):
         """Test the transition to hosts being uploaded."""
         self.report_record.ready_to_archive = True
         self.report_record.save()
-        faulty_report = ReportSlice(
+        faulty_report = LegacyReportSlice(
             account='987',
             report_platform_id=str(self.uuid2),
             report_slice_id=str(self.uuid),
-            state=ReportSlice.NEW,
+            state=LegacyReportSlice.NEW,
             report_json=json.dumps(self.report_json),
-            state_info=json.dumps([ReportSlice.PENDING, ReportSlice.NEW]),
+            state_info=json.dumps([LegacyReportSlice.PENDING, LegacyReportSlice.NEW]),
             last_update_time=datetime.now(pytz.utc),
             candidate_hosts=json.dumps({}),
             failed_hosts=json.dumps([]),
@@ -411,11 +411,11 @@ class ReportProcessorTests(TestCase):
             raise Exception('Test')
 
         with patch(
-                'processor.report_slice_processor.'
-                'ReportSliceProcessor._upload_to_host_inventory',
+                'processor.legacy_report_slice_processor.'
+                'LegacyReportSliceProcessor._upload_to_host_inventory',
                 side_effect=hosts_upload_side_effect):
             await self.processor.transition_to_hosts_uploaded()
-            self.assertEqual(self.report_slice.state, Report.VALIDATED)
+            self.assertEqual(self.report_slice.state, LegacyReport.VALIDATED)
             self.assertEqual(self.report_slice.retry_count, 1)
 
     def test_test_transition_to_hosts_uploaded_exception(self):
@@ -526,7 +526,7 @@ class ReportProcessorTests(TestCase):
             'total': 7,
             'data': []}
         with requests_mock.mock() as mock_req:
-            mock_req.post(report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
+            mock_req.post(legacy_report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
                           status_code=207, json=bulk_response)
             retry_time_hosts, retry_commit_hosts = \
                 await self.processor._upload_to_host_inventory(hosts)
@@ -565,14 +565,14 @@ class ReportProcessorTests(TestCase):
                                             'facts': [{'namespace': 'yupana',
                                                        'facts': {'yupana_host_id':
                                                                  str(self.uuid)}}]},
-                           'cause': report_slice_processor.FAILED_UPLOAD},
+                           'cause': legacy_report_slice_processor.FAILED_UPLOAD},
                           {str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo',
                                              'facts': [{'namespace': 'yupana',
                                                         'facts': {'yupana_host_id':
                                                                   str(self.uuid2)}}]},
-                           'cause': report_slice_processor.FAILED_UPLOAD}]
+                           'cause': legacy_report_slice_processor.FAILED_UPLOAD}]
         with requests_mock.mock() as mock_req:
-            mock_req.post(report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
+            mock_req.post(legacy_report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
                           status_code=207, json=None)
             retry_time_hosts, retry_commit_hosts = \
                 await self.processor._upload_to_host_inventory(hosts)
@@ -614,14 +614,14 @@ class ReportProcessorTests(TestCase):
                                                        'facts': {'yupana_host_id':
                                                                  str(self.uuid)}
                                                        }]},
-                           'cause': report_slice_processor.FAILED_UPLOAD},
+                           'cause': legacy_report_slice_processor.FAILED_UPLOAD},
                           {str(self.uuid2): {'insights_client_id': 'value', 'display_name': 'foo',
                                              'facts': [{'namespace': 'yupana',
                                                         'facts': {'yupana_host_id':
                                                                   str(self.uuid2)}}]},
-                           'cause': report_slice_processor.FAILED_UPLOAD}]
+                           'cause': legacy_report_slice_processor.FAILED_UPLOAD}]
         with requests_mock.mock() as mock_req:
-            mock_req.post(report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
+            mock_req.post(legacy_report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
                           status_code=400, json=None)
             retry_time_hosts, retry_commit_hosts = \
                 await self.processor._upload_to_host_inventory(hosts)
@@ -664,14 +664,14 @@ class ReportProcessorTests(TestCase):
                                             'facts': [{'namespace': 'yupana',
                                                        'facts':
                                                        {'yupana_host_id': str(self.uuid)}}]},
-                           'cause': report_slice_processor.FAILED_UPLOAD},
+                           'cause': legacy_report_slice_processor.FAILED_UPLOAD},
                           {str(self.uuid2): {'insights_client_id': 'value', 'display_name': 'foo',
                                              'facts': [{'namespace': 'yupana',
                                                         'facts': {'yupana_host_id':
                                                                   str(self.uuid2)}}]},
-                           'cause': report_slice_processor.FAILED_UPLOAD}]
+                           'cause': legacy_report_slice_processor.FAILED_UPLOAD}]
         with requests_mock.mock() as mock_req:
-            mock_req.post(report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
+            mock_req.post(legacy_report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
                           status_code=500, json=None)
             retry_time_hosts, retry_commit_hosts = \
                 await self.processor._upload_to_host_inventory(hosts)
@@ -709,13 +709,13 @@ class ReportProcessorTests(TestCase):
                                             'facts': [{'namespace': 'yupana',
                                                        'facts': {'yupana_host_id':
                                                                  str(self.uuid)}}]},
-                           'cause': report_slice_processor.FAILED_UPLOAD,
+                           'cause': legacy_report_slice_processor.FAILED_UPLOAD,
                            'status_code': 500},
                           {str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo',
                                              'facts': [{'namespace': 'yupana',
                                                         'facts': {'yupana_host_id':
                                                                   str(self.uuid2)}}]},
-                           'cause': report_slice_processor.FAILED_UPLOAD,
+                           'cause': legacy_report_slice_processor.FAILED_UPLOAD,
                            'status_code': 500}]
         bulk_response = {
             'errors': 2,
@@ -728,7 +728,7 @@ class ReportProcessorTests(TestCase):
                  'host': {'facts': [{'namespace': 'yupana', 'facts':
                                      {'yupana_host_id': str(self.uuid2)}}]}}]}
         with requests_mock.mock() as mock_req:
-            mock_req.post(report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
+            mock_req.post(legacy_report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
                           status_code=207, json=bulk_response)
             retry_time, retry_commit = \
                 await self.processor._upload_to_host_inventory(hosts)
@@ -781,13 +781,13 @@ class ReportProcessorTests(TestCase):
                                             'facts': [{'namespace': 'yupana',
                                                        'facts': {'yupana_host_id':
                                                                  str(self.uuid)}}]},
-                           'cause': report_slice_processor.FAILED_UPLOAD,
+                           'cause': legacy_report_slice_processor.FAILED_UPLOAD,
                            'status_code': 400},
                           {str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo',
                                              'facts': [{'namespace': 'yupana',
                                                         'facts': {'yupana_host_id':
                                                                   str(self.uuid2)}}]},
-                           'cause': report_slice_processor.FAILED_UPLOAD,
+                           'cause': legacy_report_slice_processor.FAILED_UPLOAD,
                            'status_code': 400}]
         bulk_response = {
             'errors': 2,
@@ -800,7 +800,7 @@ class ReportProcessorTests(TestCase):
                  'host': {'facts': [{'namespace': 'yupana', 'facts':
                                      {'yupana_host_id': str(self.uuid2)}}]}}]}
         with requests_mock.mock() as mock_req:
-            mock_req.post(report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
+            mock_req.post(legacy_report_slice_processor.INSIGHTS_HOST_INVENTORY_URL,
                           status_code=207, json=bulk_response)
             retry_time_hosts, retry_commit_hosts = \
                 await self.processor._upload_to_host_inventory(hosts)
@@ -824,7 +824,7 @@ class ReportProcessorTests(TestCase):
         event_loop.run_until_complete(coro())
         event_loop.close()
 
-    @patch('processor.report_processor.requests.post')
+    @patch('processor.legacy_report_processor.requests.post')
     async def async_test_host_url_exceptions(self, mock_request):
         """Test an exception being raised during host inventory upload."""
         good_resp = requests.Response()
@@ -836,7 +836,7 @@ class ReportProcessorTests(TestCase):
         self.processor.report_or_slice = self.report_slice
         hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
                  str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'}}
-        with patch('processor.report_slice_processor.INSIGHTS_HOST_INVENTORY_URL',
+        with patch('processor.legacy_report_slice_processor.INSIGHTS_HOST_INVENTORY_URL',
                    value='not none'):
             await self.processor._upload_to_host_inventory(hosts)
 
@@ -848,7 +848,7 @@ class ReportProcessorTests(TestCase):
         event_loop.run_until_complete(coro())
         event_loop.close()
 
-    @patch('processor.report_processor.requests.post')
+    @patch('processor.legacy_report_processor.requests.post')
     async def async_test_host_url_request_exceptions(self, mock_request):
         """Test a request exception raised during host inventory upload."""
         mock_request.side_effect = requests.exceptions.RequestException()
@@ -875,18 +875,18 @@ class ReportProcessorTests(TestCase):
         self.report_slice.ready_to_archive = True
         self.report_slice.report_platform_id = str(self.uuid)
         self.report_slice.report_slice_id = str(self.uuid2)
-        self.report_slice.state = ReportSlice.FAILED_HOSTS_UPLOAD
+        self.report_slice.state = LegacyReportSlice.FAILED_HOSTS_UPLOAD
         self.report_slice.save()
         self.processor.report_or_slice = self.report_slice
         self.processor.report_platform_id = str(self.uuid)
 
         self.processor.archive_report_and_slices()
         # assert the report doesn't exist
-        with self.assertRaises(Report.DoesNotExist):
-            Report.objects.get(id=self.report_record.id)
+        with self.assertRaises(LegacyReport.DoesNotExist):
+            LegacyReport.objects.get(id=self.report_record.id)
         # assert the report archive does exist
-        archived = ReportArchive.objects.get(account=self.report_record.account)
-        archived_slice = ReportSliceArchive.objects.get(
+        archived = LegacyReportArchive.objects.get(account=self.report_record.account)
+        archived_slice = LegacyReportSliceArchive.objects.get(
             report_slice_id=self.report_slice.report_slice_id)
         self.assertEqual(str(archived.report_platform_id), str(self.uuid))
         self.assertEqual(str(archived_slice.report_platform_id), str(self.uuid))
@@ -902,18 +902,18 @@ class ReportProcessorTests(TestCase):
         self.report_slice.ready_to_archive = True
         self.report_slice.report_platform_id = str(self.uuid)
         self.report_slice.report_slice_id = str(self.uuid2)
-        self.report_slice.state = ReportSlice.HOSTS_UPLOADED
+        self.report_slice.state = LegacyReportSlice.HOSTS_UPLOADED
         self.report_slice.save()
         self.processor.report_or_slice = self.report_slice
         self.processor.report_platform_id = str(self.uuid)
 
         self.processor.archive_report_and_slices()
         # assert the report doesn't exist
-        with self.assertRaises(Report.DoesNotExist):
-            Report.objects.get(id=self.report_record.id)
+        with self.assertRaises(LegacyReport.DoesNotExist):
+            LegacyReport.objects.get(id=self.report_record.id)
         # assert the report archive does exist
-        archived = ReportArchive.objects.get(account=self.report_record.account)
-        archived_slice = ReportSliceArchive.objects.get(
+        archived = LegacyReportArchive.objects.get(account=self.report_record.account)
+        archived_slice = LegacyReportSliceArchive.objects.get(
             report_slice_id=self.report_slice.report_slice_id)
         self.assertEqual(str(archived.report_platform_id), str(self.uuid))
         self.assertEqual(str(archived_slice.report_platform_id), str(self.uuid))
@@ -934,12 +934,12 @@ class ReportProcessorTests(TestCase):
 
         self.processor.archive_report_and_slices()
         # assert the report doesn't exist
-        existing = Report.objects.get(id=self.report_record.id)
+        existing = LegacyReport.objects.get(id=self.report_record.id)
         # assert the report archive does exist
-        with self.assertRaises(ReportArchive.DoesNotExist):
-            ReportArchive.objects.get(account=self.report_record.account)
-        with self.assertRaises(ReportSliceArchive.DoesNotExist):
-            ReportSliceArchive.objects.get(
+        with self.assertRaises(LegacyReportArchive.DoesNotExist):
+            LegacyReportArchive.objects.get(account=self.report_record.account)
+        with self.assertRaises(LegacyReportSliceArchive.DoesNotExist):
+            LegacyReportSliceArchive.objects.get(
                 report_slice_id=self.report_slice.report_slice_id)
         self.assertEqual(str(existing.report_platform_id), str(self.uuid))
         # assert the processor was reset
