@@ -21,4 +21,6 @@
 from api.forensics.model import InventoryUploadError
 from api.status.model import Status
 from api.legacy_report.model import LegacyAbstractReport, LegacyReport, LegacyReportArchive
-from api.legacy_report_slice.model import LegacyAbstractReportSlice, LegacyReportSlice, LegacyReportSliceArchive
+from api.legacy_report_slice.model import (LegacyAbstractReportSlice,
+                                           LegacyReportSlice,
+                                           LegacyReportSliceArchive)

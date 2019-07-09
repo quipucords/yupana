@@ -584,7 +584,8 @@ class LegacyAbstractProcessor(ABC):  # pylint: disable=too-many-instance-attribu
                 slice_serializer = LegacyReportSliceArchiveSerializer(data=archived_slice_data)
                 slice_serializer.is_valid(raise_exception=True)
                 slice_serializer.save()
-                failed_states = [LegacyReportSlice.FAILED_VALIDATION, LegacyReportSlice.FAILED_HOSTS_UPLOAD]
+                failed_states = [LegacyReportSlice.FAILED_VALIDATION,
+                                 LegacyReportSlice.FAILED_HOSTS_UPLOAD]
                 if report_slice.state in failed_states:
                     ARCHIVED_FAIL.inc()
                 else:

@@ -30,9 +30,9 @@ import requests
 from aiokafka import AIOKafkaProducer
 from django.db import transaction
 from kafka.errors import ConnectionError as KafkaConnectionError
-from processor.legacy_abstract_processor import (LegacyAbstractProcessor,
-                                          FAILED_TO_DOWNLOAD, FAILED_TO_VALIDATE,
-                                          INVALID_HOSTS, RETRY)
+from processor.legacy_abstract_processor import (
+    FAILED_TO_DOWNLOAD, FAILED_TO_VALIDATE,
+    INVALID_HOSTS, LegacyAbstractProcessor, RETRY)
 from processor.legacy_report_consumer import (KafkaMsgHandlerError,
                                               QPCReportException,
                                               format_message)

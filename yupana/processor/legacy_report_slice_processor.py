@@ -28,9 +28,10 @@ from http import HTTPStatus
 import pytz
 import requests
 from processor.legacy_abstract_processor import (
-    LegacyAbstractProcessor, FAILED_TO_VALIDATE,
+    FAILED_TO_VALIDATE,
     HOSTS_UPLOADED_FAILED, HOSTS_UPLOADED_SUCCESS,
     HOST_UPLOAD_REQUEST_LATENCY, INVALID_HOSTS,
+    LegacyAbstractProcessor,
     UPLOAD_GROUP_SIZE, VALID_HOSTS)
 from processor.legacy_report_consumer import (
     QPCReportException,
@@ -139,7 +140,8 @@ class LegacyReportSliceProcessor(LegacyAbstractProcessor):  # pylint: disable=to
             # which means it enters our odd state
             # of requiring validation
             LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error)))
-            self.determine_retry(LegacyReportSlice.FAILED_VALIDATION, LegacyReportSlice.RETRY_VALIDATION,
+            self.determine_retry(LegacyReportSlice.FAILED_VALIDATION,
+                                 LegacyReportSlice.RETRY_VALIDATION,
                                  retry_type=LegacyReportSlice.GIT_COMMIT)
 
     async def transition_to_hosts_uploaded(self):

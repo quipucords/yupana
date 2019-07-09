@@ -36,7 +36,8 @@ class LegacyAbstractReportSliceSerializer(ModelSerializer):
     git_commit = CharField(max_length=50, required=False)
     source = CharField(max_length=15, required=True)
     state = ChoiceField(choices=LegacyReportSlice.STATE_CHOICES)
-    retry_type = ChoiceField(choices=LegacyReportSlice.RETRY_CHOICES, default=LegacyReportSlice.TIME)
+    retry_type = ChoiceField(choices=LegacyReportSlice.RETRY_CHOICES,
+                             default=LegacyReportSlice.TIME)
     state_info = JSONField(allow_null=False)
     retry_count = IntegerField(default=0)
     hosts_count = IntegerField(min_value=1, max_value=MAX_HOSTS_PER_REP)

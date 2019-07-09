@@ -109,17 +109,18 @@ class LegacyReportProcessorTests(TransactionTestCase):
             self.assertEqual(attribute, None)
 
     def test_archiving_report(self):
-        """Test that archiving creates a LegacyReportArchive, deletes report, and resets the processor."""
-        report_to_archive = LegacyReport(upload_srv_kafka_msg=json.dumps(self.msg),
-                                   account='4321',
-                                   report_platform_id=self.uuid2,
-                                   state=LegacyReport.NEW,
-                                   state_info=json.dumps([LegacyReport.NEW]),
-                                   last_update_time=datetime.now(pytz.utc),
-                                   retry_count=0,
-                                   ready_to_archive=True,
-                                   arrival_time=datetime.now(pytz.utc),
-                                   processing_start_time=datetime.now(pytz.utc))
+        """Test archiving creates archive, deletes current rep, and resets processor."""
+        report_to_archive = LegacyReport(
+            upload_srv_kafka_msg=json.dumps(self.msg),
+            account='4321',
+            report_platform_id=self.uuid2,
+            state=LegacyReport.NEW,
+            state_info=json.dumps([LegacyReport.NEW]),
+            last_update_time=datetime.now(pytz.utc),
+            retry_count=0,
+            ready_to_archive=True,
+            arrival_time=datetime.now(pytz.utc),
+            processing_start_time=datetime.now(pytz.utc))
         report_to_archive.save()
         self.processor.report_or_slice = report_to_archive
         self.processor.account_number = '4321'
@@ -141,14 +142,15 @@ class LegacyReportProcessorTests(TransactionTestCase):
 
     def test_archiving_report_not_ready(self):
         """Test that archiving fails if report not ready to archive."""
-        report_to_archive = LegacyReport(upload_srv_kafka_msg=json.dumps(self.msg),
-                                   account='4321',
-                                   report_platform_id=self.uuid2,
-                                   state=LegacyReport.NEW,
-                                   state_info=json.dumps([LegacyReport.NEW]),
-                                   last_update_time=datetime.now(pytz.utc),
-                                   retry_count=0,
-                                   ready_to_archive=False)
+        report_to_archive = LegacyReport(
+            upload_srv_kafka_msg=json.dumps(self.msg),
+            account='4321',
+            report_platform_id=self.uuid2,
+            state=LegacyReport.NEW,
+            state_info=json.dumps([LegacyReport.NEW]),
+            last_update_time=datetime.now(pytz.utc),
+            retry_count=0,
+            ready_to_archive=False)
         report_to_archive.save()
         self.processor.report_or_slice = report_to_archive
         self.processor.account_number = '4321'
@@ -168,20 +170,21 @@ class LegacyReportProcessorTests(TransactionTestCase):
         self.check_variables_are_reset()
 
     def test_deduplicating_report(self):
-        """Test that archiving creates a LegacyReportArchive, deletes report, and resets the processor."""
+        """Test that archiving creates archive rep, deletes report, and resets the processor."""
         self.report_record.report_platform_id = self.uuid
         self.report_record.save()
-        report_to_dedup = LegacyReport(upload_srv_kafka_msg=json.dumps(self.msg),
-                                 account='4321',
-                                 report_platform_id=self.uuid,
-                                 state=LegacyReport.NEW,
-                                 upload_ack_status='success',
-                                 state_info=json.dumps([LegacyReport.NEW]),
-                                 last_update_time=datetime.now(pytz.utc),
-                                 retry_count=0,
-                                 ready_to_archive=True,
-                                 arrival_time=datetime.now(pytz.utc),
-                                 processing_start_time=datetime.now(pytz.utc))
+        report_to_dedup = LegacyReport(
+            upload_srv_kafka_msg=json.dumps(self.msg),
+            account='4321',
+            report_platform_id=self.uuid,
+            state=LegacyReport.NEW,
+            upload_ack_status='success',
+            state_info=json.dumps([LegacyReport.NEW]),
+            last_update_time=datetime.now(pytz.utc),
+            retry_count=0,
+            ready_to_archive=True,
+            arrival_time=datetime.now(pytz.utc),
+            processing_start_time=datetime.now(pytz.utc))
         report_to_dedup.save()
         self.processor.report_or_slice = report_to_dedup
         self.processor.account_number = '4321'
@@ -237,7 +240,8 @@ class LegacyReportProcessorTests(TransactionTestCase):
         def transition_side_effect():
             self.processor.should_run = False
 
-        with patch('processor.legacy_abstract_processor.LegacyAbstractProcessor.transition_to_started',
+        with patch('processor.legacy_abstract_processor.'
+                   'LegacyAbstractProcessor.transition_to_started',
                    side_effect=transition_side_effect):
             await self.processor.run()
             self.assertEqual(self.processor.report_or_slice, self.report_record)
@@ -262,13 +266,14 @@ class LegacyReportProcessorTests(TransactionTestCase):
         """Test the assign report function with older report."""
         current_time = datetime.now(pytz.utc)
         hours_old_time = current_time - timedelta(hours=9)
-        older_report = LegacyReport(upload_srv_kafka_msg=json.dumps(self.msg),
-                              account='4321',
-                              report_platform_id=self.uuid2,
-                              state=LegacyReport.NEW,
-                              state_info=json.dumps([LegacyReport.NEW]),
-                              last_update_time=hours_old_time,
-                              retry_count=1)
+        older_report = LegacyReport(
+            upload_srv_kafka_msg=json.dumps(self.msg),
+            account='4321',
+            report_platform_id=self.uuid2,
+            state=LegacyReport.NEW,
+            state_info=json.dumps([LegacyReport.NEW]),
+            last_update_time=hours_old_time,
+            retry_count=1)
         older_report.save()
         self.report_record.state = LegacyReport.NEW
         self.report_record.save()
@@ -285,13 +290,14 @@ class LegacyReportProcessorTests(TransactionTestCase):
         self.processor.report_or_slice = None
         current_time = datetime.now(pytz.utc)
         min_old_time = current_time - timedelta(minutes=1)
-        older_report = LegacyReport(upload_srv_kafka_msg=json.dumps(self.msg),
-                              account='4321',
-                              report_platform_id=self.uuid2,
-                              state=LegacyReport.STARTED,
-                              state_info=json.dumps([LegacyReport.NEW]),
-                              last_update_time=min_old_time,
-                              retry_count=1)
+        older_report = LegacyReport(
+            upload_srv_kafka_msg=json.dumps(self.msg),
+            account='4321',
+            report_platform_id=self.uuid2,
+            state=LegacyReport.STARTED,
+            state_info=json.dumps([LegacyReport.NEW]),
+            last_update_time=min_old_time,
+            retry_count=1)
         older_report.save()
         self.processor.assign_object()
         self.assertEqual(self.processor.report_or_slice, None)
@@ -302,16 +308,17 @@ class LegacyReportProcessorTests(TransactionTestCase):
         """Test the assign report function with retry type as commit."""
         current_time = datetime.now(pytz.utc)
         twentyminold_time = current_time - timedelta(minutes=20)
-        older_report = LegacyReport(upload_srv_kafka_msg=json.dumps(self.msg),
-                              account='4321',
-                              report_platform_id=self.uuid2,
-                              state=LegacyReport.DOWNLOADED,
-                              state_info=json.dumps([LegacyReport.NEW,
-                                                     LegacyReport.DOWNLOADED]),
-                              last_update_time=twentyminold_time,
-                              retry_count=1,
-                              retry_type=LegacyReport.GIT_COMMIT,
-                              git_commit='1234')
+        older_report = LegacyReport(
+            upload_srv_kafka_msg=json.dumps(self.msg),
+            account='4321',
+            report_platform_id=self.uuid2,
+            state=LegacyReport.DOWNLOADED,
+            state_info=json.dumps([LegacyReport.NEW,
+                                   LegacyReport.DOWNLOADED]),
+            last_update_time=twentyminold_time,
+            retry_count=1,
+            retry_type=LegacyReport.GIT_COMMIT,
+            git_commit='1234')
         older_report.save()
         self.report_record.state = LegacyReport.DOWNLOADED
         self.report_record.save()
@@ -344,7 +351,8 @@ class LegacyReportProcessorTests(TransactionTestCase):
             self.processor.state = LegacyReport.DOWNLOADED
             self.report_record.state = LegacyReport.DOWNLOADED
             self.report_record.save()
-        with patch('processor.legacy_report_processor.LegacyReportProcessor.transition_to_downloaded',
+        with patch('processor.legacy_report_processor.'
+                   'LegacyReportProcessor.transition_to_downloaded',
                    side_effect=download_side_effect):
             await self.processor.delegate_state()
             self.assertEqual(self.processor.report_platform_id,
@@ -426,7 +434,8 @@ class LegacyReportProcessorTests(TransactionTestCase):
         self.processor.report_or_slice = self.report_record
         self.processor.transition_to_started()
         self.assertEqual(self.report_record.state, LegacyReport.STARTED)
-        self.assertEqual(json.loads(self.report_record.state_info), [LegacyReport.NEW, LegacyReport.STARTED])
+        self.assertEqual(json.loads(self.report_record.state_info),
+                         [LegacyReport.NEW, LegacyReport.STARTED])
 
     def test_transition_to_downloaded(self):
         """Test that the transition to download works successfully."""
@@ -549,7 +558,8 @@ class LegacyReportProcessorTests(TransactionTestCase):
             """Transition the state to downloaded."""
             raise Exception('Test')
 
-        with patch('processor.legacy_report_processor.LegacyReportProcessor._validate_report_details',
+        with patch('processor.legacy_report_processor.'
+                   'LegacyReportProcessor._validate_report_details',
                    side_effect=validate_side_effect):
             self.processor.transition_to_validated()
             self.assertEqual(self.report_record.state, LegacyReport.VALIDATED)
@@ -609,17 +619,18 @@ class LegacyReportProcessorTests(TransactionTestCase):
 
     async def async_transition_to_validation_reported_failure_status(self):
         """Set up the test for transitioning to validation reported failure status."""
-        report_to_archive = LegacyReport(upload_srv_kafka_msg=json.dumps(self.msg),
-                                   account='43214',
-                                   report_platform_id=self.uuid2,
-                                   state=LegacyReport.VALIDATED,
-                                   state_info=json.dumps([LegacyReport.NEW]),
-                                   last_update_time=datetime.now(pytz.utc),
-                                   retry_count=0,
-                                   retry_type=LegacyReport.TIME,
-                                   ready_to_archive=True,
-                                   arrival_time=datetime.now(pytz.utc),
-                                   processing_start_time=datetime.now(pytz.utc))
+        report_to_archive = LegacyReport(
+            upload_srv_kafka_msg=json.dumps(self.msg),
+            account='43214',
+            report_platform_id=self.uuid2,
+            state=LegacyReport.VALIDATED,
+            state_info=json.dumps([LegacyReport.NEW]),
+            last_update_time=datetime.now(pytz.utc),
+            retry_count=0,
+            retry_type=LegacyReport.TIME,
+            ready_to_archive=True,
+            arrival_time=datetime.now(pytz.utc),
+            processing_start_time=datetime.now(pytz.utc))
         report_to_archive.upload_ack_status = legacy_report_processor.FAILURE_CONFIRM_STATUS
         report_to_archive.save()
         self.processor.report_or_slice = report_to_archive

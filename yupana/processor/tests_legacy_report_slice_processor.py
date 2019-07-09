@@ -185,7 +185,8 @@ class LegacyReportProcessorTests(TestCase):
             """Transition the state to downloaded."""
             raise Exception('Test')
 
-        with patch('processor.legacy_report_slice_processor.LegacyReportSliceProcessor._validate_report_details',
+        with patch('processor.legacy_report_slice_processor.'
+                   'LegacyReportSliceProcessor._validate_report_details',
                    side_effect=validate_side_effect):
             self.processor.transition_to_validated()
             self.assertEqual(self.report_slice.state, LegacyReportSlice.RETRY_VALIDATION)
