@@ -28,6 +28,7 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
 import os
+from tempfile import NamedTemporaryFile
 
 import environ
 
@@ -186,6 +187,20 @@ DATABASES = {
     'PORT': ENVIRONMENT.get_value('{}_SERVICE_PORT'.format(SERVICE_NAME),
                                   default=None),
 }
+
+# add ssl cert if specified
+database_cert = ENVIRONMENT.get_value('DATABASE_SERVICE_CERT', default=None)
+if database_cert:
+    temp_cert_file = NamedTemporaryFile(delete=False, mode='w', suffix='pem')
+    with open(temp_cert_file.name, mode='w') as cert_file:
+        cert_file.write(database_cert)
+    db_options = {
+        'OPTIONS': {
+            'sslmode': 'verify-full',
+            'sslrootcert': temp_cert_file.name
+        }
+    }
+    DATABASES.update(db_options)
 
 DATABASES = {
     'default': DATABASES

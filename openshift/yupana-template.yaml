@@ -68,9 +68,11 @@ objects:
       template: yupana-template
     annotations:
       template.openshift.io/expose-django_secret_key: "{.data['django-secret-key']}"
+      template.openshift.io/expose-db_client_cert: "{.data['db-client-cert']}"
     name: ${NAME}-secret
   stringData:
     django-secret-key: ${DJANGO_SECRET_KEY}
+    db-client-cert: ${DATABASE_SERVICE_CERT}
 - apiVersion: v1
   kind: ConfigMap
   metadata:
@@ -255,6 +257,12 @@ objects:
                   key: django-secret-key
                   name: ${NAME}-secret
                   optional: false
+            - name: DATABASE_SERVICE_CERT
+              valueFrom:
+                secretKeyRef:
+                  key: db-client-cert
+                  name: ${NAME}-secret
+                  optional: true
             - name: DATABASE_ENGINE
               valueFrom:
                 configMapKeyRef:
@@ -759,3 +767,7 @@ parameters:
   name: NEW_REPORT_QUERY_INTERVAL
   required: false
   value: "60"
+- description: The database client certificate
+  displayName: Database Client Certificate
+  name: DATABASE_SERVICE_CERT
+  required: false
