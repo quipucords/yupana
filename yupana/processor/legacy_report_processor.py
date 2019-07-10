@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-"""Report Processor."""
+"""Legacy Report Processor."""
 
 import asyncio
 import json
@@ -30,15 +30,15 @@ import requests
 from aiokafka import AIOKafkaProducer
 from django.db import transaction
 from kafka.errors import ConnectionError as KafkaConnectionError
-from processor.abstract_processor import (AbstractProcessor,
-                                          FAILED_TO_DOWNLOAD, FAILED_TO_VALIDATE,
-                                          INVALID_HOSTS, RETRY)
-from processor.kafka_msg_handler import (KafkaMsgHandlerError,
-                                         QPCReportException,
-                                         format_message)
+from processor.legacy_abstract_processor import (
+    FAILED_TO_DOWNLOAD, FAILED_TO_VALIDATE,
+    INVALID_HOSTS, LegacyAbstractProcessor, RETRY)
+from processor.legacy_report_consumer import (KafkaMsgHandlerError,
+                                              QPCReportException,
+                                              format_message)
 
-from api.models import (Report, ReportSlice, Status)
-from api.serializers import ReportSerializer, ReportSliceSerializer
+from api.models import (LegacyReport, LegacyReportSlice, Status)
+from api.serializers import LegacyReportSerializer, LegacyReportSliceSerializer
 from config.settings.base import (INSIGHTS_KAFKA_ADDRESS,
                                   MAX_HOSTS_PER_REP,
                                   RETRIES_ALLOWED,
@@ -78,32 +78,32 @@ class RetryExtractException(Exception):
     pass
 
 
-class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-attributes
+class LegacyReportProcessor(LegacyAbstractProcessor):  # pylint: disable=too-many-instance-attributes
     """Class for processing report that have been created."""
 
     def __init__(self):
         """Create a report processor."""
         state_functions = {
-            Report.NEW: self.transition_to_started,
-            Report.STARTED: self.transition_to_downloaded,
-            Report.DOWNLOADED: self.transition_to_validated,
-            Report.VALIDATED: self.transition_to_validation_reported,
-            Report.VALIDATION_REPORTED: self.archive_report_and_slices,
-            Report.FAILED_DOWNLOAD: self.archive_report_and_slices,
-            Report.FAILED_VALIDATION: self.archive_report_and_slices,
-            Report.FAILED_VALIDATION_REPORTING: self.archive_report_and_slices}
+            LegacyReport.NEW: self.transition_to_started,
+            LegacyReport.STARTED: self.transition_to_downloaded,
+            LegacyReport.DOWNLOADED: self.transition_to_validated,
+            LegacyReport.VALIDATED: self.transition_to_validation_reported,
+            LegacyReport.VALIDATION_REPORTED: self.archive_report_and_slices,
+            LegacyReport.FAILED_DOWNLOAD: self.archive_report_and_slices,
+            LegacyReport.FAILED_VALIDATION: self.archive_report_and_slices,
+            LegacyReport.FAILED_VALIDATION_REPORTING: self.archive_report_and_slices}
         state_metrics = {
-            Report.FAILED_DOWNLOAD: FAILED_TO_DOWNLOAD.inc,
-            Report.FAILED_VALIDATION: FAILED_TO_VALIDATE.inc
+            LegacyReport.FAILED_DOWNLOAD: FAILED_TO_DOWNLOAD.inc,
+            LegacyReport.FAILED_VALIDATION: FAILED_TO_VALIDATE.inc
         }
-        self.async_states = [Report.VALIDATED]
+        self.async_states = [LegacyReport.VALIDATED]
         super().__init__(pre_delegate=self.pre_delegate,
                          state_functions=state_functions,
                          state_metrics=state_metrics,
                          async_states=self.async_states,
                          object_prefix='REPORT',
-                         object_class=Report,
-                         object_serializer=ReportSerializer
+                         object_class=LegacyReport,
+                         object_serializer=LegacyReportSerializer
                          )
 
     def pre_delegate(self):
@@ -135,7 +135,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         try:
             report_tar_gz = self._download_report()
             options = self._extract_and_create_slices(report_tar_gz)
-            self.next_state = Report.DOWNLOADED
+            self.next_state = LegacyReport.DOWNLOADED
             # update the report or slice with downloaded info
             self.update_object_state(options=options)
             self.deduplicate_reports()
@@ -144,7 +144,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 self.prefix,
                 report_download_failed_msg % err,
                 account_number=self.account_number))
-            self.next_state = Report.FAILED_DOWNLOAD
+            self.next_state = LegacyReport.FAILED_DOWNLOAD
             options = {'ready_to_archive': True}
             self.update_object_state(options=options)
         except (RetryDownloadException, RetryExtractException) as err:
@@ -152,7 +152,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 self.prefix,
                 report_download_failed_msg % err,
                 account_number=self.account_number))
-            self.determine_retry(Report.FAILED_DOWNLOAD, Report.STARTED)
+            self.determine_retry(LegacyReport.FAILED_DOWNLOAD, LegacyReport.STARTED)
 
     def transition_to_validated(self):
         """Validate that the report contents & move to validated state."""
@@ -162,7 +162,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             'Validating the report contents. State is "%s".' % self.report_or_slice.state,
             account_number=self.account_number))
         # find all associated report slices
-        report_slices = ReportSlice.objects.all().filter(report=self.report_or_slice)
+        report_slices = LegacyReportSlice.objects.all().filter(report=self.report_or_slice)
         self.status = FAILURE_CONFIRM_STATUS
         for report_slice in report_slices:
             try:
@@ -172,21 +172,21 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     self.status = SUCCESS_CONFIRM_STATUS
                 INVALID_HOSTS.set(len(failed_hosts))
                 # Here we want to update the report state of the actual report slice
-                options = {'state': ReportSlice.NEW,
+                options = {'state': LegacyReportSlice.NEW,
                            'candidate_hosts': candidate_hosts, 'failed_hosts': failed_hosts}
                 self.update_slice_state(options=options, report_slice=report_slice)
             except QPCReportException:
                 # if any QPCReportExceptions occur, we know that the report is not valid
                 # but has been successfully validated
                 # that means that this slice is invalid and only awaits being archived
-                options = {'state': ReportSlice.FAILED_VALIDATION, 'ready_to_archive': True}
+                options = {'state': LegacyReportSlice.FAILED_VALIDATION, 'ready_to_archive': True}
                 self.update_slice_state(options=options, report_slice=report_slice)
             except Exception as error:  # pylint: disable=broad-except
                 # This slice blew up validation - we want to retry it later,
                 # which means it enters our odd state of retrying validation
                 LOG.error(format_message(self.prefix,
                                          'The following error occurred: %s.' % str(error)))
-                options = {'state': ReportSlice.RETRY_VALIDATION,
+                options = {'state': LegacyReportSlice.RETRY_VALIDATION,
                            'retry': RETRY.increment}
                 self.update_slice_state(options=options, report_slice=report_slice)
         if self.status == 'failure':
@@ -195,7 +195,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     self.prefix,
                     'The uploaded report was invalid. Status set to "%s".' % self.status,
                     account_number=self.account_number))
-        self.next_state = Report.VALIDATED
+        self.next_state = LegacyReport.VALIDATED
         options = {'status': self.status}
         self.update_object_state(options=options)
 
@@ -210,7 +210,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         try:
             message_hash = self.upload_message['request_id']
             await self._send_confirmation(message_hash)
-            self.next_state = Report.VALIDATION_REPORTED
+            self.next_state = LegacyReport.VALIDATION_REPORTED
             options = {'ready_to_archive': True}
             self.update_object_state(options=options)
             LOG.info(format_message(
@@ -226,7 +226,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 self.prefix, 'The following error occurred: %s.' % str(error),
                 account_number=self.account_number,
                 report_platform_id=self.report_platform_id))
-            self.determine_retry(Report.FAILED_VALIDATION_REPORTING, Report.VALIDATED)
+            self.determine_retry(LegacyReport.FAILED_VALIDATION_REPORTING, LegacyReport.VALIDATED)
 
     def create_report_slice(self, options):
         """Create report slice.
@@ -248,7 +248,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         # first we should see if any slices exist with this slice id & report_platform_id
         # if they exist we will not create the slice
         created = False
-        existing_report_slices = ReportSlice.objects.filter(
+        existing_report_slices = LegacyReportSlice.objects.filter(
             report_platform_id=self.report_platform_id).filter(report_slice_id=report_slice_id)
         if existing_report_slices.count() > 0:
             LOG.error(format_message(
@@ -259,9 +259,9 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             return created
 
         report_slice = {
-            'state': ReportSlice.PENDING,
+            'state': LegacyReportSlice.PENDING,
             'account': self.account_number,
-            'state_info': json.dumps([ReportSlice.PENDING]),
+            'state_info': json.dumps([LegacyReportSlice.PENDING]),
             'last_update_time': datetime.now(pytz.utc),
             'retry_count': 0,
             'report_json': json.dumps(report_json),
@@ -274,7 +274,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             'source': source,
             'creation_time': datetime.now(pytz.utc)
         }
-        slice_serializer = ReportSliceSerializer(data=report_slice)
+        slice_serializer = LegacyReportSliceSerializer(data=report_slice)
         if slice_serializer.is_valid(raise_exception=True):
             slice_serializer.save()
             LOG.info(
@@ -321,17 +321,17 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 'git_commit': status_info.git_commit
             }
             if not retry_type:
-                retry_type = ReportSlice.TIME
+                retry_type = LegacyReportSlice.TIME
             if retry == RETRY.clear:
                 # After a successful transaction when we have reached the update
                 # point, we want to set the retry count back to 0 because
                 # any future failures should be unrelated
                 report_slice_data['retry_count'] = 0
-                report_slice_data['retry_type'] = ReportSlice.TIME
+                report_slice_data['retry_type'] = LegacyReportSlice.TIME
             elif retry == RETRY.increment:
                 current_count = report_slice.retry_count
                 report_slice_data['retry_count'] = current_count + 1
-                report_slice_data['retry_type'] = ReportSlice.TIME
+                report_slice_data['retry_type'] = LegacyReportSlice.TIME
             # the other choice for retry is RETRY.keep_same in which case we don't
             # want to do anything to the retry count bc we want to preserve as is
             if candidate_hosts is not None:
@@ -351,7 +351,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             state_info = json.loads(report_slice.state_info)
             state_info.append(state)
             report_slice_data['state_info'] = json.dumps(state_info)
-            serializer = ReportSliceSerializer(
+            serializer = LegacyReportSliceSerializer(
                 instance=report_slice,
                 data=report_slice_data,
                 partial=True)
@@ -684,7 +684,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
     def deduplicate_reports(self):
         """If a report with the same id already exists, archive the new report."""
         try:
-            existing_reports = Report.objects.filter(
+            existing_reports = LegacyReport.objects.filter(
                 report_platform_id=self.report_platform_id)
             if existing_reports.count() > 1:
                 LOG.error(format_message(
@@ -693,7 +693,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     self.report_or_slice.report_platform_id,
                     account_number=self.account_number, report_platform_id=self.report_platform_id))
                 self.archive_report_and_slices()
-        except Report.DoesNotExist:
+        except LegacyReport.DoesNotExist:
             pass
 
 
@@ -706,7 +706,7 @@ def asyncio_report_processor_thread(loop):  # pragma: no cover
     :param loop: event loop
     :returns None
     """
-    processor = ReportProcessor()
+    processor = LegacyReportProcessor()
     loop.run_until_complete(processor.run())
 
 

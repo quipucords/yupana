@@ -20,5 +20,7 @@
 # pylint: disable=unused-import
 from api.forensics.model import InventoryUploadError
 from api.status.model import Status
-from api.report.model import AbstractReport, Report, ReportArchive
-from api.report_slice.model import AbstractReportSlice, ReportSlice, ReportSliceArchive
+from api.legacy_report.model import LegacyAbstractReport, LegacyReport, LegacyReportArchive
+from api.legacy_report_slice.model import (LegacyAbstractReportSlice,
+                                           LegacyReportSlice,
+                                           LegacyReportSliceArchive)

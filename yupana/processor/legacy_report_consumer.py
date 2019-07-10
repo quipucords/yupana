@@ -27,8 +27,8 @@ from aiokafka import AIOKafkaConsumer
 from kafka.errors import ConnectionError as KafkaConnectionError
 from prometheus_client import Counter
 
-from api.models import Report
-from api.serializers import ReportSerializer
+from api.models import LegacyReport
+from api.serializers import LegacyReportSerializer
 from config.settings.base import INSIGHTS_KAFKA_ADDRESS
 
 LOG = logging.getLogger(__name__)
@@ -138,13 +138,13 @@ async def save_message_and_ack(consumer, consumer_record):
                     'upload_srv_kafka_msg': json.dumps(upload_service_message),
                     'account': account_number,
                     'request_id': request_id,
-                    'state': Report.NEW,
-                    'state_info': json.dumps([Report.NEW]),
+                    'state': LegacyReport.NEW,
+                    'state_info': json.dumps([LegacyReport.NEW]),
                     'last_update_time': datetime.now(pytz.utc),
                     'arrival_time': datetime.now(pytz.utc),
                     'retry_count': 0
                 }
-                report_serializer = ReportSerializer(data=uploaded_report)
+                report_serializer = LegacyReportSerializer(data=uploaded_report)
                 report_serializer.is_valid(raise_exception=True)
                 report_serializer.save()
                 MSG_UPLOADS.inc()
