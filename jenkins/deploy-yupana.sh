@@ -38,6 +38,7 @@ if [ -z "$BUILD_CONFIG" ]; then
       --param MAX_THREADS=${MAX_THREADS} \
       --param BUILD_VERSION=${BUILD_VERSION} \
       --param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
+      --param POSTGRES_SQL_SERVICE_HOST=${POSTGRES_SQL_SERVICE_HOST} \
 
   echo "Find build id"
   BUILD_ID=`oc get builds | grep ${APP_NAME} | tail -1 | awk '{print $1}'`
@@ -81,6 +82,7 @@ else
       --param MAX_THREADS=${MAX_THREADS} \
       --param BUILD_VERSION=${BUILD_VERSION} \
       --param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
+      --param POSTGRES_SQL_SERVICE_HOST=${POSTGRES_SQL_SERVICE_HOST} \
       | oc apply -f -
   BUILD_ID=`oc start-build ${BUILD_CONFIG} | awk '{print $2}' | sed -e 's/^"//' -e 's/"$//'`
 fi

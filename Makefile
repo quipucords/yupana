@@ -25,6 +25,7 @@ HOSTS_PER_REQ=250
 MAX_THREADS=10
 BUILD_VERSION=0.0.0
 PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=False
+POSTGRES_SQL_SERVICE_HOST='yupana-pgsql.yupana.svc'
 
 OS := $(shell uname)
 ifeq ($(OS),Darwin)
@@ -171,6 +172,7 @@ oc-new-app:
 		--param MAX_THREADS=${MAX_THREADS} \
 		--param BUILD_VERSION=${DEPLOY_BUILD_VERSION} \
 		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
+		--param POSTGRES_SQL_SERVICE_HOST=${DB_HOST} \
 
 oc-refresh:
 	oc process -f ${OPENSHIFT_TEMPLATE_PATH} \
@@ -188,6 +190,7 @@ oc-refresh:
 		--param MAX_THREADS=${MAX_THREADS} \
 		--param BUILD_VERSION=${DEPLOY_BUILD_VERSION} \
 		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
+		--param POSTGRES_SQL_SERVICE_HOST=${DB_HOST} \
 		| oc apply -f -
 	oc start-build yupana
 
@@ -203,6 +206,7 @@ oc-dev-new-app:
 		--param MAX_THREADS=${MAX_THREADS} \
 		--param BUILD_VERSION=${BUILD_VERSION} \
 		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
+		--param POSTGRES_SQL_SERVICE_HOST=${POSTGRES_SQL_SERVICE_HOST} \
 
 oc-dev-refresh:
 	oc process -f ${OPENSHIFT_TEMPLATE_PATH} \
@@ -216,6 +220,7 @@ oc-dev-refresh:
 		--param MAX_THREADS=${MAX_THREADS} \
 		--param BUILD_VERSION=${BUILD_VERSION} \
 		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
+		--param POSTGRES_SQL_SERVICE_HOST=${POSTGRES_SQL_SERVICE_HOST} \
 		| oc apply -f -
 	oc start-build yupana -n yupana
 

@@ -30,20 +30,20 @@ objects:
       name: latest
       referencePolicy:
         type: Source
-# - apiVersion: v1
-#   kind: ImageStream
-#   metadata:
-#     name: postgresql
-#     namespace: ${NAMESPACE}
-#   spec:
-#     tags:
-#     - from:
-#         kind: DockerImage
-#         name: centos/postgresql-96-centos7
-#         resourceVersion: latest
-#       name: "9.6"
-#       referencePolicy:
-#         type: Source
+- apiVersion: v1
+  kind: ImageStream
+  metadata:
+    name: postgresql
+    namespace: ${NAMESPACE}
+  spec:
+    tags:
+    - from:
+        kind: DockerImage
+        name: centos/postgresql-96-centos7
+        resourceVersion: latest
+      name: "9.6"
+      referencePolicy:
+        type: Source
 - apiVersion: v1
   kind: Secret
   metadata:
@@ -83,7 +83,7 @@ objects:
     database-engine: ${DATABASE_ENGINE}
     database-name: ${DATABASE_NAME}
     database-service-name: POSTGRES_SQL
-    postgres-sql-service-host: ${NAME}-pgsql.${NAMESPACE}.svc
+    postgres-sql-service-host: ${POSTGRES_SQL_SERVICE_HOST}
     postgres-sql-service-port: "5432"
     app-config: ${APP_CONFIG}
     app-home: ${APP_HOME}
@@ -664,6 +664,9 @@ parameters:
   displayName: Application Configuration File Path
   name: APP_CONFIG
   value: /opt/app-root/src/yupana/gunicorn.py
+- displayName: Database Host
+  name: POSTGRES_SQL_SERVICE_HOST
+  required: true
 - description: Absolute path to application install location (optional).
   displayName: Application Home Directory
   name: APP_HOME

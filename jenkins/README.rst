@@ -40,6 +40,7 @@ First make sure that you are logged into the correct cluster and project. Next, 
     KAFKA_NAMESPACE=<KAFKA_NAMESPACE>
     INSIGHTS_HOST_INVENTORY_URL=<INSIGHTS_HOST_INVENTORY_URL>
     DEPLOY_BUILD_VERSION=<DEPLOY_BUILD_VERSION>
+    DB_HOST=<DB_HOST>
 
 To deploy a new app to the project, run::
 
