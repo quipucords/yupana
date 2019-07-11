@@ -189,18 +189,18 @@ DATABASES = {
 }
 
 # add ssl cert if specified
-database_cert = ENVIRONMENT.get_value('DATABASE_SERVICE_CERT', default=None)
-if database_cert:
-    temp_cert_file = NamedTemporaryFile(delete=False, mode='w', suffix='pem')
-    with open(temp_cert_file.name, mode='w') as cert_file:
-        cert_file.write(database_cert)
-    db_options = {
+DATABASE_CERT = ENVIRONMENT.get_value('DATABASE_SERVICE_CERT', default=None)
+if DATABASE_CERT:
+    TEMP_CERT_FILE = NamedTemporaryFile(delete=False, mode='w', suffix='pem')
+    with open(TEMP_CERT_FILE.name, mode='w') as cert_file:
+        cert_file.write(DATABASE_CERT)
+    DB_OPTIONS = {
         'OPTIONS': {
             'sslmode': 'verify-full',
-            'sslrootcert': temp_cert_file.name
+            'sslrootcert': TEMP_CERT_FILE.name
         }
     }
-    DATABASES.update(db_options)
+    DATABASES.update(DB_OPTIONS)
 
 DATABASES = {
     'default': DATABASES

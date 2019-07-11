@@ -30,20 +30,20 @@ objects:
       name: latest
       referencePolicy:
         type: Source
-- apiVersion: v1
-  kind: ImageStream
-  metadata:
-    name: postgresql
-    namespace: ${NAMESPACE}
-  spec:
-    tags:
-    - from:
-        kind: DockerImage
-        name: centos/postgresql-96-centos7
-        resourceVersion: latest
-      name: "9.6"
-      referencePolicy:
-        type: Source
+# - apiVersion: v1
+#   kind: ImageStream
+#   metadata:
+#     name: postgresql
+#     namespace: ${NAMESPACE}
+#   spec:
+#     tags:
+#     - from:
+#         kind: DockerImage
+#         name: centos/postgresql-96-centos7
+#         resourceVersion: latest
+#       name: "9.6"
+#       referencePolicy:
+#         type: Source
 - apiVersion: v1
   kind: Secret
   metadata:
