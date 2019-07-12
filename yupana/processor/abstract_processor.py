@@ -26,15 +26,15 @@ from enum import Enum
 
 import pytz
 from django.db import transaction
-from processor.legacy_report_consumer import (QPCReportException,
-                                              format_message)
+from processor.report_consumer import (QPCReportException,
+                                       format_message)
 from prometheus_client import Counter, Gauge, Summary
 
-from api.models import (LegacyReport,
-                        LegacyReportSlice,
+from api.models import (Report,
+                        ReportSlice,
                         Status)
-from api.serializers import (LegacyReportArchiveSerializer,
-                             LegacyReportSliceArchiveSerializer)
+from api.serializers import (ReportArchiveSerializer,
+                             ReportSliceArchiveSerializer)
 from config.settings.base import (NEW_REPORT_QUERY_INTERVAL,
                                   RETRIES_ALLOWED,
                                   RETRY_TIME)
@@ -51,38 +51,29 @@ RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
 
 # setup for prometheus metrics
-QUEUED_OBJECTS = Gauge('legacy_queued_objects', 'Reports & Report slices waiting to be processed')
-ARCHIVED_FAIL = Counter('legacy_archived_fail', 'Reports that have been archived as failures')
-ARCHIVED_SUCCESS = Counter('legacy_archived_success',
-                           'Reports that have been archived as successes')
-FAILED_TO_DOWNLOAD = Counter('legacy_failed_download',
-                             'Reports that failed to downlaod')
-FAILED_TO_VALIDATE = Counter('legacy_failed_validation',
-                             'Reports that could not be validated')
-INVALID_REPORTS = Counter('legacy_invalid_reports', 'Reports containing invalid syntax')
-TIME_RETRIES = Counter('legacy_time_retries',
-                       'The total number of retries based on time for all reports')
-COMMIT_RETRIES = Counter('legacy_commit_retries',
+QUEUED_OBJECTS = Gauge('queued_objects', 'Reports & Report slices waiting to be processed')
+ARCHIVED_FAIL = Counter('archived_fail', 'Reports that have been archived as failures')
+ARCHIVED_SUCCESS = Counter('archived_success', 'Reports that have been archived as successes')
+FAILED_TO_DOWNLOAD = Counter('failed_download', 'Reports that failed to downlaod')
+FAILED_TO_VALIDATE = Counter('failed_validation', 'Reports that could not be validated')
+INVALID_REPORTS = Counter('invalid_reports', 'Reports containing invalid syntax')
+TIME_RETRIES = Counter('time_retries', 'The total number of retries based on time for all reports')
+COMMIT_RETRIES = Counter('commit_retries',
                          'The total number of retries based on commit for all reports')
 HOST_UPLOAD_REQUEST_LATENCY = Summary(
-    'legacy_inventory_upload_latency',
+    'inventory_upload_latency',
     'The time in seconds that it takes to post to the host inventory')
-UPLOAD_GROUP_SIZE = Gauge('legacy_upload_group_size',
+UPLOAD_GROUP_SIZE = Gauge('upload_group_size',
                           'The amount of hosts being uploaded in a single bulk request.')
-VALIDATION_LATENCY = Summary('legacy_validation_latency',
-                             'The time it takes to validate a report')
-INVALID_HOSTS = Gauge('legacy_invalid_hosts_per_report',
-                      'The total number of invalid hosts per report')
-VALID_HOSTS = Gauge('legacy_valid_hosts_per_report',
-                    'The total number of valid hosts per report')
-HOSTS_UPLOADED_SUCCESS = Gauge('legacy_hosts_uploaded',
-                               'The total number of hosts successfully uploaded')
-HOSTS_UPLOADED_FAILED = Gauge('legacy_hosts_failed',
-                              'The total number of hosts that fail to upload')
+VALIDATION_LATENCY = Summary('validation_latency', 'The time it takes to validate a report')
+INVALID_HOSTS = Gauge('invalid_hosts_per_report', 'The total number of invalid hosts per report')
+VALID_HOSTS = Gauge('valid_hosts_per_report', 'The total number of valid hosts per report')
+HOSTS_UPLOADED_SUCCESS = Gauge('hosts_uploaded', 'The total number of hosts successfully uploaded')
+HOSTS_UPLOADED_FAILED = Gauge('hosts_failed', 'The total number of hosts that fail to upload')
 
 
 # pylint: disable=broad-except, too-many-lines, too-many-public-methods
-class LegacyAbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
+class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
     """Class for processing saved reports that have been uploaded."""
 
     # pylint: disable=too-many-arguments
@@ -179,7 +170,7 @@ class LegacyAbstractProcessor(ABC):  # pylint: disable=too-many-instance-attribu
         try:
             report_or_slice = queryset.earliest('last_update_time')
             return report_or_slice
-        except (LegacyReport.DoesNotExist, LegacyReportSlice.DoesNotExist):
+        except (Report.DoesNotExist, ReportSlice.DoesNotExist):
             return None
 
     def get_oldest_object_to_retry(self):
@@ -405,7 +396,7 @@ class LegacyAbstractProcessor(ABC):  # pylint: disable=too-many-instance-attribu
         self.candidate_hosts = []
 
     def determine_retry(self, fail_state, current_state,
-                        candidate_hosts=None, retry_type=LegacyReport.TIME):
+                        candidate_hosts=None, retry_type=Report.TIME):
         """Determine if yupana should archive a report based on retry count.
 
         :param fail_state: <str> the final state if we have reached max retries
@@ -511,19 +502,19 @@ class LegacyAbstractProcessor(ABC):  # pylint: disable=too-many-instance-attribu
     def archive_report_and_slices(self):  # pylint: disable=too-many-statements
         """Archive the report slice objects & associated report."""
         self.prefix = 'ARCHIVING'
-        if self.object_class == LegacyReport:
+        if self.object_class == Report:
             report = self.report_or_slice
         else:
             report = self.report_or_slice.report
         all_report_slices = []
         all_slices_ready = True
         try:
-            all_report_slices = LegacyReportSlice.objects.all().filter(report=report)
+            all_report_slices = ReportSlice.objects.all().filter(report=report)
             for report_slice in all_report_slices:
                 if not report_slice.ready_to_archive:
                     all_slices_ready = False
                     break
-        except LegacyReportSlice.DoesNotExist:
+        except ReportSlice.DoesNotExist:
             pass
 
         if report.ready_to_archive and all_slices_ready:
@@ -552,15 +543,15 @@ class LegacyAbstractProcessor(ABC):  # pylint: disable=too-many-instance-attribu
                 archived_rep_data['upload_ack_status'] = report.upload_ack_status
             if report.report_platform_id:
                 archived_rep_data['report_platform_id'] = report.report_platform_id
-            rep_serializer = LegacyReportArchiveSerializer(data=archived_rep_data)
+            rep_serializer = ReportArchiveSerializer(data=archived_rep_data)
             rep_serializer.is_valid(raise_exception=True)
             archived_rep = rep_serializer.save()
             LOG.info(format_message(self.prefix, 'Report successfully archived.',
                                     account_number=self.account_number,
                                     report_platform_id=self.report_platform_id))
 
-            failed_states = [LegacyReport.FAILED_DOWNLOAD, LegacyReport.FAILED_VALIDATION,
-                             LegacyReport.FAILED_VALIDATION_REPORTING]
+            failed_states = [Report.FAILED_DOWNLOAD, Report.FAILED_VALIDATION,
+                             Report.FAILED_VALIDATION_REPORTING]
             if report.state in failed_states or failed:
                 ARCHIVED_FAIL.inc()
             else:
@@ -590,11 +581,11 @@ class LegacyAbstractProcessor(ABC):  # pylint: disable=too-many-instance-attribu
                     archived_slice_data['report_platform_id'] = report_slice.report_platform_id
                 if report_slice.report_json:
                     archived_slice_data['report_json'] = report_slice.report_json
-                slice_serializer = LegacyReportSliceArchiveSerializer(data=archived_slice_data)
+                slice_serializer = ReportSliceArchiveSerializer(data=archived_slice_data)
                 slice_serializer.is_valid(raise_exception=True)
                 slice_serializer.save()
-                failed_states = [LegacyReportSlice.FAILED_VALIDATION,
-                                 LegacyReportSlice.FAILED_HOSTS_UPLOAD]
+                failed_states = [ReportSlice.FAILED_VALIDATION,
+                                 ReportSlice.FAILED_HOSTS_UPLOAD]
                 if report_slice.state in failed_states:
                     ARCHIVED_FAIL.inc()
                 else:
@@ -608,8 +599,8 @@ class LegacyAbstractProcessor(ABC):  # pylint: disable=too-many-instance-attribu
             # now delete the report object and it will delete all of the associated
             # report slices
             try:
-                LegacyReport.objects.get(id=report.id).delete()
-            except LegacyReport.DoesNotExist:
+                Report.objects.get(id=report.id).delete()
+            except Report.DoesNotExist:
                 pass
             if all_report_slices:
                 LOG.info(format_message(self.prefix, 'Report slices successfully archived.',

@@ -88,16 +88,30 @@ class ApiConfig(AppConfig):
     @staticmethod
     def start_report_processor():
         """Start the report processor."""
-        from processor.legacy_report_processor import initialize_report_processor
-        logger.info('Initializing the report processor.')
-        initialize_report_processor()
+        host_inventory_upload_mode = ENVIRONMENT.get_value(
+            'HOST_INVENTORY_UPLOAD_MODE', default='http')
+        if host_inventory_upload_mode == 'http':
+            from processor.legacy_report_processor import initialize_report_processor
+            logger.info('Initializing the legacy report processor.')
+            initialize_report_processor()
+        else:
+            from processor.report_processor import initialize_report_processor
+            logger.info('Initializing the report processor.')
+            initialize_report_processor()
 
     @staticmethod
     def start_report_slice_processor():
         """Start the report slice processor."""
-        from processor.legacy_report_slice_processor import initialize_report_slice_processor
-        logger.info('Initializing the report slice processor.')
-        initialize_report_slice_processor()
+        host_inventory_upload_mode = ENVIRONMENT.get_value(
+            'HOST_INVENTORY_UPLOAD_MODE', default='http')
+        if host_inventory_upload_mode == 'http':
+            from processor.legacy_report_slice_processor import initialize_report_slice_processor
+            logger.info('Initializing the legacy report slice processor.')
+            initialize_report_slice_processor()
+        else:
+            from processor.report_slice_processor import initialize_report_slice_processor
+            logger.info('Initializing the report slice processor.')
+            initialize_report_slice_processor()
 
     def check_and_create_service_admin(self):  # pylint: disable=R0201
         """Check for the service admin and create it if necessary."""
