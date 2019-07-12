@@ -68,9 +68,11 @@ objects:
       template: yupana-template
     annotations:
       template.openshift.io/expose-django_secret_key: "{.data['django-secret-key']}"
+      template.openshift.io/expose-db_client_cert: "{.data['db-client-cert']}"
     name: ${NAME}-secret
   stringData:
     django-secret-key: ${DJANGO_SECRET_KEY}
+    db-client-cert: ${DATABASE_SERVICE_CERT}
 - apiVersion: v1
   kind: ConfigMap
   metadata:
@@ -81,7 +83,7 @@ objects:
     database-engine: ${DATABASE_ENGINE}
     database-name: ${DATABASE_NAME}
     database-service-name: POSTGRES_SQL
-    postgres-sql-service-host: ${NAME}-pgsql.${NAMESPACE}.svc
+    postgres-sql-service-host: ${POSTGRES_SQL_SERVICE_HOST}
     postgres-sql-service-port: "5432"
     app-config: ${APP_CONFIG}
     app-home: ${APP_HOME}
@@ -255,6 +257,12 @@ objects:
                   key: django-secret-key
                   name: ${NAME}-secret
                   optional: false
+            - name: DATABASE_SERVICE_CERT
+              valueFrom:
+                secretKeyRef:
+                  key: db-client-cert
+                  name: ${NAME}-secret
+                  optional: true
             - name: DATABASE_ENGINE
               valueFrom:
                 configMapKeyRef:
@@ -656,6 +664,9 @@ parameters:
   displayName: Application Configuration File Path
   name: APP_CONFIG
   value: /opt/app-root/src/yupana/gunicorn.py
+- displayName: Database Host
+  name: POSTGRES_SQL_SERVICE_HOST
+  required: true
 - description: Absolute path to application install location (optional).
   displayName: Application Home Directory
   name: APP_HOME
@@ -759,3 +770,7 @@ parameters:
   name: NEW_REPORT_QUERY_INTERVAL
   required: false
   value: "60"
+- description: The database client certificate
+  displayName: Database Client Certificate
+  name: DATABASE_SERVICE_CERT
+  required: false
