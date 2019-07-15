@@ -102,7 +102,8 @@ class KafkaMsgHandlerTest(TestCase):
         """Test the save and ack message method."""
         test_consumer = AIOKafkaConsumer(
             msg_handler.QPC_TOPIC,
-            loop=msg_handler.EVENT_LOOP, bootstrap_servers=msg_handler.INSIGHTS_KAFKA_ADDRESS,
+            loop=msg_handler.UPLOAD_REPORT_CONSUMER_LOOP,
+            bootstrap_servers=msg_handler.INSIGHTS_KAFKA_ADDRESS,
             group_id='qpc-group', enable_auto_commit=False
         )
         test_consumer.commit = CoroutineMock()

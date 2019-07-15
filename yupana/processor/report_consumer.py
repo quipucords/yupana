@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-"""Kafka message handler."""
+"""Upload report consumer."""
 
 import asyncio
 import json
@@ -32,8 +32,8 @@ from api.serializers import ReportSerializer
 from config.settings.base import INSIGHTS_KAFKA_ADDRESS
 
 LOG = logging.getLogger(__name__)
-EVENT_LOOP = asyncio.get_event_loop()
-MSG_PENDING_QUEUE = asyncio.Queue()
+UPLOAD_REPORT_CONSUMER_LOOP = asyncio.get_event_loop()
+REPORT_PENDING_QUEUE = asyncio.Queue()
 QPC_TOPIC = 'platform.upload.qpc'
 
 MSG_UPLOADS = Counter('uploaded_messages', 'Number of messages uploaded to qpc topic')
@@ -169,16 +169,16 @@ async def save_message_and_ack(consumer, consumer_record):
 async def loop_save_message_and_ack(consumer):
     """Loop the save_message_and_ack function."""
     while True:
-        consumer_record = await MSG_PENDING_QUEUE.get()
+        consumer_record = await REPORT_PENDING_QUEUE.get()
         await save_message_and_ack(consumer, consumer_record)
 
 
-async def listen_for_messages(consumer):  # pragma: no cover
+async def listen_for_messages(consumer, async_queue, log_message):  # pragma: no cover
     """
     Listen for messages on the qpc topic.
 
     Once a message from one of these topics arrives, we add
-    them to the MSG_PENDING_QUEUE.
+    them to the passed in queue.
     :param consumer : Kafka consumer
     :returns None
     """
@@ -188,17 +188,17 @@ async def listen_for_messages(consumer):  # pragma: no cover
         await consumer.stop()
         raise KafkaMsgHandlerError('Unable to connect to kafka server.  Closing consumer.')
 
-    LOG.info('Listener started.  Waiting for messages...')
+    LOG.info(log_message)
     try:
         # Consume messages
         async for msg in consumer:
-            await MSG_PENDING_QUEUE.put(msg)
+            await async_queue.put(msg)
     finally:
         # Will leave consumer group; perform autocommit if enabled.
         await consumer.stop()
 
 
-def asyncio_worker_thread(loop):  # pragma: no cover
+def create_upload_report_consumer_loop(loop):  # pragma: no cover
     """
     Worker thread function to run the asyncio event loop.
 
@@ -207,25 +207,27 @@ def asyncio_worker_thread(loop):  # pragma: no cover
     """
     consumer = AIOKafkaConsumer(
         QPC_TOPIC,
-        loop=EVENT_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS,
+        loop=UPLOAD_REPORT_CONSUMER_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS,
         group_id='qpc-group', enable_auto_commit=False
     )
 
     loop.create_task(loop_save_message_and_ack(consumer))
 
     try:
-        loop.run_until_complete(listen_for_messages(consumer))
+        log_message = 'Upload report listener started.  Waiting for messages...'
+        loop.run_until_complete(listen_for_messages(consumer, REPORT_PENDING_QUEUE, log_message))
     except KafkaMsgHandlerError as err:
         LOG.info('Stopping kafka worker thread.  Error: %s', str(err))
 
 
-def initialize_kafka_handler():  # pragma: no cover
+def initialize_upload_report_consumer():  # pragma: no cover
     """
     Create asyncio tasks and daemon thread to run event loop.
 
     :param None
     :returns None
     """
-    event_loop_thread = threading.Thread(target=asyncio_worker_thread, args=(EVENT_LOOP,))
+    event_loop_thread = threading.Thread(
+        target=create_upload_report_consumer_loop, args=(UPLOAD_REPORT_CONSUMER_LOOP,))
     event_loop_thread.daemon = True
     event_loop_thread.start()

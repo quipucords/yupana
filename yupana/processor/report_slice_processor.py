@@ -17,31 +17,23 @@
 """Report Slice Processor."""
 
 import asyncio
-import base64
-import concurrent.futures
 import json
 import logging
 import threading
-from datetime import datetime
-from http import HTTPStatus
 
-import pytz
-import requests
-from processor.abstract_processor import (
-    AbstractProcessor,
-    FAILED_TO_VALIDATE,
-    HOSTS_UPLOADED_FAILED, HOSTS_UPLOADED_SUCCESS,
-    HOST_UPLOAD_REQUEST_LATENCY, INVALID_HOSTS,
-    UPLOAD_GROUP_SIZE, VALID_HOSTS)
-from processor.report_consumer import (
-    QPCReportException,
-    format_message)
+from aiokafka import AIOKafkaProducer
+from kafka.errors import ConnectionError as KafkaConnectionError
+from processor.abstract_processor import (AbstractProcessor, FAILED_TO_VALIDATE,
+                                          INVALID_HOSTS)
+from processor.report_consumer import (KafkaMsgHandlerError,
+                                       QPCReportException,
+                                       format_message)
 
-from api.models import InventoryUploadError, ReportSlice
+from api.models import ReportSlice
 from api.serializers import InventoryUploadErrorSerializer, ReportSliceSerializer
 from config.settings.base import (HOSTS_PER_REQ,
                                   HOST_INVENTORY_UPLOAD_MODE,
-                                  INSIGHTS_HOST_INVENTORY_URL,
+                                  INSIGHTS_KAFKA_ADDRESS,
                                   MAX_THREADS,
                                   RETRIES_ALLOWED,
                                   RETRY_TIME)
@@ -56,6 +48,7 @@ HOSTS_PER_REQ = int(HOSTS_PER_REQ)
 MAX_THREADS = int(MAX_THREADS)
 INVENTORY_FAILURE = 'INVENTORY FAILURE'
 UPLOAD_DATA_FAILURE = 'UPLOAD DATA FAILURE'
+UPLOAD_TOPIC = 'platform.upload.hostvalidation'  # placeholder topic
 
 
 class RetryUploadTimeException(Exception):
@@ -140,8 +133,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             # which means it enters our odd state
             # of requiring validation
             LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error)))
-            self.determine_retry(ReportSlice.FAILED_VALIDATION,
-                                 ReportSlice.RETRY_VALIDATION,
+            self.determine_retry(ReportSlice.FAILED_VALIDATION, ReportSlice.RETRY_VALIDATION,
                                  retry_type=ReportSlice.GIT_COMMIT)
 
     async def transition_to_hosts_uploaded(self):
@@ -155,13 +147,9 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         try:
             if self.candidate_hosts:
                 candidates = self.generate_upload_candidates()
-                if HOST_INVENTORY_UPLOAD_MODE.lower() == 'http':
-                    retry_time_candidates, retry_commit_candidates = \
-                        await self._upload_to_host_inventory(candidates)
-                else:
-                    # placeholder for upload via Kafka function
-                    retry_time_candidates, retry_commit_candidates = \
-                        await self._upload_to_host_inventory(candidates)
+                await self._upload_to_host_inventory_via_kafka(candidates)
+                retry_time_candidates = []
+                retry_commit_candidates = []
                 if not retry_time_candidates and not retry_commit_candidates:
                     LOG.info(format_message(self.prefix, 'All hosts were successfully uploaded.',
                                             account_number=self.account_number,
@@ -231,23 +219,6 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                       for key in host.keys() if key not in ['cause', 'status_code']}
         return candidates
 
-    @staticmethod
-    def split_hosts(list_of_all_hosts):
-        """Split up the hosts into lists of 1000 or less."""
-        hosts_lists_to_upload = \
-            [list_of_all_hosts[i:i + HOSTS_PER_REQ]
-             for i in range(0, len(list_of_all_hosts), HOSTS_PER_REQ)]
-        # hosts list to upload is a list containing lists of however many hosts can be
-        # uploaded at one time (aka. 1000). We now need to break this into a list
-        # of lists that have the same number of lists as we do threads
-        # for example, if the max number of hosts per req is 100, and our max number of threads
-        # is 3, our final list would look like this:
-        # [[[100 hosts], [100 hosts], [100 hosts]], [[100 hosts], [100 hosts], [100 hosts]]]
-        thread_lists_to_upload = \
-            [hosts_lists_to_upload[i:i + MAX_THREADS]
-             for i in range(0, len(hosts_lists_to_upload), MAX_THREADS)]
-        return thread_lists_to_upload
-
     def record_inventory_upload_errors(self, options):
         """Record request and response body of requests that failed to upload.
 
@@ -277,242 +248,45 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     report_platform_id=self.report_platform_id))
         return True
 
-    # pylint: disable=too-many-locals, too-many-nested-blocks, too-many-branches
-    # pylint: disable=too-many-statements
-    def execute_request(self, hosts_tuple):  # noqa: C901 (too-complex)
-        """Execute the http requests for posting to inventory service."""
-        hosts_list, hosts = hosts_tuple
-        LOG.info('Thread %s spawned, attempting to upload %s hosts',
-                 threading.current_thread().name, len(hosts_list))
-        identity_string = '{"identity": {"account_number": "%s"}}' % str(self.account_number)
-        bytes_string = identity_string.encode()
-        x_rh_identity_value = base64.b64encode(bytes_string).decode()
-        identity_header = {'x-rh-identity': x_rh_identity_value,
-                           'Content-Type': 'application/json'}
-        failed_hosts = []
-        retry_time_candidates = []  # storing hosts to retry after time
-        retry_commit_candidates = []  # storing hosts to retry after commit change
-        error_messages = []
-        details = {'identity_header': identity_header}
-        inventory_error_info = {'upload_type': InventoryUploadError.HTTP,
-                                'source': self.report_or_slice.source}
-        retry_exception = False
-        inventory_error = False
-        UPLOAD_GROUP_SIZE.set(len(hosts_list))
-        try:
-            with HOST_UPLOAD_REQUEST_LATENCY.time():
-                response = requests.post(INSIGHTS_HOST_INVENTORY_URL,
-                                         data=json.dumps(hosts_list),
-                                         headers=identity_header)
-            details['response_code'] = response.status_code
-            if response.status_code in [HTTPStatus.MULTI_STATUS]:
-                try:
-                    json_body = response.json()
-                except ValueError:
-                    # something went wrong
-                    json_error = 'Missing JSON response.'
-                    error_messages.append(json_error)
-                    details['additional_info'] = json_error
-                    inventory_error = True
-                    details['failure_category'] = INVENTORY_FAILURE
-                    raise RetryUploadTimeException()
+    async def _upload_to_host_inventory_via_kafka(self, hosts):
+        """
+        Upload to the host inventory via kafka.
 
-                errors = json_body.get('errors')
-                if errors != 0:
-                    details['response_body'] = json_body
-                    inventory_error = True
-                    details['failure_category'] = UPLOAD_DATA_FAILURE
-                    all_data = json_body.get('data', [])
-                    host_index = 0
-                    for host_data in all_data:
-                        host_status = host_data.get('status')
-                        if host_status not in [HTTPStatus.OK, HTTPStatus.CREATED]:
-                            original_host = {}
-                            host_id = ''
-                            upload_host = hosts_list[host_index]
-                            host_facts = upload_host.get('facts', [])
-                            for namespace_facts in host_facts:
-                                if namespace_facts.get('namespace') == 'yupana':
-                                    yupana_facts = namespace_facts.get('facts', {})
-                                    host_id = yupana_facts.get('yupana_host_id', '')
-                                    original_host = hosts.get(host_id, {})
-                            failed_hosts.append({
-                                'status_code': host_status,
-                                'display_name': original_host.get('display_name'),
-                                'yupana_host_id': host_id,
-                                'host': original_host})
-
-                            # if the response code is a 500, then something on
-                            # host inventory side blew up and we want to retry
-                            # after a certain amount of time
-                            if str(host_status).startswith('5'):
-                                retry_time_candidates.append({host_id: original_host,
-                                                              'cause': FAILED_UPLOAD,
-                                                              'status_code': host_status})
-                            else:
-                                # else, if we recieved a 400 status code, the problem is
-                                # likely on our side so we should retry after a code change
-                                retry_commit_candidates.append({host_id: original_host,
-                                                                'cause': FAILED_UPLOAD,
-                                                                'status_code': host_status})
-                        host_index += 1
-            else:
-                # something unexpected happened
-                inventory_error = True
-                error_messages.append(
-                    'Post request recieved the following response code: %s' %
-                    str(response.status_code))
-                error_messages.append('Attempted to upload the following: %s' % str(hosts_list))
-                try:
-                    message = response.json()
-                    details['response_body'] = message
-                    error_messages.append(message)
-                except ValueError:
-                    json_error = 'Missing JSON response.'
-                    details['additional_info'] = json_error
-                    error_messages.append(json_error)
-                    error_messages.append('Unexpected response code %s' % str(response.status_code))
-                if str(response.status_code).startswith('5'):
-                    details['failure_category'] = INVENTORY_FAILURE
-                    # something went wrong on host inventory side and we should regenerate after
-                    # some time has passed
-                    raise RetryUploadTimeException()
-                # else something went wrong possibly on our side (if its a 400)
-                # and we should regenerate the hosts dictionary and re-upload after a commit
-                details['failure_category'] = UPLOAD_DATA_FAILURE
-                raise RetryUploadCommitException()
-
-        except RetryUploadCommitException:
-            retry_exception = True
-            retry_list = retry_commit_candidates
-        except RetryUploadTimeException:
-            retry_exception = True
-            retry_list = retry_time_candidates
-        except requests.exceptions.RequestException as err:
-            inventory_error = True
-            details['failure_category'] = INVENTORY_FAILURE
-            request_error = 'A request exception occurred: %s ' % str(err)
-            details['additional_info'] = request_error
-            error_messages.append(request_error)
-            error_messages.append('Attempted to upload the following: %s' % str(hosts_list))
-            retry_exception = True
-            retry_list = retry_time_candidates
-
-        if retry_exception:
-            # we are going to have to look up the original host, and map it to the
-            # one we are trying to upload so that we can retry it.
-            for upload_host in hosts_list:
-                host_id = 'unknown'
-                original_host = {}
-                host_facts = upload_host.get('facts', [])
-                for namespace_facts in host_facts:
-                    if namespace_facts.get('namespace') == 'yupana':
-                        yupana_facts = namespace_facts.get('facts', {})
-                        host_id = yupana_facts.get('yupana_host_id', '')
-                        original_host = hosts.get(host_id, {})
-                failed_hosts.append({
-                    'status_code': 'unknown',
-                    'display_name': original_host.get('display_name', 'unknown'),
-                    'yupana_host_id': host_id,
-                    'host': original_host})
-                retry_list.append({host_id: original_host,
-                                   'cause': FAILED_UPLOAD})
-
-        response = {
-            'retry_time_candidates': retry_time_candidates,
-            'retry_commit_candidates': retry_commit_candidates,
-            'failed_hosts': failed_hosts,
-            'error_messages': error_messages
-        }
-        details['date'] = str(datetime.now(pytz.utc))
-        inventory_error_info['details'] = details
-        if inventory_error:
-            response['inventory_error'] = inventory_error_info
-        return response
-
-    async def _upload_to_host_inventory(self, hosts):  # noqa: C901 (too-complex)
-        """Create bulk upload threads for post requests to inventory."""
-        self.prefix = 'UPLOAD TO HOST INVENTORY'
-        failed_hosts = []
-        inventory_errors = []
-        all_error_messages = []
-        retry_time_hosts = []  # storing hosts to retry after time
-        retry_commit_hosts = []  # storing hosts to retry after commit change
+        :param: hosts <list> the hosts to upload.
+        """
+        self.prefix = 'UPLOAD TO INVENTORY VIA KAFKA'
         list_of_all_hosts = self.generate_bulk_upload_list(hosts)
-        hosts_lists_to_upload = self.split_hosts(list_of_all_hosts)
-        LOG.info(format_message(self.prefix, 'Spawning threads to upload hosts.',
-                                account_number=self.account_number,
-                                report_platform_id=self.report_platform_id))
-        for split_list in hosts_lists_to_upload:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
-                process_loop = asyncio.get_event_loop()
-                futures = [
-                    process_loop.run_in_executor(
-                        executor,
-                        self.execute_request,
-                        (hosts_list, hosts)
-                    )
-                    for hosts_list in split_list
-                ]
-                for response in await asyncio.gather(*futures):
-                    retry_time_candidates = response.get('retry_time_candidates', [])
-                    retry_commit_candidates = response.get('retry_commit_candidates', [])
-                    failed_candidates = response.get('failed_hosts', [])
-                    error_messages = response.get('error_messages', [])
-                    inventory_error = response.get('inventory_error')
-                    if inventory_error:
-                        inventory_errors.append(inventory_error)
-                    retry_time_hosts += retry_time_candidates
-                    retry_commit_hosts += retry_commit_candidates
-                    failed_hosts += failed_candidates
-                    all_error_messages += error_messages
-
-        for error in all_error_messages:
-            LOG.error(format_message(self.prefix, error,
-                                     account_number=self.account_number,
-                                     report_platform_id=self.report_platform_id
-                                     ))
-        for inventory_error in inventory_errors:
-            try:
-                self.record_inventory_upload_errors(inventory_error)
-            except Exception as err:  # pylint:disable=broad-except
-                LOG.error(
+        producer = AIOKafkaProducer(
+            loop=SLICE_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
+        )
+        try:
+            await producer.start()
+        except (KafkaConnectionError, TimeoutError):
+            await producer.stop()
+            raise KafkaMsgHandlerError(
+                format_message(
+                    self.prefix,
+                    'Unable to connect to kafka server. Closing producer.',
+                    account_number=self.account_number,
+                    report_platform_id=self.report_platform_id))
+        total_hosts = len(list_of_all_hosts)
+        count = 0
+        try:
+            for host in list_of_all_hosts:
+                count += 1
+                msg = bytes(json.dumps(host), 'utf-8')
+                await producer.send_and_wait(UPLOAD_TOPIC, msg)
+                LOG.info(
                     format_message(
                         self.prefix,
-                        'Could not save inventory error due to the '
-                        'following exception: %s' % str(err),
+                        'Sending %s/%s hosts to the inventory service.' % (count, total_hosts),
                         account_number=self.account_number,
                         report_platform_id=self.report_platform_id))
-        total_hosts_count = len(hosts)
-        failed_hosts_count = len(failed_hosts)
-        successful = total_hosts_count - failed_hosts_count
-        VALID_HOSTS.set(total_hosts_count)
-        HOSTS_UPLOADED_SUCCESS.set(successful)
-        HOSTS_UPLOADED_FAILED.set(failed_hosts_count)
-        upload_msg = format_message(
-            self.prefix, '%s/%s hosts uploaded to host inventory' %
-            (successful, len(hosts)),
-            account_number=self.account_number,
-            report_platform_id=self.report_platform_id
-        )
-        if successful != len(hosts):
-            LOG.warning(upload_msg)
-        else:
-            LOG.info(upload_msg)
-        if failed_hosts:
-            for failed_info in failed_hosts:
-                LOG.error(format_message(
-                    self.prefix,
-                    'Host inventory returned %s for %s. '
-                    'yupana_host_id: %s. host: %s' % (
-                        failed_info.get('status_code'),
-                        failed_info.get('display_name'),
-                        failed_info.get('yupana_host_id'),
-                        failed_info.get('host')),
-                    account_number=self.account_number,
-                    report_platform_id=self.report_platform_id
-                ))
-        return retry_time_hosts, retry_commit_hosts
+        except Exception as err:  # pylint: disable=broad-except
+            print('here is the exception: %s' % err)
+            await producer.stop()
+        finally:
+            await producer.stop()
 
 
 def asyncio_report_processor_thread(loop):  # pragma: no cover

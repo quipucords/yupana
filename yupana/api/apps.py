@@ -41,7 +41,7 @@ class ApiConfig(AppConfig):
         try:
             self.startup_status()
             self.check_and_create_service_admin()
-            self.start_kafka_consumer()
+            self.start_kafka_consumers()
             self.start_report_processor()
             self.start_report_slice_processor()
         except (OperationalError, ProgrammingError) as op_error:
@@ -74,14 +74,23 @@ class ApiConfig(AppConfig):
         logger.info('Created Service Admin: %s.', service_email)
 
     @staticmethod
-    def start_kafka_consumer():
+    def start_kafka_consumers():
         """Start the kafka consumer."""
-        from processor.legacy_report_consumer import initialize_kafka_handler
         pause_kafka_for_file_upload = ENVIRONMENT.get_value(
             'PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE', default=False)
+        host_inventory_upload_mode = ENVIRONMENT.get_value(
+            'HOST_INVENTORY_UPLOAD_MODE', default='http')
         if not pause_kafka_for_file_upload:
-            logger.info('Initializing the kafka messaging handler.')
-            initialize_kafka_handler()
+            if host_inventory_upload_mode == 'http':
+                from processor.legacy_report_consumer import initialize_kafka_handler
+                logger.info('Initializing the legacy kafka messaging handler.')
+                initialize_kafka_handler()
+            else:
+                from processor.report_consumer import initialize_upload_report_consumer
+                from processor.host_validation_consumer import initialize_host_validation_consumer
+                logger.info('Initializing the kafka messaging handler.')
+                initialize_upload_report_consumer()
+                initialize_host_validation_consumer()
         else:
             logger.info('Kafka messaging handler paused for file upload service.')
 
