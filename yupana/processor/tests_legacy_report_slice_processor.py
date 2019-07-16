@@ -42,7 +42,7 @@ from api.models import (InventoryUploadError,
 
 # pylint: disable=too-many-public-methods
 # pylint: disable=protected-access,too-many-lines,too-many-instance-attributes
-class LegacyReportProcessorTests(TestCase):
+class LegacyReportSliceProcessorTests(TestCase):
     """Test Cases for the Message processor."""
 
     def setUp(self):

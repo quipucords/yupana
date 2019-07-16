@@ -48,7 +48,7 @@ HOSTS_PER_REQ = int(HOSTS_PER_REQ)
 MAX_THREADS = int(MAX_THREADS)
 INVENTORY_FAILURE = 'INVENTORY FAILURE'
 UPLOAD_DATA_FAILURE = 'UPLOAD DATA FAILURE'
-UPLOAD_TOPIC = 'platform.upload.hostvalidation'  # placeholder topic
+UPLOAD_TOPIC = 'platform.inventory.host-ingress'  # placeholder topic
 
 
 class RetryUploadTimeException(Exception):
@@ -147,9 +147,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         try:
             if self.candidate_hosts:
                 candidates = self.generate_upload_candidates()
-                await self._upload_to_host_inventory_via_kafka(candidates)
-                retry_time_candidates = []
-                retry_commit_candidates = []
+                retry_time_candidates, retry_commit_candidates = \
+                    await self._upload_to_host_inventory_via_kafka(candidates)
                 if not retry_time_candidates and not retry_commit_candidates:
                     LOG.info(format_message(self.prefix, 'All hosts were successfully uploaded.',
                                             account_number=self.account_number,
@@ -274,7 +273,11 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         try:
             for host in list_of_all_hosts:
                 count += 1
-                msg = bytes(json.dumps(host), 'utf-8')
+                upload_msg = {
+                    'operation': 'add_host',
+                    'data': host
+                }
+                msg = bytes(json.dumps(upload_msg), 'utf-8')
                 await producer.send_and_wait(UPLOAD_TOPIC, msg)
                 LOG.info(
                     format_message(
@@ -283,10 +286,13 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                         account_number=self.account_number,
                         report_platform_id=self.report_platform_id))
         except Exception as err:  # pylint: disable=broad-except
-            print('here is the exception: %s' % err)
+            LOG.error('The following exception occurred: %s', err)
             await producer.stop()
         finally:
             await producer.stop()
+        retry_time_candidates = []
+        retry_commit_candidates = []
+        return retry_time_candidates, retry_commit_candidates
 
 
 def asyncio_report_processor_thread(loop):  # pragma: no cover

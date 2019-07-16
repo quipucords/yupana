@@ -15,6 +15,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 """Host validation consumer."""
+# marking this as deprecated because it is undecided how the host inventory
+# will handle validation
 
 import asyncio
 import json
@@ -27,13 +29,12 @@ from processor.report_consumer import (KafkaMsgHandlerError,
                                        format_message,
                                        listen_for_messages)
 
-from api.serializers import InventoryUploadErrorSerializer
 from config.settings.base import INSIGHTS_KAFKA_ADDRESS
 
 LOG = logging.getLogger(__name__)
 HOST_VALIDATION_CONSUMER_LOOP = asyncio.get_event_loop()
 VALIDATION_PENDING_QUEUE = asyncio.Queue()
-VALIDATION_TOPIC = 'platform.upload.hostvalidation'
+VALIDATION_TOPIC = 'platform.inventory.host-ingress'
 
 
 def unpack_validation_msg(host_validation_message):
@@ -62,38 +63,8 @@ def record_host_results(validation_message):
 
     :param validation_message: JSON message containing error info.
     """
-    LOG.debug('Validation message contents: %s ', validation_message)
-    facts = validation_message.get('facts', [])
-    yupana_namespaced_facts = None
-    for namespaced_facts in facts:
-        if namespaced_facts.get('namespace', '') == 'yupana':
-            yupana_namespaced_facts = namespaced_facts
-            break
-    if yupana_namespaced_facts:
-        yupana_facts = yupana_namespaced_facts.get('facts', {})
-        report_platform_id = yupana_facts.get('report_platform_id')
-        report_slice_id = yupana_facts.get('report_slice_id')
-        account = yupana_facts.get('account')
-        source = yupana_facts.get('source')
-        yupana_host_id = yupana_facts.get('yupana_host_id')
-        # print('yupana_facts: ')
-        # print(yupana_facts)
-        # print('report platform id: %s' % report_platform_id)
-        # print('report_slice_id: %s' % report_slice_id)
-        # print('account: %s' % account)
-        # print('source: %s' % source)
-        # print('yupana_host_id: %s' % yupana_host_id)
-        upload_error = {
-            'report_slice_id': report_slice_id,
-            'report_platform_id': report_platform_id,
-            'account': account,
-            'source': source,
-            'yupana_host_id': yupana_host_id,
-            'details': json.dumps(validation_message)
-        }
-        upload_serializer = InventoryUploadErrorSerializer(data=upload_error)
-        upload_serializer.is_valid(raise_exception=True)
-        upload_serializer.save()
+    LOG.info('Validation message contents: %s ', validation_message)
+    # in the future we will save an inventory upload error
 
 
 async def process_consumer_messages(consumer, consumer_record):
