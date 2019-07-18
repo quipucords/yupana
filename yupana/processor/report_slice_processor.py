@@ -226,7 +226,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     report_platform_id=self.report_platform_id))
         return True
 
-    async def _upload_to_host_inventory_via_kafka(self, hosts):
+    async def _upload_to_host_inventory_via_kafka(self, hosts):   # noqa: C901 (too-complex)
         """
         Upload to the host inventory via kafka.
 
@@ -249,7 +249,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     report_platform_id=self.report_platform_id))
         total_hosts = len(list_of_all_hosts)
         count = 0
-        try:
+        send_futures = []
+        try:  # pylint: disable=too-many-nested-blocks
             for host in list_of_all_hosts:
                 count += 1
                 upload_msg = {
@@ -257,13 +258,23 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     'data': host
                 }
                 msg = bytes(json.dumps(upload_msg), 'utf-8')
-                await producer.send_and_wait(UPLOAD_TOPIC, msg)
+                future = await producer.send(UPLOAD_TOPIC, msg)
+                send_futures.append(future)
                 LOG.info(
                     format_message(
                         self.prefix,
                         'Sending %s/%s hosts to the inventory service.' % (count, total_hosts),
                         account_number=self.account_number,
                         report_platform_id=self.report_platform_id))
+                if count % 100 == 0 or count == total_hosts:
+                    try:
+                        await asyncio.wait(send_futures, timeout=5)
+                        for future_res in send_futures:
+                            if future_res.exception():
+                                LOG.error('An exception occurred %s', future_res.exception())
+                    except Exception as error:  # pylint: disable=broad-except
+                        LOG.error('An exception occurred: %s', error)
+                    send_futures = []
         except Exception as err:  # pylint: disable=broad-except
             await producer.stop()
             raise KafkaMsgHandlerError(

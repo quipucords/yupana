@@ -404,13 +404,15 @@ class ReportSliceProcessorTests(TestCase):
             bootstrap_servers=report_slice_processor.INSIGHTS_KAFKA_ADDRESS
         )
         test_producer.start = CoroutineMock()
-        test_producer.send_and_wait = CoroutineMock()
+        test_producer.send = CoroutineMock()
         test_producer.stop = CoroutineMock()
         with patch('processor.report_slice_processor.AIOKafkaProducer',
                    return_value=test_producer):
-            # all though we are not asserting any results, the test here is
-            # that no error was raised
-            await self.processor._upload_to_host_inventory_via_kafka(hosts)
+            with patch('processor.report_slice_processor.asyncio.wait',
+                       side_effect=None):
+                # all though we are not asserting any results, the test here is
+                # that no error was raised
+                await self.processor._upload_to_host_inventory_via_kafka(hosts)
 
     def test_upload_to_host_inventory_via_kafka(self):
         """Test the async hosts uploaded exception."""
@@ -440,7 +442,7 @@ class ReportSliceProcessorTests(TestCase):
             raise KafkaConnectionError('Test')
 
         test_producer.start = CoroutineMock(side_effect=raise_kafka_error)
-        test_producer.send_and_wait = CoroutineMock()
+        test_producer.send = CoroutineMock()
         test_producer.stop = CoroutineMock()
         with self.assertRaises(msg_handler.KafkaMsgHandlerError):
             with patch('processor.report_slice_processor.AIOKafkaProducer',
@@ -476,7 +478,7 @@ class ReportSliceProcessorTests(TestCase):
             raise Exception('Test')
 
         test_producer.start = CoroutineMock()
-        test_producer.send_and_wait = CoroutineMock(side_effect=raise_error)
+        test_producer.send = CoroutineMock(side_effect=raise_error)
         test_producer.stop = CoroutineMock()
         with self.assertRaises(msg_handler.KafkaMsgHandlerError):
             with patch('processor.report_slice_processor.AIOKafkaProducer',
