@@ -358,8 +358,10 @@ local-dev-up:
 	clear
 
 local-dev-down:
+	osascript -e 'quit app "iTerm"' | true
 	cd ../insights-upload/docker/;docker-compose down
 	docker-compose down
+	sudo lsof -t -i tcp:8081 | xargs kill -9
 
 local-upload-data:
 	curl -vvvv -H "x-rh-identity: eyJpZGVudGl0eSI6IHsiYWNjb3VudF9udW1iZXIiOiAiMTIzNDUiLCAiaW50ZXJuYWwiOiB7Im9yZ19pZCI6ICI1NDMyMSJ9fX0=" \
