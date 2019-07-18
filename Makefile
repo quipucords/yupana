@@ -20,11 +20,14 @@ EMAIL_SERVICE_PASSWORD=$EMAIL_SERVICE_PASSWORD
 PGSQL_VERSION=9.6
 MINIMUM_REPLICAS=1
 MAXIMUM_REPLICAS=3
+PROD_MAXIMUM_REPLICAS=1
 TARGET_CPU_UTILIZATION=75
 HOSTS_PER_REQ=250
 MAX_THREADS=10
+PROD_MAX_THREADS=2
 BUILD_VERSION=0.0.0
 PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=False
+DEV_POSTGRES_SQL_SERVICE_HOST='yupana-pgsql.yupana.svc'
 
 OS := $(shell uname)
 ifeq ($(OS),Darwin)
@@ -69,6 +72,7 @@ help:
 	@echo "oc-new-app               create new app in openshift dedicated"
 	@echo "oc-dev-refresh           apply template changes to locally deployed app"
 	@echo "oc-refresh               apply template changes to openshift dedicated"
+	@echo "oc-refresh-prod          apply template changes to openshift dedicated in production"
 	@echo ""
 	@echo "--- Commands to upload data to Insights ---"
 	@echo "sample-data                                 ready sample data for upload to Insights"
@@ -171,6 +175,7 @@ oc-new-app:
 		--param MAX_THREADS=${MAX_THREADS} \
 		--param BUILD_VERSION=${DEPLOY_BUILD_VERSION} \
 		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
+		--param POSTGRES_SQL_SERVICE_HOST=${POSTGRES_SQL_SERVICE_HOST} \
 
 oc-refresh:
 	oc process -f ${OPENSHIFT_TEMPLATE_PATH} \
@@ -188,6 +193,30 @@ oc-refresh:
 		--param MAX_THREADS=${MAX_THREADS} \
 		--param BUILD_VERSION=${DEPLOY_BUILD_VERSION} \
 		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
+		--param POSTGRES_SQL_SERVICE_HOST=${POSTGRES_SQL_SERVICE_HOST} \
+		| oc apply -f -
+	oc start-build yupana
+
+oc-refresh-prod:
+	oc process -f ${OPENSHIFT_TEMPLATE_PATH} \
+		--param NAMESPACE=${OPENSHIFT_PROJECT} \
+		--param SOURCE_REPOSITORY_URL=${CODE_REPO} \
+		--param SOURCE_REPOSITORY_REF=${REPO_BRANCH} \
+		--param KAFKA_HOST=${KAFKA_HOST} \
+		--param KAFKA_PORT=${KAFKA_PORT} \
+		--param KAFKA_NAMESPACE=${KAFKA_NAMESPACE} \
+		--param INSIGHTS_HOST_INVENTORY_URL=${INSIGHTS_HOST_INVENTORY_URL} \
+		--param MINIMUM_REPLICAS=${MINIMUM_REPLICAS} \
+		--param MAXIMUM_REPLICAS=${PROD_MAXIMUM_REPLICAS} \
+		--param TARGET_CPU_UTILIZATION=${TARGET_CPU_UTILIZATION} \
+		--param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
+		--param MAX_THREADS=${PROD_MAX_THREADS} \
+		--param BUILD_VERSION=${DEPLOY_BUILD_VERSION} \
+		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
+		--param POSTGRES_SQL_SERVICE_HOST=${POSTGRES_SQL_SERVICE_HOST} \
+		--param DATABASE_ADMIN_PASSWORD=${DATABASE_ADMIN_PASSWORD} \
+        --param DATABASE_PASSWORD=${DATABASE_PASSWORD} \
+        --param DATABASE_USER=${DATABASE_USER} \
 		| oc apply -f -
 	oc start-build yupana
 
@@ -203,6 +232,7 @@ oc-dev-new-app:
 		--param MAX_THREADS=${MAX_THREADS} \
 		--param BUILD_VERSION=${BUILD_VERSION} \
 		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
+		--param POSTGRES_SQL_SERVICE_HOST=${DEV_POSTGRES_SQL_SERVICE_HOST} \
 
 oc-dev-refresh:
 	oc process -f ${OPENSHIFT_TEMPLATE_PATH} \
@@ -216,6 +246,7 @@ oc-dev-refresh:
 		--param MAX_THREADS=${MAX_THREADS} \
 		--param BUILD_VERSION=${BUILD_VERSION} \
 		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
+		--param POSTGRES_SQL_SERVICE_HOST=${DEV_POSTGRES_SQL_SERVICE_HOST} \
 		| oc apply -f -
 	oc start-build yupana -n yupana
 
