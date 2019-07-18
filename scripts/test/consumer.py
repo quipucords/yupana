@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-"""Kafka host inventory consume."""
+"""Kafka host inventory consumer."""
 
 import asyncio
 import json
@@ -25,14 +25,20 @@ import threading
 from aiokafka import AIOKafkaConsumer
 from kafka.errors import ConnectionError as KafkaConnectionError
 
+print('#' * 65)
+print('Starting up test kakfa consumer')
+print('#' * 65)
+
 EVENT_LOOP = asyncio.get_event_loop()
+
+# Topic to listen to
 HOST_INVENTORY_INGESTION_KAFKA_TOPIC = os.getenv(
     'HOST_INVENTORY_INGESTION_KAFKA_TOPIC', 'platform.inventory.host-ingress')
 
-# Insights Kafka messaging address
+# Insights Kafka messaging host
 HOST_INVENTORY_INGESTION_KAFKA_HOST = os.getenv('HOST_INVENTORY_INGESTION_KAFKA_HOST', 'localhost')
 
-# Insights Kafka messaging address
+# Insights Kafka messaging port
 HOST_INVENTORY_INGESTION_KAFKA_PORT = os.getenv('HOST_INVENTORY_INGESTION_KAFKA_PORT', '29092')
 
 # Insights Kafka server address
@@ -42,7 +48,7 @@ print(HOST_INVENTORY_INGESTION_KAFKA_ADDRESS)
 
 async def listen_for_messages(consumer):  # pragma: no cover
     """
-    Listen for messages on the qpc topic.
+    Listen for messages on the host inventory topic.
 
     Once a message from one of these topics arrives, we add
     them to the MSG_PENDING_QUEUE.

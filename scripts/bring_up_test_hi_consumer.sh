@@ -1,7 +1,7 @@
 #!/bin/bash
 set - x
 
-cd test_host_consumer
+cd test
 
 . .env
 pipenv run python consumer.py
