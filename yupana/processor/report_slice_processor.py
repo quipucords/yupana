@@ -147,34 +147,13 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         try:
             if self.candidate_hosts:
                 candidates = self.generate_upload_candidates()
-                retry_time_candidates, retry_commit_candidates = \
-                    await self._upload_to_host_inventory_via_kafka(candidates)
-                if not retry_time_candidates and not retry_commit_candidates:
-                    LOG.info(format_message(self.prefix, 'All hosts were successfully uploaded.',
-                                            account_number=self.account_number,
-                                            report_platform_id=self.report_platform_id))
-                    self.next_state = ReportSlice.HOSTS_UPLOADED
-                    options = {'candidate_hosts': [], 'ready_to_archive': True}
-                    self.update_object_state(options=options)
-                else:
-                    candidates = []
-                    # if both retry_commit_candidates and retry_time_candidates are returned
-                    # (ie. we got both 400 & 500 status codes were returned), we give the
-                    # retry_time precedence because we want to retry those with the hope that
-                    # they will succeed and leave behind the retry_commit hosts
-                    if retry_commit_candidates:
-                        candidates += retry_commit_candidates
-                        retry_type = ReportSlice.GIT_COMMIT
-                    if retry_time_candidates:
-                        candidates += retry_time_candidates
-                        retry_type = ReportSlice.TIME
-                    LOG.info(format_message(self.prefix, 'Hosts were not successfully uploaded',
-                                            account_number=self.account_number,
-                                            report_platform_id=self.report_platform_id))
-                    self.determine_retry(ReportSlice.FAILED_HOSTS_UPLOAD,
-                                         ReportSlice.VALIDATED,
-                                         candidate_hosts=candidates,
-                                         retry_type=retry_type)
+                await self._upload_to_host_inventory_via_kafka(candidates)
+                LOG.info(format_message(self.prefix, 'All hosts were successfully uploaded.',
+                                        account_number=self.account_number,
+                                        report_platform_id=self.report_platform_id))
+                self.next_state = ReportSlice.HOSTS_UPLOADED
+                options = {'candidate_hosts': [], 'ready_to_archive': True}
+                self.update_object_state(options=options)
             else:
                 # need to not upload, but archive bc no hosts were valid
                 LOG.info(format_message(self.prefix, 'There are no valid hosts to upload',
@@ -189,7 +168,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                                      account_number=self.account_number,
                                      report_platform_id=self.report_platform_id))
             self.determine_retry(ReportSlice.FAILED_HOSTS_UPLOAD, ReportSlice.VALIDATED,
-                                 retry_type=ReportSlice.GIT_COMMIT)
+                                 retry_type=ReportSlice.TIME)
 
     @staticmethod
     def generate_bulk_upload_list(hosts):  # pylint:disable=too-many-locals
@@ -286,13 +265,15 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                         account_number=self.account_number,
                         report_platform_id=self.report_platform_id))
         except Exception as err:  # pylint: disable=broad-except
-            LOG.error('The following exception occurred: %s', err)
             await producer.stop()
+            raise KafkaMsgHandlerError(
+                format_message(
+                    self.prefix,
+                    'The following exception occurred: %s' % err,
+                    account_number=self.account_number,
+                    report_platform_id=self.report_platform_id))
         finally:
             await producer.stop()
-        retry_time_candidates = []
-        retry_commit_candidates = []
-        return retry_time_candidates, retry_commit_candidates
 
 
 def asyncio_report_processor_thread(loop):  # pragma: no cover

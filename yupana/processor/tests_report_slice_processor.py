@@ -23,8 +23,10 @@ from datetime import datetime
 from unittest.mock import patch
 
 import pytz
+from aiokafka import AIOKafkaProducer
 from asynctest import CoroutineMock
 from django.test import TestCase
+from kafka.errors import ConnectionError as KafkaConnectionError
 from processor import (abstract_processor,
                        report_consumer as msg_handler,
                        report_slice_processor,
@@ -273,7 +275,7 @@ class ReportSliceProcessorTests(TestCase):
         self.processor.report_or_slice = self.report_slice
         self.processor.candidate_hosts = hosts
         self.processor._upload_to_host_inventory_via_kafka = CoroutineMock(
-            return_value=([], []))
+            return_value=[])
         await self.processor.transition_to_hosts_uploaded()
         self.assertEqual(json.loads(self.report_slice.candidate_hosts), [])
         self.assertEqual(self.report_slice.state, ReportSlice.HOSTS_UPLOADED)
@@ -308,7 +310,7 @@ class ReportSliceProcessorTests(TestCase):
         self.processor.report_or_slice = self.report_slice
         self.processor.candidate_hosts = hosts
         self.processor._upload_to_host_inventory_via_kafka = CoroutineMock(
-            return_value=([], []))
+            return_value=[])
         await self.processor.transition_to_hosts_uploaded()
         self.assertEqual(json.loads(self.report_slice.candidate_hosts), [])
         self.assertEqual(self.report_slice.state, ReportSlice.HOSTS_UPLOADED)
@@ -319,42 +321,6 @@ class ReportSliceProcessorTests(TestCase):
         event_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(event_loop)
         coro = asyncio.coroutine(self.async_test_transition_to_hosts_uploaded)
-        event_loop.run_until_complete(coro())
-        event_loop.close()
-
-    async def async_test_transition_to_hosts_uploaded_unsuccessful(self):
-        """Test the transition to hosts being uploaded."""
-        hosts = [{str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
-                  'cause': report_slice_processor.FAILED_UPLOAD,
-                  'status_code': '500'},
-                 {str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'}},
-                 {str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'}},
-                 {str(self.uuid4): {'mac_addresses': 'value', 'name': 'foo'}},
-                 {str(self.uuid5): {'vm_uuid': 'value', 'name': 'foo'}},
-                 {str(self.uuid6): {'etc_machine_id': 'value'}}]
-        retry_commit_hosts = [{str(self.uuid7): {'subscription_manager_id': 'value'},
-                               'cause': report_slice_processor.FAILED_UPLOAD,
-                               'status_code': '400'}]
-        self.report_slice.failed_hosts = []
-        self.report_slice.candidate_hosts = json.dumps(hosts)
-        self.report_slice.save()
-        self.processor.report_or_slice = self.report_slice
-        self.processor.candidate_hosts = hosts
-        self.processor._upload_to_host_inventory_via_kafka = CoroutineMock(
-            return_value=(hosts, retry_commit_hosts))
-        await self.processor.transition_to_hosts_uploaded()
-        total_hosts = hosts + retry_commit_hosts
-        for host in total_hosts:
-            self.assertIn(host,
-                          json.loads(self.report_slice.candidate_hosts))
-        self.assertEqual(self.report_slice.state, ReportSlice.VALIDATED)
-        self.assertEqual(self.report_slice.retry_count, 1)
-
-    def test_transition_to_hosts_uploaded_unsuccessful(self):
-        """Test the async hosts uploaded unsuccessful."""
-        event_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(event_loop)
-        coro = asyncio.coroutine(self.async_test_transition_to_hosts_uploaded_unsuccessful)
         event_loop.run_until_complete(coro())
         event_loop.close()
 
@@ -421,6 +387,108 @@ class ReportSliceProcessorTests(TestCase):
         event_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(event_loop)
         coro = asyncio.coroutine(self.async_test_transition_to_hosts_uploaded_exception)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
+
+    async def async_test_upload_to_host_inventory_via_kafka(self):
+        """Test uploading to inventory via kafka."""
+        hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
+                 str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'},
+                 str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'},
+                 str(self.uuid4): {'mac_addresses': 'value', 'name': 'foo'},
+                 str(self.uuid5): {'vm_uuid': 'value', 'name': 'foo'},
+                 str(self.uuid6): {'etc_machine_id': 'value'},
+                 str(self.uuid7): {'subscription_manager_id': 'value'}}
+        test_producer = AIOKafkaProducer(
+            loop=report_slice_processor.SLICE_PROCESSING_LOOP,
+            bootstrap_servers=report_slice_processor.INSIGHTS_KAFKA_ADDRESS
+        )
+        test_producer.start = CoroutineMock()
+        test_producer.send_and_wait = CoroutineMock()
+        test_producer.stop = CoroutineMock()
+        with patch('processor.report_slice_processor.AIOKafkaProducer',
+                   return_value=test_producer):
+            # all though we are not asserting any results, the test here is
+            # that no error was raised
+            await self.processor._upload_to_host_inventory_via_kafka(hosts)
+
+    def test_upload_to_host_inventory_via_kafka(self):
+        """Test the async hosts uploaded exception."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(self.async_test_upload_to_host_inventory_via_kafka)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
+
+    async def async_test_upload_to_host_inventory_via_kafka_exception(self):
+        """Test uploading to inventory via kafka."""
+        hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
+                 str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'},
+                 str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'},
+                 str(self.uuid4): {'mac_addresses': 'value', 'name': 'foo'},
+                 str(self.uuid5): {'vm_uuid': 'value', 'name': 'foo'},
+                 str(self.uuid6): {'etc_machine_id': 'value'},
+                 str(self.uuid7): {'subscription_manager_id': 'value'}}
+        test_producer = AIOKafkaProducer(
+            loop=report_slice_processor.SLICE_PROCESSING_LOOP,
+            bootstrap_servers=report_slice_processor.INSIGHTS_KAFKA_ADDRESS
+        )
+
+        # test KafkaConnectionException
+        def raise_kafka_error():
+            """Raise a kafka error."""
+            raise KafkaConnectionError('Test')
+
+        test_producer.start = CoroutineMock(side_effect=raise_kafka_error)
+        test_producer.send_and_wait = CoroutineMock()
+        test_producer.stop = CoroutineMock()
+        with self.assertRaises(msg_handler.KafkaMsgHandlerError):
+            with patch('processor.report_slice_processor.AIOKafkaProducer',
+                       return_value=test_producer):
+                await self.processor._upload_to_host_inventory_via_kafka(hosts)
+
+    def test_upload_to_host_inventory_via_kafka_exception(self):
+        """Test the async hosts uploaded exception."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(
+            self.async_test_upload_to_host_inventory_via_kafka_exception)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
+
+    async def async_test_upload_to_host_inventory_via_kafka_send_exception(self):
+        """Test uploading to inventory via kafka."""
+        hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
+                 str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'},
+                 str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'},
+                 str(self.uuid4): {'mac_addresses': 'value', 'name': 'foo'},
+                 str(self.uuid5): {'vm_uuid': 'value', 'name': 'foo'},
+                 str(self.uuid6): {'etc_machine_id': 'value'},
+                 str(self.uuid7): {'subscription_manager_id': 'value'}}
+        test_producer = AIOKafkaProducer(
+            loop=report_slice_processor.SLICE_PROCESSING_LOOP,
+            bootstrap_servers=report_slice_processor.INSIGHTS_KAFKA_ADDRESS
+        )
+
+        # test KafkaConnectionException
+        def raise_error():
+            """Raise a general error."""
+            raise Exception('Test')
+
+        test_producer.start = CoroutineMock()
+        test_producer.send_and_wait = CoroutineMock(side_effect=raise_error)
+        test_producer.stop = CoroutineMock()
+        with self.assertRaises(msg_handler.KafkaMsgHandlerError):
+            with patch('processor.report_slice_processor.AIOKafkaProducer',
+                       return_value=test_producer):
+                await self.processor._upload_to_host_inventory_via_kafka(hosts)
+
+    def test_upload_to_host_inventory_via_kafka_send_exception(self):
+        """Test the async hosts uploaded exception."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(
+            self.async_test_upload_to_host_inventory_via_kafka_send_exception)
         event_loop.run_until_complete(coro())
         event_loop.close()
 
