@@ -226,6 +226,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     report_platform_id=self.report_platform_id))
         return True
 
+    # pylint:disable=too-many-locals
     async def _upload_to_host_inventory_via_kafka(self, hosts):   # noqa: C901 (too-complex)
         """
         Upload to the host inventory via kafka.
@@ -250,6 +251,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         total_hosts = len(list_of_all_hosts)
         count = 0
         send_futures = []
+        associated_msg = []
         try:  # pylint: disable=too-many-nested-blocks
             for host in list_of_all_hosts:
                 count += 1
@@ -260,6 +262,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 msg = bytes(json.dumps(upload_msg), 'utf-8')
                 future = await producer.send(UPLOAD_TOPIC, msg)
                 send_futures.append(future)
+                associated_msg.append(upload_msg)
                 LOG.info(
                     format_message(
                         self.prefix,
@@ -269,9 +272,15 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 if count % 100 == 0 or count == total_hosts:
                     try:
                         await asyncio.wait(send_futures, timeout=5)
+                        future_index = 0
                         for future_res in send_futures:
                             if future_res.exception():
-                                LOG.error('An exception occurred %s', future_res.exception())
+                                LOG.error(
+                                    'An exception occurred %s when trying to upload '
+                                    'the following message: %s',
+                                    future_res.exception(),
+                                    associated_msg[future_index])
+                            future_index += 1
                     except Exception as error:  # pylint: disable=broad-except
                         LOG.error('An exception occurred: %s', error)
                     send_futures = []
