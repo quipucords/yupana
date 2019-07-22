@@ -6,7 +6,7 @@ chardet==3.0.4
 django-environ==0.4.5
 django-prometheus==1.0.15
 django==2.2.3
-djangorestframework==3.9.4
+djangorestframework==3.10.1
 gunicorn==19.9.0
 idna==2.8; python_version != '3.3.*'
 kafka-python==1.4.6
