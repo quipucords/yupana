@@ -8,7 +8,7 @@ name = "pypi"
 [packages]
 
 aiokafka = "==0.5.2"
-djangorestframework = "==3.9.4"
+djangorestframework = "==3.10.1"
 Django = "==2.2.3"
 django-environ = "==0.4.5"
 gunicorn = "==19.9.0"
