@@ -30,24 +30,22 @@ from processor.report_consumer import (KafkaMsgHandlerError,
                                        format_message)
 
 from api.models import ReportSlice
-from api.serializers import InventoryUploadErrorSerializer, ReportSliceSerializer
-from config.settings.base import (HOSTS_PER_REQ,
+from api.serializers import ReportSliceSerializer
+from config.settings.base import (HOSTS_UPLOAD_FUTURES_COUNT,
+                                  HOSTS_UPLOAD_TIMEOUT,
                                   HOST_INVENTORY_UPLOAD_MODE,
                                   INSIGHTS_KAFKA_ADDRESS,
-                                  MAX_THREADS,
                                   RETRIES_ALLOWED,
                                   RETRY_TIME)
 
 LOG = logging.getLogger(__name__)
 SLICE_PROCESSING_LOOP = asyncio.new_event_loop()
 
+HOSTS_UPLOAD_FUTURES_COUNT = int(HOSTS_UPLOAD_FUTURES_COUNT)
+HOSTS_UPLOAD_TIMEOUT = int(HOSTS_UPLOAD_TIMEOUT)
 FAILED_UPLOAD = 'UPLOAD'
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
-HOSTS_PER_REQ = int(HOSTS_PER_REQ)
-MAX_THREADS = int(MAX_THREADS)
-INVENTORY_FAILURE = 'INVENTORY FAILURE'
-UPLOAD_DATA_FAILURE = 'UPLOAD DATA FAILURE'
 UPLOAD_TOPIC = 'platform.inventory.host-ingress'  # placeholder topic
 
 
@@ -197,35 +195,6 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                       for key in host.keys() if key not in ['cause', 'status_code']}
         return candidates
 
-    def record_inventory_upload_errors(self, options):
-        """Record request and response body of requests that failed to upload.
-
-        :param options: <dict> containing the source and details of the failure.
-        """
-        details = options.get('details')
-        source = options.get('source')
-        upload_type = options.get('upload_type')
-
-        inventory_upload_error = {
-            'report_platform_id': self.report_platform_id,
-            'report_slice_id': self.report_slice_id,
-            'account': self.account_number,
-            'details': json.dumps(details),
-            'source': source,
-            'upload_type': upload_type
-        }
-        error_serializer = InventoryUploadErrorSerializer(data=inventory_upload_error)
-        if error_serializer.is_valid(raise_exception=True):
-            error_serializer.save()
-            LOG.info(
-                format_message(
-                    self.prefix,
-                    'Saved request & response body for hosts that failed '
-                    'to upload from report slice %s' % self.report_slice_id,
-                    account_number=self.account_number,
-                    report_platform_id=self.report_platform_id))
-        return True
-
     # pylint:disable=too-many-locals
     async def _upload_to_host_inventory_via_kafka(self, hosts):   # noqa: C901 (too-complex)
         """
@@ -263,15 +232,15 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 future = await producer.send(UPLOAD_TOPIC, msg)
                 send_futures.append(future)
                 associated_msg.append(upload_msg)
-                LOG.info(
-                    format_message(
-                        self.prefix,
-                        'Sending %s/%s hosts to the inventory service.' % (count, total_hosts),
-                        account_number=self.account_number,
-                        report_platform_id=self.report_platform_id))
-                if count % 100 == 0 or count == total_hosts:
+                if count % HOSTS_UPLOAD_FUTURES_COUNT == 0 or count == total_hosts:
+                    LOG.info(
+                        format_message(
+                            self.prefix,
+                            'Sending %s/%s hosts to the inventory service.' % (count, total_hosts),
+                            account_number=self.account_number,
+                            report_platform_id=self.report_platform_id))
                     try:
-                        await asyncio.wait(send_futures, timeout=5)
+                        await asyncio.wait(send_futures, timeout=HOSTS_UPLOAD_TIMEOUT)
                         future_index = 0
                         for future_res in send_futures:
                             if future_res.exception():

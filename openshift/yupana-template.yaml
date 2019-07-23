@@ -96,6 +96,8 @@ objects:
     insights-host-inventory-url: ${INSIGHTS_HOST_INVENTORY_URL}
     retries-allowed: ${RETRIES_ALLOWED}
     retry-time: ${RETRY_TIME}
+    hosts-upload-timeout: ${HOSTS_UPLOAD_TIMEOUT}
+    hosts-upload-futures-count: ${HOSTS_UPLOAD_FUTURES_COUNT}
     hosts-per-req: ${HOSTS_PER_REQ}
     max-hosts-per-rep: ${MAX_HOSTS_PER_REP}
     max-threads: ${MAX_THREADS}
@@ -340,6 +342,16 @@ objects:
                 configMapKeyRef:
                   name: yupana-env
                   key: retry-time
+                  optional: true
+            - name: HOSTS_UPLOAD_TIMEOUT
+              valueFrom:
+                configMapKeyRef:
+                  name: yupana-env
+                  optional: true
+            - name: HOSTS_UPLOAD_FUTURES_COUNT
+              valueFrom:
+                configMapKeyRef:
+                  name: yupana-env
                   optional: true
             - name: HOSTS_PER_REQ
               valueFrom:
@@ -722,6 +734,16 @@ parameters:
   name: RETRY_TIME
   required: false
   value: "480"
+- description: Timeout for each host upload
+  displayName: Hosts Upload Timeout
+  name: HOSTS_UPLOAD_TIMEOUT
+  required: false
+  value: "120"
+- description: The hosts upload future count to wait for at one time
+  displayName: Hosts Upload Futures Count
+  name: HOSTS_UPLOAD_FUTURES_COUNT
+  required: false
+  value: "100"
 - description: Number of retries allowed
   displayName: Retries allowed
   name: RETRIES_ALLOWED

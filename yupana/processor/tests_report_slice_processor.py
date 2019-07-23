@@ -32,8 +32,7 @@ from processor import (abstract_processor,
                        report_slice_processor,
                        tests_report_consumer as test_handler)
 
-from api.models import (InventoryUploadError,
-                        Report,
+from api.models import (Report,
                         ReportArchive,
                         ReportSlice,
                         ReportSliceArchive)
@@ -608,37 +607,3 @@ class ReportSliceProcessorTests(TestCase):
         self.assertEqual(str(existing.report_platform_id), str(self.uuid))
         # assert the processor was reset
         self.check_variables_are_reset()
-
-    def test_record_inventory_error(self):
-        """Test recording the inventory errors method."""
-        request_body = {
-            'host_id': 'foo',
-            'ip_addresses': 'bar'
-        }
-        response_body = {
-            'foo': 'bar'
-        }
-        identity_header = {
-            'account': '123456'
-        }
-        details = {
-            'request_body': request_body,
-            'response_body': response_body,
-            'response_code': 200,
-            'identity_header': identity_header,
-            'failure_category': 'INVENTORY FAILURE'
-        }
-        details['date'] = str(datetime.now())
-        self.processor.report_platform_id = str(self.uuid)
-        self.processor.report_slice_id = str(self.uuid2)
-        self.processor.account_number = '123456'
-        options = {
-            'upload_type': InventoryUploadError.HTTP,
-            'source': 'qpc',
-            'details': details
-        }
-        self.processor.record_inventory_upload_errors(options)
-        inventory_error = InventoryUploadError.objects.get(
-            account=self.processor.account_number)
-        self.assertEqual(inventory_error.upload_type, InventoryUploadError.HTTP)
-        self.assertEqual(inventory_error.source, 'qpc')
