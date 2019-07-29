@@ -347,11 +347,13 @@ objects:
               valueFrom:
                 configMapKeyRef:
                   name: yupana-env
+                  key: hosts-upload-timeout
                   optional: true
             - name: HOSTS_UPLOAD_FUTURES_COUNT
               valueFrom:
                 configMapKeyRef:
                   name: yupana-env
+                  key: hosts-upload-futures-count
                   optional: true
             - name: HOSTS_PER_REQ
               valueFrom:
