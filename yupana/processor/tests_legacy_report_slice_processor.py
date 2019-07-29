@@ -42,7 +42,7 @@ from api.models import (InventoryUploadError,
 
 # pylint: disable=too-many-public-methods
 # pylint: disable=protected-access,too-many-lines,too-many-instance-attributes
-class LegacyReportProcessorTests(TestCase):
+class LegacyReportSliceProcessorTests(TestCase):
     """Test Cases for the Message processor."""
 
     def setUp(self):
@@ -55,7 +55,7 @@ class LegacyReportProcessorTests(TestCase):
         self.uuid5 = uuid.uuid4()
         self.uuid6 = uuid.uuid4()
         self.uuid7 = uuid.uuid4()
-        self.fake_record = test_handler.KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
+        self.fake_record = test_handler.LegacyKafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
         self.msg = msg_handler.unpack_consumer_record(self.fake_record)
         self.report_json = {
             'report_id': 1,
@@ -533,10 +533,10 @@ class LegacyReportProcessorTests(TestCase):
                 await self.processor._upload_to_host_inventory(hosts)
             self.assertEqual(retry_time_hosts, [])
             self.assertEqual(retry_commit_hosts, [])
-            total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
-            uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
-            failed_hosts = REGISTRY.get_sample_value('hosts_failed')
-            upload_group_size = REGISTRY.get_sample_value('upload_group_size')
+            total_hosts = REGISTRY.get_sample_value('legacy_valid_hosts_per_report')
+            uploaded_hosts = REGISTRY.get_sample_value('legacy_hosts_uploaded')
+            failed_hosts = REGISTRY.get_sample_value('legacy_hosts_failed')
+            upload_group_size = REGISTRY.get_sample_value('legacy_upload_group_size')
             self.assertEqual(total_hosts, 7)
             self.assertEqual(uploaded_hosts, 7)
             self.assertEqual(failed_hosts, 0)
@@ -580,10 +580,10 @@ class LegacyReportProcessorTests(TestCase):
             for host in expected_hosts:
                 self.assertIn(host, retry_time_hosts)
             self.assertEqual(retry_commit_hosts, [])
-            total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
-            uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
-            failed_hosts = REGISTRY.get_sample_value('hosts_failed')
-            upload_group_size = REGISTRY.get_sample_value('upload_group_size')
+            total_hosts = REGISTRY.get_sample_value('legacy_valid_hosts_per_report')
+            uploaded_hosts = REGISTRY.get_sample_value('legacy_hosts_uploaded')
+            failed_hosts = REGISTRY.get_sample_value('legacy_hosts_failed')
+            upload_group_size = REGISTRY.get_sample_value('legacy_upload_group_size')
             self.assertEqual(total_hosts, 2)
             self.assertEqual(uploaded_hosts, 0)
             self.assertEqual(failed_hosts, 2)
@@ -629,10 +629,10 @@ class LegacyReportProcessorTests(TestCase):
             for host in expected_hosts:
                 self.assertIn(host, retry_commit_hosts)
             self.assertEqual(retry_time_hosts, [])
-            total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
-            uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
-            failed_hosts = REGISTRY.get_sample_value('hosts_failed')
-            upload_group_size = REGISTRY.get_sample_value('upload_group_size')
+            total_hosts = REGISTRY.get_sample_value('legacy_valid_hosts_per_report')
+            uploaded_hosts = REGISTRY.get_sample_value('legacy_hosts_uploaded')
+            failed_hosts = REGISTRY.get_sample_value('legacy_hosts_failed')
+            upload_group_size = REGISTRY.get_sample_value('legacy_upload_group_size')
             self.assertEqual(total_hosts, 2)
             self.assertEqual(uploaded_hosts, 0)
             self.assertEqual(failed_hosts, 2)
@@ -679,10 +679,10 @@ class LegacyReportProcessorTests(TestCase):
             for host in expected_hosts:
                 self.assertIn(host, retry_time_hosts)
             self.assertEqual(retry_commit_hosts, [])
-            total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
-            uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
-            failed_hosts = REGISTRY.get_sample_value('hosts_failed')
-            upload_group_size = REGISTRY.get_sample_value('upload_group_size')
+            total_hosts = REGISTRY.get_sample_value('legacy_valid_hosts_per_report')
+            uploaded_hosts = REGISTRY.get_sample_value('legacy_hosts_uploaded')
+            failed_hosts = REGISTRY.get_sample_value('legacy_hosts_failed')
+            upload_group_size = REGISTRY.get_sample_value('legacy_upload_group_size')
             self.assertEqual(total_hosts, 2)
             self.assertEqual(uploaded_hosts, 0)
             self.assertEqual(failed_hosts, 2)
@@ -736,10 +736,10 @@ class LegacyReportProcessorTests(TestCase):
             self.assertEqual(retry_commit, [])
             for host in expected_hosts:
                 self.assertIn(host, retry_time)
-            total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
-            uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
-            failed_hosts = REGISTRY.get_sample_value('hosts_failed')
-            upload_group_size = REGISTRY.get_sample_value('upload_group_size')
+            total_hosts = REGISTRY.get_sample_value('legacy_valid_hosts_per_report')
+            uploaded_hosts = REGISTRY.get_sample_value('legacy_hosts_uploaded')
+            failed_hosts = REGISTRY.get_sample_value('legacy_hosts_failed')
+            upload_group_size = REGISTRY.get_sample_value('legacy_upload_group_size')
             self.assertEqual(total_hosts, 2)
             self.assertEqual(uploaded_hosts, 0)
             self.assertEqual(failed_hosts, 2)
@@ -808,10 +808,10 @@ class LegacyReportProcessorTests(TestCase):
             self.assertEqual(retry_time_hosts, [])
             for host in expected_hosts:
                 self.assertIn(host, retry_commit_hosts)
-            total_hosts = REGISTRY.get_sample_value('valid_hosts_per_report')
-            uploaded_hosts = REGISTRY.get_sample_value('hosts_uploaded')
-            failed_hosts = REGISTRY.get_sample_value('hosts_failed')
-            upload_group_size = REGISTRY.get_sample_value('upload_group_size')
+            total_hosts = REGISTRY.get_sample_value('legacy_valid_hosts_per_report')
+            uploaded_hosts = REGISTRY.get_sample_value('legacy_hosts_uploaded')
+            failed_hosts = REGISTRY.get_sample_value('legacy_hosts_failed')
+            upload_group_size = REGISTRY.get_sample_value('legacy_upload_group_size')
             self.assertEqual(total_hosts, 7)
             self.assertEqual(uploaded_hosts, 5)
             self.assertEqual(failed_hosts, 2)

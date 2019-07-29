@@ -24,3 +24,5 @@ from api.legacy_report.model import LegacyAbstractReport, LegacyReport, LegacyRe
 from api.legacy_report_slice.model import (LegacyAbstractReportSlice,
                                            LegacyReportSlice,
                                            LegacyReportSliceArchive)
+from api.report.model import AbstractReport, Report, ReportArchive
+from api.report_slice.model import AbstractReportSlice, ReportSlice, ReportSliceArchive

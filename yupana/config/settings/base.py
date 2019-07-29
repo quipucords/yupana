@@ -64,12 +64,17 @@ HOSTS_PER_REQ = ENVIRONMENT.get_value('HOSTS_PER_REQ', default=250)
 MAX_HOSTS_PER_REP = ENVIRONMENT.get_value('MAX_HOSTS_PER_REP', default=10000)
 
 # this is the max number of threads that we want to allow per pod
-# default is 25
 MAX_THREADS = ENVIRONMENT.get_value('MAX_THREADS', default=10)
 
 # this is how long we want to sleep in between looking for reports or slices
 # to be processed
 NEW_REPORT_QUERY_INTERVAL = ENVIRONMENT.get_value('NEW_REPORT_QUERY_INTERVAL', default=60)
+
+# this is the count of futures to wait on results for at one time
+HOSTS_UPLOAD_FUTURES_COUNT = ENVIRONMENT.get_value('HOSTS_UPLOAD_FUTURES_COUNT', default=100)
+
+# this is the timeout for each kafka producer send
+HOSTS_UPLOAD_TIMEOUT = ENVIRONMENT.get_value('HOSTS_UPLOAD_TIMEOUT', default=120)
 
 # Logging
 # https://docs.djangoproject.com/en/dev/topics/logging/

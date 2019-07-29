@@ -41,7 +41,7 @@ class ApiConfig(AppConfig):
         try:
             self.startup_status()
             self.check_and_create_service_admin()
-            self.start_kafka_consumer()
+            self.start_upload_report_consumer()
             self.start_report_processor()
             self.start_report_slice_processor()
         except (OperationalError, ProgrammingError) as op_error:
@@ -74,30 +74,51 @@ class ApiConfig(AppConfig):
         logger.info('Created Service Admin: %s.', service_email)
 
     @staticmethod
-    def start_kafka_consumer():
-        """Start the kafka consumer."""
-        from processor.legacy_report_consumer import initialize_kafka_handler
+    def start_upload_report_consumer():
+        """Start the kafka consumer for incoming reports."""
         pause_kafka_for_file_upload = ENVIRONMENT.get_value(
             'PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE', default=False)
+        host_inventory_upload_mode = ENVIRONMENT.get_value(
+            'HOST_INVENTORY_UPLOAD_MODE', default='http')
         if not pause_kafka_for_file_upload:
-            logger.info('Initializing the kafka messaging handler.')
-            initialize_kafka_handler()
+            if host_inventory_upload_mode == 'http':
+                from processor.legacy_report_consumer import initialize_kafka_handler
+                logger.info('Initializing the legacy kafka report consumer.')
+                initialize_kafka_handler()
+            else:
+                from processor.report_consumer import initialize_upload_report_consumer
+                logger.info('Initializing the kafka report consumer.')
+                initialize_upload_report_consumer()
         else:
-            logger.info('Kafka messaging handler paused for file upload service.')
+            logger.info('Kafka report consumer paused for file upload service.')
 
     @staticmethod
     def start_report_processor():
         """Start the report processor."""
-        from processor.legacy_report_processor import initialize_report_processor
-        logger.info('Initializing the report processor.')
-        initialize_report_processor()
+        host_inventory_upload_mode = ENVIRONMENT.get_value(
+            'HOST_INVENTORY_UPLOAD_MODE', default='http')
+        if host_inventory_upload_mode == 'http':
+            from processor.legacy_report_processor import initialize_report_processor
+            logger.info('Initializing the legacy report processor.')
+            initialize_report_processor()
+        else:
+            from processor.report_processor import initialize_report_processor
+            logger.info('Initializing the report processor.')
+            initialize_report_processor()
 
     @staticmethod
     def start_report_slice_processor():
         """Start the report slice processor."""
-        from processor.legacy_report_slice_processor import initialize_report_slice_processor
-        logger.info('Initializing the report slice processor.')
-        initialize_report_slice_processor()
+        host_inventory_upload_mode = ENVIRONMENT.get_value(
+            'HOST_INVENTORY_UPLOAD_MODE', default='http')
+        if host_inventory_upload_mode == 'http':
+            from processor.legacy_report_slice_processor import initialize_report_slice_processor
+            logger.info('Initializing the legacy report slice processor.')
+            initialize_report_slice_processor()
+        else:
+            from processor.report_slice_processor import initialize_report_slice_processor
+            logger.info('Initializing the report slice processor.')
+            initialize_report_slice_processor()
 
     def check_and_create_service_admin(self):  # pylint: disable=R0201
         """Check for the service admin and create it if necessary."""
