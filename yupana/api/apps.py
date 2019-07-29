@@ -83,14 +83,14 @@ class ApiConfig(AppConfig):
         if not pause_kafka_for_file_upload:
             if host_inventory_upload_mode == 'http':
                 from processor.legacy_report_consumer import initialize_kafka_handler
-                logger.info('Initializing the legacy kafka messaging handler.')
+                logger.info('Initializing the legacy kafka report consumer.')
                 initialize_kafka_handler()
             else:
                 from processor.report_consumer import initialize_upload_report_consumer
-                logger.info('Initializing the kafka messaging handler.')
+                logger.info('Initializing the kafka report consumer.')
                 initialize_upload_report_consumer()
         else:
-            logger.info('Kafka messaging handler paused for file upload service.')
+            logger.info('Kafka report consumer paused for file upload service.')
 
     @staticmethod
     def start_report_processor():
