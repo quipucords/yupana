@@ -448,7 +448,7 @@ objects:
             - secret:
                 name: ${NAME}-secret
                 items:
-                  - key: database-client-cert
+                  - key: db-client-cert
                     path: server.pem
     triggers:
     - type: ConfigChange
