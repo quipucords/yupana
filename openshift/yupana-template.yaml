@@ -446,7 +446,7 @@ objects:
           projected:
             sources:
             - secret:
-                name: ${NAME}-db
+                name: ${NAME}-secret
                 items:
                   - key: database-client-cert
                     path: server.pem

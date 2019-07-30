@@ -195,11 +195,11 @@ DATABASES = {
 # add ssl cert if specified
 DATABASE_CERT = ENVIRONMENT.get_value('DATABASE_SERVICE_CERT', default=None)
 if DATABASE_CERT:
-    cert_file = '/etc/ssl/certs/server.pem'
+    CERT_FILE = '/etc/ssl/certs/server.pem'
     DB_OPTIONS = {
         'OPTIONS': {
             'sslmode': 'verify-full',
-            'sslrootcert': cert_file
+            'sslrootcert': CERT_FILE
         }
     }
     DATABASES.update(DB_OPTIONS)
