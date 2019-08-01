@@ -33,6 +33,14 @@ DEPLOY_BUILD_VERSION=<DEPLOY_BUILD_VERSION>
 POSTGRES_SQL_SERVICE_HOST=<POSTGRES_SQL_SERVICE_HOST>
 ```
 
+To deploy to PROD you will have to export the following environment variables in addition to the above:
+```
+DATABASE_ADMIN_PASSWORD=<DATABASE_ADMIN_PASSWORD>
+DATABASE_PASSWORD=<DATABASE_PASSWORD>
+DATABASE_USER=<DATABASE_USER>
+DATABASE_SERVICE_CERT=<DATABASE_SERVICE_CERT>
+```
+
 To deploy a new app to the project, run:
 ```
 make oc-new-app

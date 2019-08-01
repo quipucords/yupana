@@ -194,15 +194,16 @@ DATABASES = {
 
 # add ssl cert if specified
 DATABASE_CERT = ENVIRONMENT.get_value('DATABASE_SERVICE_CERT', default=None)
-if DATABASE_CERT:
-    CERT_FILE = '/etc/ssl/certs/server.pem'
-    DB_OPTIONS = {
-        'OPTIONS': {
-            'sslmode': 'verify-full',
-            'sslrootcert': CERT_FILE
-        }
-    }
-    DATABASES.update(DB_OPTIONS)
+#TODO: uncomment this after test
+# if DATABASE_CERT:
+#     CERT_FILE = '/etc/ssl/certs/server.pem'
+#     DB_OPTIONS = {
+#         'OPTIONS': {
+#             'sslmode': 'verify-full',
+#             'sslrootcert': CERT_FILE
+#         }
+#     }
+#     DATABASES.update(DB_OPTIONS)
 
 DATABASES = {
     'default': DATABASES
