@@ -809,5 +809,5 @@ parameters:
   value: "60"
 - description: The database client certificate
   displayName: Database Client Certificate
-  name: ${DATABASE_SERVICE_CERT}
+  name: DATABASE_SERVICE_CERT
   required: false
