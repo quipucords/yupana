@@ -807,7 +807,3 @@ parameters:
   name: NEW_REPORT_QUERY_INTERVAL
   required: false
   value: "60"
-- description: The database client certificate
-  displayName: Database Client Certificate
-  name: DATABASE_SERVICE_CERT
-  required: false
