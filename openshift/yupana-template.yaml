@@ -61,7 +61,6 @@ objects:
     database-password: ${DATABASE_PASSWORD}
     database-user: ${DATABASE_USER}
     database-admin-password: ${DATABASE_ADMIN_PASSWORD}
-    db-client-cert: ${DATABASE_SERVICE_CERT}
 - apiVersion: v1
   kind: Secret
   metadata:
