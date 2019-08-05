@@ -54,12 +54,14 @@ objects:
       template.openshift.io/expose-database_name: "{.data['database-name']}"
       template.openshift.io/expose-password: "{.data['database-password']}"
       template.openshift.io/expose-username: "{.data['database-user']}"
+      template.openshift.io/expose-db_client_cert: "{.data['db-client-cert']}"
     name: ${DATABASE_SERVICE_NAME}
   stringData:
     database-name: ${DATABASE_NAME}
     database-password: ${DATABASE_PASSWORD}
     database-user: ${DATABASE_USER}
     database-admin-password: ${DATABASE_ADMIN_PASSWORD}
+    db-client-cert: ${DATABASE_SERVICE_CERT}
 - apiVersion: v1
   kind: Secret
   metadata:
@@ -68,11 +70,9 @@ objects:
       template: yupana-template
     annotations:
       template.openshift.io/expose-django_secret_key: "{.data['django-secret-key']}"
-      template.openshift.io/expose-db_client_cert: "{.data['db-client-cert']}"
     name: ${NAME}-secret
   stringData:
     django-secret-key: ${DJANGO_SECRET_KEY}
-    db-client-cert: ${DATABASE_SERVICE_CERT}
 - apiVersion: v1
   kind: ConfigMap
   metadata:
@@ -240,6 +240,10 @@ objects:
         containers:
         - name: ${NAME}
           image: ${NAME}
+          volumeMounts:
+          - name: ssl-cert
+            mountPath: /etc/ssl/certs
+            readOnly: true
           env:
             - name: DATABASE_USER
               valueFrom:
@@ -263,7 +267,7 @@ objects:
               valueFrom:
                 secretKeyRef:
                   key: db-client-cert
-                  name: ${NAME}-secret
+                  name: ${DATABASE_SERVICE_NAME}
                   optional: true
             - name: DATABASE_ENGINE
               valueFrom:
@@ -437,6 +441,15 @@ objects:
               memory: ${MEMORY_REQUEST}
             limits:
               memory: ${MEMORY_LIMIT}
+        volumes:
+        - name: ssl-cert
+          projected:
+            sources:
+            - secret:
+                name: ${DATABASE_SERVICE_NAME}
+                items:
+                  - key: db-client-cert
+                    path: server.pem
     triggers:
     - type: ConfigChange
     - imageChangeParams:
