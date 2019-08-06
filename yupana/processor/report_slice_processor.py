@@ -168,17 +168,6 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             self.determine_retry(ReportSlice.FAILED_HOSTS_UPLOAD, ReportSlice.VALIDATED,
                                  retry_type=ReportSlice.TIME)
 
-    @staticmethod
-    def generate_bulk_upload_list(hosts):  # pylint:disable=too-many-locals
-        """Generate a list of hosts to upload.
-
-        :param hosts: <dict> dictionary containing hosts to upload.
-        """
-        bulk_upload_list = []
-        for _, host in hosts.items():
-            bulk_upload_list.append(host)
-        return bulk_upload_list
-
     def generate_upload_candidates(self):
         """Generate dictionary of hosts that need to be uploaded to host inventory.
 
