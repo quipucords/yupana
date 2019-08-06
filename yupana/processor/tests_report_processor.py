@@ -682,7 +682,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {self.uuid: {'key': 'value'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_fails_no_canonical_facts(self):
         """Test to verify a QPC report with the correct structure passes validation."""
@@ -696,7 +696,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {self.uuid: {'name': 'value'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_invalid_report_type(self):
         """Test to verify a QPC report with an invalid report_type is failed."""
@@ -710,7 +710,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {self.uuid: {'key': 'value'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_missing_version(self):
         """Test to verify a QPC report missing report_version is failed."""
@@ -723,7 +723,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {self.uuid: {'key': 'value'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_missing_platform_id(self):
         """Test to verify a QPC report missing report_platform_id is failed."""
@@ -736,7 +736,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {self.uuid: {'key': 'value'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_missing_hosts(self):
         """Test to verify a QPC report with empty hosts is failed."""
@@ -750,7 +750,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {}}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_missing_slice_id(self):
         """Test to verify a QPC report with no report_slice_id is failed."""
@@ -763,7 +763,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {self.uuid: {'key': 'value'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_invalid_hosts(self):
         """Test to verify a QPC report with invalid hosts is failed."""
@@ -777,7 +777,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': ['foo']}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_invalid_hosts_key(self):
         """Test to verify a QPC report with invalid hosts key is failed."""
@@ -791,7 +791,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {1: {'foo': 'bar'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_invalid_hosts_val(self):
         """Test to verify a QPC report with invalid hosts value is failed."""
@@ -805,7 +805,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {self.uuid: ['foo']}}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_hosts(self):
         """Test host verification."""
