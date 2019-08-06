@@ -391,6 +391,7 @@ class ReportSliceProcessorTests(TestCase):
 
     async def async_test_upload_to_host_inventory_via_kafka(self):
         """Test uploading to inventory via kafka."""
+        self.processor.report_or_slice = self.report_slice
         hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
                  str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'},
                  str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'},
@@ -423,6 +424,7 @@ class ReportSliceProcessorTests(TestCase):
 
     async def async_test_upload_to_host_inventory_via_kafka_exception(self):
         """Test uploading to inventory via kafka."""
+        self.processor.report_or_slice = self.report_slice
         hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
                  str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'},
                  str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'},
@@ -459,6 +461,7 @@ class ReportSliceProcessorTests(TestCase):
 
     async def async_test_upload_to_host_inventory_via_kafka_send_exception(self):
         """Test uploading to inventory via kafka."""
+        self.processor.report_or_slice = self.report_slice
         hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
                  str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'},
                  str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'},
@@ -492,43 +495,6 @@ class ReportSliceProcessorTests(TestCase):
             self.async_test_upload_to_host_inventory_via_kafka_send_exception)
         event_loop.run_until_complete(coro())
         event_loop.close()
-
-    def test_generate_bulk_upload_list(self):
-        """Test generating a list of all hosts for upload."""
-        hosts = {self.uuid: {'account': self.uuid3, 'bios_uuid': 'value', 'display_name': 'value',
-                             'facts': [{'namespace': 'yupana', 'facts':
-                                        {'yupana_host_id': self.uuid,
-                                         'bios_uuid': 'value', 'name': 'value'},
-                                        'rh_product_certs': [],
-                                        'rh_products_installed': []}]},
-                 self.uuid2: {'account': self.uuid3,
-                              'insights_client_id': 'value', 'display_name': 'foo',
-                              'facts': [{'namespace': 'yupana',
-                                         'facts': {'yupana_host_id': self.uuid2,
-                                                   'insights_client_id': 'value',
-                                                   'name': 'foo'},
-                                         'rh_product_certs': [],
-                                         'rh_products_installed': []}]}}
-        expected = [{'account': self.uuid3,
-                     'bios_uuid': 'value',
-                     'display_name': 'value',
-                     'facts': [{'namespace': 'yupana',
-                                'facts': {'yupana_host_id': self.uuid,
-                                          'bios_uuid': 'value',
-                                          'name': 'value'},
-                                'rh_product_certs': [],
-                                'rh_products_installed': []}]},
-                    {'account': self.uuid3,
-                     'insights_client_id': 'value',
-                     'display_name': 'foo',
-                     'facts': [{'namespace': 'yupana',
-                                'facts': {'yupana_host_id': self.uuid2,
-                                          'insights_client_id': 'value',
-                                          'name': 'foo'},
-                                'rh_product_certs': [],
-                                'rh_products_installed': []}]}]
-        list_of_hosts = self.processor.generate_bulk_upload_list(hosts)
-        self.assertEqual(list_of_hosts, expected)
 
     def test_archive_report_and_slices_in_failed_state(self):
         """Test the archive method in a failed state."""

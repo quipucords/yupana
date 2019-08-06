@@ -662,13 +662,14 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                         account_number=self.account_number,
                         report_platform_id=self.report_platform_id))
         report_slice_id = self.report_json.get('report_slice_id')
-        candidate_hosts, failed_hosts = self._validate_report_hosts(report_slice_id)
-        number_valid = len(candidate_hosts)
-        total = number_valid + len(failed_hosts)
+        candidate_hosts, hosts_without_facts = \
+            self._validate_report_hosts(report_slice_id)
+        total_fingerprints = len(candidate_hosts)
+        total_valid = total_fingerprints - len(hosts_without_facts)
         LOG.info(format_message(
             self.prefix,
             '%s/%s hosts are valid.' % (
-                number_valid, total),
+                total_valid, total_fingerprints),
             account_number=self.account_number,
             report_platform_id=self.report_platform_id
         ))
@@ -679,7 +680,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     'report does not contain any valid hosts.',
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id))
-        return candidate_hosts, failed_hosts
+        return candidate_hosts
 
     def _validate_report_hosts(self, report_slice_id):
         """Verify that report hosts contain canonical facts.
@@ -690,7 +691,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
 
         prefix = 'VALIDATE HOSTS'
         candidate_hosts = []
-        failed_hosts = []
+        hosts_without_facts = []
         for host in hosts:
             host_uuid = str(uuid.uuid4())
             host['account'] = self.account_number
@@ -707,18 +708,17 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 if host.get(fact):
                     found_facts = True
                     break
-            if found_facts:
-                candidate_hosts.append({host_uuid: host})
-            else:
-                failed_hosts.append({host_uuid: host,
-                                     'cause': FAILED_VALIDATION})
-        if failed_hosts:
+            if not found_facts:
+                hosts_without_facts.append({host_uuid: host})
+            candidate_hosts.append({host_uuid: host})
+
+        if hosts_without_facts:
             LOG.warning(
                 format_message(
                     prefix,
-                    'Removed %d hosts with 0 canonical facts: %s' % (
-                        len(failed_hosts), failed_hosts),
+                    '%d host(s) found that contain(s) 0 canonical facts: %s' % (
+                        len(hosts_without_facts), hosts_without_facts),
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id))
 
-        return candidate_hosts, failed_hosts
+        return candidate_hosts, hosts_without_facts

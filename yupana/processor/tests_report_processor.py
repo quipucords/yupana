@@ -518,15 +518,6 @@ class ReportProcessorTests(TransactionTestCase):
             self.processor.transition_to_downloaded()
             self.assertEqual(self.report_record.state, Report.FAILED_DOWNLOAD)
 
-    def test_transition_to_validated(self):
-        """Test that the transition to validated is successful."""
-        self.processor.report_or_slice = self.report_record
-        self.report_slice.state_info = json.dumps([ReportSlice.PENDING])
-        self.processor.transition_to_validated()
-        invalid_hosts = REGISTRY.get_sample_value('invalid_hosts_per_report')
-        self.assertEqual(self.report_record.state, Report.VALIDATED)
-        self.assertEqual(invalid_hosts, 1)
-
     def test_transition_to_validated_report_exception(self):
         """Test that a report with no report_slice_id is still marked as validated."""
         self.report_record.state = Report.DOWNLOADED
@@ -672,15 +663,13 @@ class ReportProcessorTests(TransactionTestCase):
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'hosts': [{'bios_uuid': 'value', 'facts': []}]}
-        valid, invalid = self.processor._validate_report_details()
-        expect_invalid = []
+        valid = self.processor._validate_report_details()
         for _, value in valid[0].items():
             self.assertIn('bios_uuid', value)
             self.assertIn('account', value)
             self.assertIn('facts', value)
             self.assertEqual(value['bios_uuid'], 'value')
             self.assertEqual(value['account'], '123')
-        self.assertEqual(invalid, expect_invalid)
 
     def test_validate_report_missing_id(self):
         """Test that a QPC report with a missing id is fails validation."""
@@ -693,7 +682,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {self.uuid: {'key': 'value'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_fails_no_canonical_facts(self):
         """Test to verify a QPC report with the correct structure passes validation."""
@@ -707,7 +696,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {self.uuid: {'name': 'value'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_invalid_report_type(self):
         """Test to verify a QPC report with an invalid report_type is failed."""
@@ -721,7 +710,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {self.uuid: {'key': 'value'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_missing_version(self):
         """Test to verify a QPC report missing report_version is failed."""
@@ -734,7 +723,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {self.uuid: {'key': 'value'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_missing_platform_id(self):
         """Test to verify a QPC report missing report_platform_id is failed."""
@@ -747,7 +736,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {self.uuid: {'key': 'value'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_missing_hosts(self):
         """Test to verify a QPC report with empty hosts is failed."""
@@ -761,7 +750,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {}}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_missing_slice_id(self):
         """Test to verify a QPC report with no report_slice_id is failed."""
@@ -774,7 +763,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {self.uuid: {'key': 'value'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_invalid_hosts(self):
         """Test to verify a QPC report with invalid hosts is failed."""
@@ -788,7 +777,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': ['foo']}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_invalid_hosts_key(self):
         """Test to verify a QPC report with invalid hosts key is failed."""
@@ -802,7 +791,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {1: {'foo': 'bar'}}}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_invalid_hosts_val(self):
         """Test to verify a QPC report with invalid hosts value is failed."""
@@ -816,7 +805,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {self.uuid: ['foo']}}
 
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            self.processor._validate_report_details()
 
     def test_validate_report_hosts(self):
         """Test host verification."""
@@ -866,17 +855,16 @@ class ReportProcessorTests(TransactionTestCase):
                                                  'account': '12345',
                                                  'source': 'qpc'}}])
 
-        # test that invalid hosts are removed
+        # test that invalid hosts are not removed
         invalid_host = {'no': 'canonical facts', 'metadata': []}
         hosts.append(invalid_host)
         valid_hosts, _ = self.processor._validate_report_hosts(self.uuid)
+        kept_invalid = False
         for valid_host in valid_hosts:
             for host_id, host in valid_host.items():
-                self.assertNotIn('no', host)
-        # test that if there are no valid hosts we return []
-        self.processor.report_json['hosts'] = [invalid_host]
-        valid_hosts, _ = self.processor._validate_report_hosts(self.uuid)
-        self.assertEqual([], valid_hosts)
+                if 'no' in host:
+                    kept_invalid = True
+        self.assertEqual(kept_invalid, True)
 
     def test_update_slice_exception(self):
         """Test udpating the slice with invalid data."""
