@@ -23,8 +23,7 @@ import threading
 
 from aiokafka import AIOKafkaProducer
 from kafka.errors import ConnectionError as KafkaConnectionError
-from processor.abstract_processor import (AbstractProcessor, FAILED_TO_VALIDATE,
-                                          INVALID_HOSTS)
+from processor.abstract_processor import (AbstractProcessor, FAILED_TO_VALIDATE)
 from processor.report_consumer import (KafkaMsgHandlerError,
                                        QPCReportException,
                                        format_message)
@@ -113,12 +112,10 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             account_number=self.account_number, report_platform_id=self.report_platform_id))
         try:
             self.report_json = json.loads(self.report_or_slice.report_json)
-            self.candidate_hosts, self.failed_hosts = self._validate_report_details()
-            INVALID_HOSTS.set(len(self.failed_hosts))
+            self.candidate_hosts = self._validate_report_details()
             # Here we want to update the report state of the actual report slice & when finished
             self.next_state = ReportSlice.VALIDATED
-            options = {'candidate_hosts': self.candidate_hosts,
-                       'failed_hosts': self.failed_hosts}
+            options = {'candidate_hosts': self.candidate_hosts}
             self.update_object_state(options=options)
         except QPCReportException:
             # if any QPCReportExceptions occur, we know that the report is not valid but has been
@@ -168,17 +165,6 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             self.determine_retry(ReportSlice.FAILED_HOSTS_UPLOAD, ReportSlice.VALIDATED,
                                  retry_type=ReportSlice.TIME)
 
-    @staticmethod
-    def generate_bulk_upload_list(hosts):  # pylint:disable=too-many-locals
-        """Generate a list of hosts to upload.
-
-        :param hosts: <dict> dictionary containing hosts to upload.
-        """
-        bulk_upload_list = []
-        for _, host in hosts.items():
-            bulk_upload_list.append(host)
-        return bulk_upload_list
-
     def generate_upload_candidates(self):
         """Generate dictionary of hosts that need to be uploaded to host inventory.
 
@@ -203,7 +189,6 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         :param: hosts <list> the hosts to upload.
         """
         self.prefix = 'UPLOAD TO INVENTORY VIA KAFKA'
-        list_of_all_hosts = self.generate_bulk_upload_list(hosts)
         producer = AIOKafkaProducer(
             loop=SLICE_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
         )
@@ -217,16 +202,22 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     'Unable to connect to kafka server. Closing producer.',
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id))
-        total_hosts = len(list_of_all_hosts)
+        total_hosts = len(hosts)
         count = 0
         send_futures = []
         associated_msg = []
+        report = self.report_or_slice.report
+        unique_id_base = '{}:{}:{}:'.format(report.request_id,
+                                            report.report_platform_id,
+                                            self.report_or_slice.report_slice_id)
         try:  # pylint: disable=too-many-nested-blocks
-            for host in list_of_all_hosts:
+            for host_id, host in hosts.items():
+                system_unique_id = unique_id_base + host_id
                 count += 1
                 upload_msg = {
                     'operation': 'add_host',
-                    'data': host
+                    'data': host,
+                    'platform_metadata': {'request_id': system_unique_id}
                 }
                 msg = bytes(json.dumps(upload_msg), 'utf-8')
                 future = await producer.send(UPLOAD_TOPIC, msg)

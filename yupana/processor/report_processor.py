@@ -32,8 +32,7 @@ from django.db import transaction
 from kafka.errors import ConnectionError as KafkaConnectionError
 from processor.abstract_processor import (
     AbstractProcessor,
-    FAILED_TO_DOWNLOAD, FAILED_TO_VALIDATE,
-    INVALID_HOSTS, RETRY)
+    FAILED_TO_DOWNLOAD, FAILED_TO_VALIDATE, RETRY)
 from processor.report_consumer import (KafkaMsgHandlerError,
                                        QPCReportException,
                                        format_message)
@@ -168,13 +167,12 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         for report_slice in report_slices:
             try:
                 self.report_json = json.loads(report_slice.report_json)
-                candidate_hosts, failed_hosts = self._validate_report_details()
+                candidate_hosts = self._validate_report_details()
                 if candidate_hosts:
                     self.status = SUCCESS_CONFIRM_STATUS
-                INVALID_HOSTS.set(len(failed_hosts))
                 # Here we want to update the report state of the actual report slice
                 options = {'state': ReportSlice.NEW,
-                           'candidate_hosts': candidate_hosts, 'failed_hosts': failed_hosts}
+                           'candidate_hosts': candidate_hosts}
                 self.update_slice_state(options=options, report_slice=report_slice)
             except QPCReportException:
                 # if any QPCReportExceptions occur, we know that the report is not valid
