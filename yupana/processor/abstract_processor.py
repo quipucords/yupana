@@ -716,7 +716,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             LOG.warning(
                 format_message(
                     prefix,
-                    '%d hosts found that contain 0 canonical facts: %s' % (
+                    '%d host(s) found that contain(s) 0 canonical facts: %s' % (
                         len(hosts_without_facts), hosts_without_facts),
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id))
