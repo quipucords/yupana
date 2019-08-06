@@ -391,6 +391,7 @@ class ReportSliceProcessorTests(TestCase):
 
     async def async_test_upload_to_host_inventory_via_kafka(self):
         """Test uploading to inventory via kafka."""
+        self.processor.report_or_slice = self.report_slice
         hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
                  str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'},
                  str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'},
@@ -423,6 +424,7 @@ class ReportSliceProcessorTests(TestCase):
 
     async def async_test_upload_to_host_inventory_via_kafka_exception(self):
         """Test uploading to inventory via kafka."""
+        self.processor.report_or_slice = self.report_slice
         hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
                  str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'},
                  str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'},
@@ -459,6 +461,7 @@ class ReportSliceProcessorTests(TestCase):
 
     async def async_test_upload_to_host_inventory_via_kafka_send_exception(self):
         """Test uploading to inventory via kafka."""
+        self.processor.report_or_slice = self.report_slice
         hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
                  str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'},
                  str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'},
