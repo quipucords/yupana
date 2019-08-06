@@ -664,12 +664,12 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         report_slice_id = self.report_json.get('report_slice_id')
         candidate_hosts, hosts_without_facts = \
             self._validate_report_hosts(report_slice_id)
-        number_valid = len(candidate_hosts)
-        total = number_valid + len(hosts_without_facts)
+        total_fingerprints = len(candidate_hosts)
+        total_valid = total_fingerprints - len(hosts_without_facts)
         LOG.info(format_message(
             self.prefix,
             '%s/%s hosts are valid.' % (
-                number_valid, total),
+                total_valid, total_fingerprints),
             account_number=self.account_number,
             report_platform_id=self.report_platform_id
         ))
