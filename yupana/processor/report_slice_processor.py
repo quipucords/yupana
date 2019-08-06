@@ -23,8 +23,7 @@ import threading
 
 from aiokafka import AIOKafkaProducer
 from kafka.errors import ConnectionError as KafkaConnectionError
-from processor.abstract_processor import (AbstractProcessor, FAILED_TO_VALIDATE,
-                                          INVALID_HOSTS)
+from processor.abstract_processor import (AbstractProcessor, FAILED_TO_VALIDATE)
 from processor.report_consumer import (KafkaMsgHandlerError,
                                        QPCReportException,
                                        format_message)
@@ -113,12 +112,10 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             account_number=self.account_number, report_platform_id=self.report_platform_id))
         try:
             self.report_json = json.loads(self.report_or_slice.report_json)
-            self.candidate_hosts, self.failed_hosts = self._validate_report_details()
-            INVALID_HOSTS.set(len(self.failed_hosts))
+            self.candidate_hosts = self._validate_report_details()
             # Here we want to update the report state of the actual report slice & when finished
             self.next_state = ReportSlice.VALIDATED
-            options = {'candidate_hosts': self.candidate_hosts,
-                       'failed_hosts': self.failed_hosts}
+            options = {'candidate_hosts': self.candidate_hosts}
             self.update_object_state(options=options)
         except QPCReportException:
             # if any QPCReportExceptions occur, we know that the report is not valid but has been
