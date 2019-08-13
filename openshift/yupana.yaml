@@ -32,6 +32,7 @@ objects:
       targetPort: 8080
     selector:
       name: ${NAME}
+
 - apiVersion: v1
   kind: Route
   metadata:
@@ -41,12 +42,14 @@ objects:
     to:
       kind: Service
       name: ${NAME}
+
 - apiVersion: v1
   kind: ImageStream
   metadata:
     name: ${NAME}
     annotations:
       description: "Keeps track of changes in the application image"
+
 - apiVersion: v1
   kind: BuildConfig
   metadata:
@@ -82,33 +85,33 @@ objects:
           - name: APP_CONFIG
             valueFrom:
               configMapKeyRef:
-                name: yupana-env
+                name: yupana-app
                 key: app-config
                 optional: false
           - name: APP_HOME
             valueFrom:
               configMapKeyRef:
-                name: yupana-env
+                name: yupana-app
                 key: app-home
           - name: APP_MODULE
             valueFrom:
               configMapKeyRef:
-                name: yupana-env
+                name: yupana-app
                 key: app-module
           - name: APP_NAMESPACE
             valueFrom:
               configMapKeyRef:
-                name: yupana-env
+                name: yupana-app
                 key: app-namespace
           - name: APP_DOMAIN
             valueFrom:
               configMapKeyRef:
-                name: yupana-env
+                name: yupana-app
                 key: app-domain
           - name: BUILD_VERSION
             valueFrom:
               configMapKeyRef:
-                name: yupana-env
+                name: yupana-app
                 key: build-version
         from:
           kind: ImageStreamTag
@@ -119,6 +122,7 @@ objects:
     - type: ConfigChange
     - imageChange: {}
       type: ImageChange
+
 - apiVersion: v1
   kind: DeploymentConfig
   metadata:
@@ -178,67 +182,67 @@ objects:
             - name: DATABASE_ENGINE
               valueFrom:
                 configMapKeyRef:
-                  name: yupana-env
+                  name: yupana-db
                   key: database-engine
                   optional: false
             - name: DATABASE_NAME
               valueFrom:
                 configMapKeyRef:
-                  name: yupana-env
+                  name: yupana-db
                   key: database-name
                   optional: false
             - name: DATABASE_SERVICE_NAME
               valueFrom:
                 configMapKeyRef:
-                  name: yupana-env
+                  name: yupana-db
                   key: database-service-name
                   optional: false
             - name: POSTGRES_SQL_SERVICE_HOST
               valueFrom:
                 configMapKeyRef:
-                  name: yupana-env
+                  name: yupana-db
                   key: postgres-sql-service-host
                   optional: false
             - name: POSTGRES_SQL_SERVICE_PORT
               valueFrom:
                 configMapKeyRef:
-                  name: yupana-env
+                  name: yupana-db
                   key: postgres-sql-service-port
                   optional: false
             - name: APP_NAMESPACE
               valueFrom:
                 configMapKeyRef:
-                  name: yupana-env
+                  name: yupana-app
                   key: app-namespace
                   optional: true
             - name: APP_DOMAIN
               valueFrom:
                 configMapKeyRef:
-                  name: yupana-env
+                  name: yupana-app
                   key: app-domain
                   optional: true
             - name: BUILD_VERSION
               valueFrom:
                 configMapKeyRef:
-                  name: yupana-env
+                  name: yupana-app
                   key: build-version
                   optional: true
             - name: INSIGHTS_KAFKA_HOST
               valueFrom:
                 configMapKeyRef:
-                  name: yupana-env
+                  name: yupana-messaging
                   key: insights-kafka-server-host
                   optional: false
             - name: INSIGHTS_KAFKA_PORT
               valueFrom:
                 configMapKeyRef:
-                  name: yupana-env
+                  name: yupana-messaging
                   key: insights-kafka-server-port
                   optional: false
             - name: INSIGHTS_HOST_INVENTORY_URL
               valueFrom:
                 configMapKeyRef:
-                  name: yupana-env
+                  name: yupana-messaging
                   key: insights-host-inventory-url
                   optional: false
             - name: RETRIES_ALLOWED
@@ -366,102 +370,7 @@ objects:
           kind: ImageStreamTag
           name: ${NAME}:latest
       type: ImageChange
-- apiVersion: v1
-  kind: DeploymentConfig
-  metadata:
-    annotations:
-      description: Defines how to deploy the database
-      template.alpha.openshift.io/wait-for-ready: "true"
-    labels:
-      app: yupana
-      template: yupana-template
-    name: yupana-pgsql
-  spec:
-    replicas: 1
-    selector:
-      name: yupana-pgsql
-    resources:
-      limits:
-        memory: ${MEMORY_REQUEST}
-      limits:
-        memory: ${MEMORY_LIMIT}
-    strategy:
-      type: Recreate
-    template:
-      metadata:
-        labels:
-          app: yupana
-          name: yupana-pgsql
-          template: yupana-template
-        name: yupana-pgsql
-      spec:
-        containers:
-        - env:
-          - name: POSTGRESQL_USER
-            valueFrom:
-              secretKeyRef:
-                key: database-user
-                name: ${DATABASE_SERVICE_NAME}
-          - name: POSTGRESQL_PASSWORD
-            valueFrom:
-              secretKeyRef:
-                key: database-password
-                name: ${DATABASE_SERVICE_NAME}
-          - name: POSTGRESQL_ADMIN_PASSWORD
-            valueFrom:
-              secretKeyRef:
-                key: database-admin-password
-                name: ${DATABASE_SERVICE_NAME}
-          - name: POSTGRESQL_DATABASE
-            value: ${DATABASE_NAME}
-          image: postgresql:9.6
-          imagePullPolicy: IfNotPresent
-          livenessProbe:
-            exec:
-              command:
-              - /usr/libexec/check-container
-              - --live
-            failureThreshold: 3
-            initialDelaySeconds: 120
-            periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 10
-          name: yupana-pgsql
-          ports:
-          - containerPort: 5432
-            protocol: TCP
-          readinessProbe:
-            exec:
-              command:
-              - /usr/libexec/check-container
-            failureThreshold: 3
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 1
-          resources:
-            requests:
-              memory: ${POSTGRESQL_MEMORY_REQUEST}
-            limits:
-              memory: ${POSTGRESQL_MEMORY_LIMIT}
-          volumeMounts:
-          - mountPath: /var/lib/pgsql/data
-            name: yupana-pgsql-data
-        volumes:
-        - name: yupana-pgsql-data
-          persistentVolumeClaim:
-            claimName: yupana-pgsql
-    triggers:
-    - imageChangeParams:
-        automatic: true
-        containerNames:
-        - yupana-pgsql
-        from:
-          kind: ImageStreamTag
-          name: postgresql:9.6
-          namespace: ${NAMESPACE}
-      type: ImageChange
-    - type: ConfigChange
+
 - apiVersion: autoscaling/v1
   kind: HorizontalPodAutoscaler
   metadata:
@@ -542,7 +451,7 @@ parameters:
 - displayName: Database Service Name
   name: DATABASE_SERVICE_NAME
   required: true
-  value: yupana-pgsql
+  value: yupana-db
 - description: 'Database engine: postgresql, mysql or sqlite (default).'
   displayName: Database Engine
   name: DATABASE_ENGINE

@@ -20,100 +20,100 @@ labels:
 objects:
 - apiVersion: v1
   kind: DeploymentConfig
-    metadata:
-      annotations:
-        description: Defines how to deploy the database
-        template.alpha.openshift.io/wait-for-ready: "true"
-      labels:
-        app: yupana
-        template: yupana-template
-      name: yupana-pgsql
-    spec:
-      replicas: 1
-      selector:
-        name: yupana-pgsql
-      resources:
-        limits:
-          memory: ${MEMORY_REQUEST}
-        limits:
-          memory: ${MEMORY_LIMIT}
-      strategy:
-        type: Recreate
-      template:
-        metadata:
-          labels:
-            app: yupana
-            name: yupana-pgsql
-            template: yupana-template
-          name: yupana-pgsql
-        spec:
-          containers:
-          - env:
-            - name: POSTGRESQL_USER
-              valueFrom:
-                secretKeyRef:
-                  key: database-user
-                  name: ${DATABASE_SERVICE_NAME}
-            - name: POSTGRESQL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  key: database-password
-                  name: ${DATABASE_SERVICE_NAME}
-            - name: POSTGRESQL_ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  key: database-admin-password
-                  name: ${DATABASE_SERVICE_NAME}
-            - name: POSTGRESQL_DATABASE
-              value: ${DATABASE_NAME}
-            image: postgresql:9.6
-            imagePullPolicy: IfNotPresent
-            livenessProbe:
-              exec:
-                command:
-                - /usr/libexec/check-container
-                - --live
-              failureThreshold: 3
-              initialDelaySeconds: 120
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 10
-            name: yupana-pgsql
-            ports:
-            - containerPort: 5432
-              protocol: TCP
-            readinessProbe:
-              exec:
-                command:
-                - /usr/libexec/check-container
-              failureThreshold: 3
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 1
-            resources:
-              requests:
-                memory: ${POSTGRESQL_MEMORY_REQUEST}
-              limits:
-                memory: ${POSTGRESQL_MEMORY_LIMIT}
-            volumeMounts:
-            - mountPath: /var/lib/pgsql/data
-              name: yupana-pgsql-data
-          volumes:
-          - name: yupana-pgsql-data
-            persistentVolumeClaim:
-              claimName: yupana-pgsql
-      triggers:
-      - imageChangeParams:
-          automatic: true
-          containerNames:
-          - yupana-pgsql
-          from:
-            kind: ImageStreamTag
-            name: postgresql:9.6
-            namespace: ${NAMESPACE}
-        type: ImageChange
-      - type: ConfigChange
+  metadata:
+    annotations:
+      description: Defines how to deploy the database
+      template.alpha.openshift.io/wait-for-ready: "true"
+    labels:
+      app: yupana
+      template: yupana-template
+    name: yupana-db
+  spec:
+    replicas: 1
+    selector:
+      name: yupana-db
+    resources:
+      limits:
+        memory: ${MEMORY_REQUEST}
+      limits:
+        memory: ${MEMORY_LIMIT}
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          app: yupana
+          name: yupana-db
+          template: yupana-template
+        name: yupana-db
+      spec:
+        containers:
+        - env:
+          - name: POSTGRESQL_USER
+            valueFrom:
+              secretKeyRef:
+                key: database-user
+                name: ${DATABASE_SERVICE_NAME}
+          - name: POSTGRESQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: database-password
+                name: ${DATABASE_SERVICE_NAME}
+          - name: POSTGRESQL_ADMIN_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: database-admin-password
+                name: ${DATABASE_SERVICE_NAME}
+          - name: POSTGRESQL_DATABASE
+            value: ${DATABASE_NAME}
+          image: postgresql:9.6
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            exec:
+              command:
+              - /usr/libexec/check-container
+              - --live
+            failureThreshold: 3
+            initialDelaySeconds: 120
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 10
+          name: yupana-db
+          ports:
+          - containerPort: 5432
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - /usr/libexec/check-container
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            requests:
+              memory: ${POSTGRESQL_MEMORY_REQUEST}
+            limits:
+              memory: ${POSTGRESQL_MEMORY_LIMIT}
+          volumeMounts:
+          - mountPath: /var/lib/pgsql/data
+            name: yupana-db-data
+        volumes:
+        - name: yupana-db-data
+          persistentVolumeClaim:
+            claimName: yupana-db
+    triggers:
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - yupana-db
+        from:
+          kind: ImageStreamTag
+          name: postgresql:9.6
+          namespace: ${NAMESPACE}
+      type: ImageChange
+    - type: ConfigChange
 
 - apiVersion: v1
   kind: PersistentVolumeClaim
@@ -137,10 +137,10 @@ objects:
     labels:
       app: yupana
       template: yupana-template
-    name: yupana-pgsql
+    name: yupana-db
   spec:
     ports:
-    - name: yupana-pgsql
+    - name: yupana-db
       port: 5432
       protocol: TCP
       targetPort: 5432
@@ -177,3 +177,7 @@ parameters:
   name: DATABASE_NAME
   required: true
   value: yupana
+- displayName: Database Service Name
+  name: DATABASE_SERVICE_NAME
+  required: true
+  value: yupana-db

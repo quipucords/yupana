@@ -7,15 +7,26 @@ PYDIR=yupana
 APIDOC=apidoc
 STATIC=staticfiles
 
+# OC Params
+OC_TEMPLATE_DIR = $(TOPDIR)/openshift
+OC_PARAM_DIR = $(OC_TEMPLATE_DIR)/parameters
+
+# required OpenShift template parameters
+# if a value is defined in a parameter file, we try to use that.
+# otherwise, we use a default value
+# NAME = $(or $(shell grep -h '^[^\#]*NAME=' openshift/parameters/* 2>/dev/null | uniq | awk -F= '{print $$2}'), yupana)
+NAME = 'yupana'
+NAMESPACE = $(or $(shell grep -h '^[^\#]*NAMESPACE=' openshift/parameters/* 2>/dev/null | uniq | awk -F= '{print $$2}'), yupana)
+
 # OC dev variables
 OC_SOURCE=registry.access.redhat.com/openshift3/ose
 OC_VERSION=v3.9
 OC_DATA_DIR=${HOME}/.oc/openshift.local.data
 OPENSHIFT_PROJECT_DEV='yupana'
-OPENSHIFT_TEMPLATE_PATH='openshift/yupana-template.yaml'
-TEMPLATE='yupana-template'
+OPENSHIFT_TEMPLATE_PATH='openshift/yupana.yaml'
+TEMPLATE='yupana'
 CODE_REPO='https://github.com/quipucords/yupana.git'
-REPO_BRANCH='master'
+REPO_BRANCH='issues/141a'
 EMAIL_SERVICE_PASSWORD=$EMAIL_SERVICE_PASSWORD
 PGSQL_VERSION=9.6
 MINIMUM_REPLICAS=1
@@ -27,7 +38,7 @@ MAX_THREADS=10
 PROD_MAX_THREADS=2
 BUILD_VERSION=0.0.0
 PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=False
-DEV_POSTGRES_SQL_SERVICE_HOST='yupana-pgsql.yupana.svc'
+DEV_POSTGRES_SQL_SERVICE_HOST='yupana-db.yupana.svc'
 
 OS := $(shell uname)
 ifeq ($(OS),Darwin)
@@ -260,10 +271,10 @@ oc-update-template:
 
 oc-delete-yupana-data:
 	oc delete all -l app=yupana
-	oc delete persistentvolumeclaim yupana-pgsql
+	oc delete persistentvolumeclaim yupana-db
 	oc delete configmaps yupana-env
 	oc delete secret yupana-secret
-	oc delete secret yupana-pgsql
+	oc delete secret yupana-db
 
 oc-delete-project:
 	oc delete project yupana
@@ -287,7 +298,7 @@ oc-create-db:
 		-p POSTGRESQL_PASSWORD=admin123 \
 		-p POSTGRESQL_DATABASE=yupana \
 		-p POSTGRESQL_VERSION=$(PGSQL_VERSION) \
-		-p DATABASE_SERVICE_NAME=yupana-pgsql \
+		-p DATABASE_SERVICE_NAME=yupana-db \
 	| oc create -f -
 
 oc-server-migrate: oc-forward-ports
@@ -300,7 +311,7 @@ oc-stop-forwarding-ports:
 
 oc-forward-ports:
 	-make oc-stop-forwarding-ports 2>/dev/null
-	oc port-forward $$(oc get pods -o jsonpath='{.items[*].metadata.name}' -l name=yupana-pgsql) 15432:5432 >/dev/null 2>&1 &
+	oc port-forward $$(oc get pods -o jsonpath='{.items[*].metadata.name}' -l name=yupana-db) 15432:5432 >/dev/null 2>&1 &
 
 clean-db:
 	$(PREFIX) rm -rf $(TOPDIR)/pg_data
@@ -369,3 +380,91 @@ local-upload-data:
 		-F "file=@$(file);type=application/vnd.redhat.qpc.tar+tgz" \
 		-H "x-rh-insights-request-id: 52df9f748eabcfea" \
 		localhost:8080/api/ingress/v1/upload
+
+oc-create-yupana-api: OC_OBJECT := 'bc/$(NAME) dc/$(NAME)'
+oc-create-yupana-api: OC_PARAMETER_FILE := $(NAME).env
+oc-create-yupana-api: OC_TEMPLATE_FILE := $(NAME)-template.yaml
+oc-create-yupana-api: OC_PARAMS := OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE)
+oc-create-yupana-api:
+	$(OC_PARAMS) $(MAKE) oc-create-imagestream
+	$(OC_PARAMS) $(MAKE) oc-create-configmap
+	$(OC_PARAMS) $(MAKE) oc-create-secret
+	$(OC_PARAMS) $(MAKE) __oc-apply-object
+	$(OC_PARAMS) $(MAKE) __oc-create-object
+
+oc-create-secret: OC_OBJECT := 'secret -l app=$(NAME)'
+oc-create-secret: OC_PARAMETER_FILE := secret.env
+oc-create-secret: OC_TEMPLATE_FILE := secret.yaml
+oc-create-secret: OC_PARAMS := OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE)
+oc-create-secret:
+	$(OC_PARAMS) $(MAKE) __oc-create-object
+
+oc-create-configmap: OC_OBJECT := 'configmap -l app=$(NAME)'
+oc-create-configmap: OC_PARAMETER_FILE := configmap.env
+oc-create-configmap: OC_TEMPLATE_FILE := configmap.yaml
+oc-create-configmap: OC_PARAMS := OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE)
+oc-create-configmap:
+	$(OC_PARAMS) $(MAKE) __oc-create-object
+
+oc-create-imagestream: OC_OBJECT := 'is/centos is/python-36-centos7 is/postgresql'
+oc-create-imagestream: OC_PARAMETER_FILE := imagestream.env
+oc-create-imagestream: OC_TEMPLATE_FILE := imagestream.yaml
+oc-create-imagestream: OC_PARAMS := OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE)
+oc-create-imagestream:
+	$(OC_PARAMS) $(MAKE) __oc-apply-object
+	$(OC_PARAMS) $(MAKE) __oc-create-object
+
+oc-create-database: OC_OBJECT := 'bc/$(NAME)-db dc/$(NAME)-db'
+oc-create-database: OC_PARAMETER_FILE := $(NAME)-db.env
+oc-create-database: OC_TEMPLATE_FILE := $(NAME)-db.yaml
+oc-create-database: OC_PARAMS := OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE)
+oc-create-database:
+	$(OC_PARAMS) $(MAKE) oc-create-imagestream
+	$(OC_PARAMS) $(MAKE) oc-create-configmap
+	$(OC_PARAMS) $(MAKE) oc-create-secret
+	$(OC_PARAMS) $(MAKE) __oc-apply-object
+	$(OC_PARAMS) $(MAKE) __oc-create-object
+##################################
+### Internal openshift targets ###
+##################################
+
+__oc-create-project:
+	@if [[ ! $$(oc get -o name project/$(NAMESPACE) 2>/dev/null) ]]; then \
+		oc new-project $(NAMESPACE) ;\
+	fi
+
+# if object doesn't already exist,
+# create it from the provided template and parameters
+__oc-create-object: __oc-create-project
+	@if [[ $$(oc get -o name $(OC_OBJECT) 2>&1) == '' ]] || \
+	[[ $$(oc get -o name $(OC_OBJECT) 2>&1 | grep 'not found') ]]; then \
+		if [ -f $(OC_PARAM_DIR)/$(OC_PARAMETER_FILE) ]; then \
+			oc process -f $(OC_TEMPLATE_DIR)/$(OC_TEMPLATE_FILE) \
+				--param-file=$(OC_PARAM_DIR)/$(OC_PARAMETER_FILE) \
+			| oc create --save-config=True -n $(NAMESPACE) -f - 2>&1 | grep -v "already exists" || /usr/bin/true ;\
+		else \
+			oc process -f $(OC_TEMPLATE_DIR)/$(OC_TEMPLATE_FILE) \
+				$(foreach PARAM, $(OC_PARAMETERS), -p $(PARAM)) \
+			| oc create --save-config=True -n $(NAMESPACE) -f - 2>&1 | grep -v "already exists" || /usr/bin/true ;\
+		fi ;\
+	fi
+
+__oc-apply-object: __oc-create-project
+	@if [[ $$(oc get -o name $(OC_OBJECT) 2>&1) != '' ]] || \
+	[[ $$(oc get -o name $(OC_OBJECT) 2>&1 | grep -v 'not found') ]]; then \
+		echo "WARNING: Resources matching 'oc get $(OC_OBJECT)' exists. Updating template. Skipping object creation." ;\
+		if [ -f $(OC_PARAM_DIR)/$(OC_PARAMETER_FILE) ]; then \
+			oc process -f $(OC_TEMPLATE_DIR)/$(OC_TEMPLATE_FILE) \
+				--param-file=$(OC_PARAM_DIR)/$(OC_PARAMETER_FILE) \
+			| oc apply -n $(NAMESPACE) -f - 2>&1 || /usr/bin/true ;\
+		else \
+			oc process -f $(OC_TEMPLATE_DIR)/$(OC_TEMPLATE_FILE) \
+				$(foreach PARAM, $(OC_PARAMETERS), -p $(PARAM)) \
+			| oc apply -n $(NAMESPACE) -f - 2>&1 || /usr/bin/true ;\
+		fi ;\
+	fi
+
+#
+# Phony targets
+#
+.PHONY: docs __oc-create-object __oc-create-project __oc-apply-object

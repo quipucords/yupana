@@ -21,7 +21,7 @@ objects:
 - apiVersion: v1
   kind: ConfigMap
   metadata:
-    name: yupana-env
+    name: yupana-db
     labels:
       name: yupana
   data:
@@ -35,7 +35,7 @@ objects:
 - apiVersion: v1
   kind: ConfigMap
   metadata:
-    name: yupana-env
+    name: yupana-app
     labels:
       name: yupana
   data:
@@ -50,7 +50,7 @@ objects:
 - apiVersion: v1
   kind: ConfigMap
   metadata:
-    name: yupana-env
+    name: yupana-messaging
     labels:
       name: yupana
   data:
@@ -177,6 +177,7 @@ parameters:
   displayName: Max threads
   name: MAX_THREADS
   required: true
+  value: "3"
 - description: Minimum Replicas for Autoscaling
   displayName: Minimum Replicas
   name: MINIMUM_REPLICAS
