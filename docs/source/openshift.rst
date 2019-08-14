@@ -27,17 +27,17 @@ Add `172.30.1.1` to the list of proxies to bypass. This can be found at Docker -
 Running Locally in OpenShift
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To start the local cluster run the following:
+To start a barebones OpenShift cluster that will persist configuration between restarts, you can run the following:
 
 .. code-block:: bash
 
     make oc-up
 
-That will start a barebones OpenShift cluster that will persist configuration between restarts. Once the cluster is running, you can deploy Yupana and PostgreSQL by running the following:
+ Once the cluster is running, you can deploy Yupana and PostgreSQL by running the following:
 
 .. code-block:: bash
 
-    make oc-create-yupana
+    make oc-create-yupana-and-db
 
 If you'd like to start the cluster, deploy Yupana, and deploy PostgreSQL, run the following:
 
@@ -49,7 +49,7 @@ If you'd like to refresh the deployed app with your local changes, run the follo
 
 .. code-block:: bash
 
-    make oc-dev-refresh
+    make oc-refresh
 
 To stop the local cluster run the following:
 
@@ -65,7 +65,7 @@ If you'd like to remove all your saved settings for your cluster, you can run th
 
     make oc-clean
 
-There are also other make targets available to step through the project deployment. You can run the entire application and its dependent services through Openshift, or just the dependent services can be spun up, while using the local Django dev server.
+There are also other make targets available to step through the project deployment. See ``make help`` for more information about available targets. You can run the entire application and its dependent services through Openshift, or just the dependent services can be spun up, while using the local Django dev server.
 
 .. code-block:: bash
 
@@ -82,7 +82,19 @@ There are also other make targets available to step through the project deployme
     make serve-with-oc
 
     # Run a build with updated template changes
-    make oc-update-template
+    make oc-refresh
+
+OpenShift Templates
+^^^^^^^^^^^^^^^^^^^
+
+OpenShift templates are provided for all service resources. Each template includes parameters to enable customization to the target environment.
+
+The ``Makefile`` targets include scripting to dynamically pass parameter values into the OpenShift templates. A developer may define parameter values by placing a parameter file into the ``yupana.git/openshift/parameters`` directory.
+
+Examples of parameter files are provided in the ``yupana.git/openshift/parameters/examples`` directory.
+
+The ``Makefile`` scripting applies parameter values only to matching templates based on matching the filenames of each file. For example, parameters defined in ``secret.env`` are applied *only* to the ``secret.yaml`` template. As a result, common parameters like ``NAMESPACE`` must be defined consistently within *each* parameter file.
+
 
 Fedora
 ------
