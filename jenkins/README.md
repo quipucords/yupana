@@ -18,22 +18,12 @@ make oc-delete-yupana-data
 
 After deleting the app, you can redeploy by rerunning the jenkins job by visiting [Jenkins](https://sonar-jenkins.rhev-ci-vms.eng.rdu2.redhat.com/) and choosing `Build Now` for the `deploy-yupana-ci/qa/stage/prod` projects.
 
-## Openshift Templates
-
-OpenShift templates are provided for all service resources. Each template includes parameters to enable customization to the target environment.
-
-The `Makefile` targets include scripting to dynamically pass parameter values into the OpenShift templates. A developer may define parameter values by placing a parameter file into the `yupana.git/openshift/parameters` directory.
-
-Examples of parameter files are provided in the `yupana.git/openshift/parameters/examples` directory.
-
-The `Makefile` scripting applies parameter values only to matching templates based on matching the filenames of each file. For example, parameters defined in `secret.env` are applied *only* to the `secret.yaml` template. As a result, common parameters like `NAMESPACE` must be defined consistently within *each* parameter file.
-
 
 ## Deploying without Jenkins
 
 If for any reason Jenkins is not working, we have provided make commands that will create and deploy a new app, or refresh an existing one.
 
-First make sure that you are logged into the correct cluster and project. Next, make sure that you have the correct variables set in your `.env` files for your templates. Typically, you will need the following defined in the correct .env file for the environment that you want to deploy to:
+First make sure that you are logged into the correct cluster and project. Next, make sure that you have the correct parameters set in each of your `.env` files for your templates. Typically, you will need the following defined in the correct .env file for the environment that you want to deploy to:
 ```
 OPENSHIFT_PROJECT=<OPENSHIFT_PROJECT>
 KAFKA_HOST=<KAFKA_HOST>

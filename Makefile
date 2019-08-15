@@ -294,7 +294,7 @@ oc-create-configmap: OC_PARAMS := OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_
 oc-create-configmap:
 	$(OC_PARAMS) $(MAKE) __oc-create-object
 
-oc-create-imagestream: OC_OBJECT := 'is/centos is/python-36-centos7 is/postgresql'
+oc-create-imagestream: OC_OBJECT := 'is/python-36-centos7 is/postgresql'
 oc-create-imagestream: OC_PARAMETER_FILE := imagestream.env
 oc-create-imagestream: OC_TEMPLATE_FILE := imagestream.yaml
 oc-create-imagestream: OC_PARAMS := OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE)
