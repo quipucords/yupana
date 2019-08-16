@@ -21,10 +21,11 @@ After deleting the app, you can redeploy by rerunning the jenkins job by visitin
 
 ## Deploying without Jenkins
 
-If for any reason Jenkins is not working, we have provided make commands that will create and deploy a new app, or refresh an existing one.
+If for any reason Jenkins is not working, we have provided make commands that will create and deploy all of the services and objects for a new app, or refresh an existing one.
 
-First make sure that you are logged into the correct cluster and project. Next, make sure that you have the correct parameters set in each of your `.env` files for your templates. Typically, you will need the following defined in the correct .env file for the environment that you want to deploy to:
+First make sure that you are logged into the correct cluster and project. Next, make sure that you have the correct values set in your parameter files. Examples of parameter files are provided in the `yupana.git/openshift/parameters/examples` directory. Typically, you will need the following defined in the correct `.env` file for the environment that you want to deploy to:
 ```
+NAMESPACE=<OPENSHIFT_NAMESPACE>
 OPENSHIFT_PROJECT=<OPENSHIFT_PROJECT>
 KAFKA_HOST=<KAFKA_HOST>
 KAFKA_PORT=<KAFKA_PORT>
@@ -42,17 +43,17 @@ DATABASE_USER=<DATABASE_USER>
 DATABASE_SERVICE_CERT=<DATABASE_SERVICE_CERT>
 ```
 
-To deploy a new app to the project, run:
+To deploy a new app to the project, you can run the following where `NAMESPACE` is set to the environment that you wish to deploy to:
 ```
-make oc-create-yupana-and-db
+make oc-create-yupana-and-db NAMESPACE=subscriptions-ci
 ```
 
 To refresh an existing app, run:
 ```
-make oc-refresh
+make oc-refresh NAMESPACE=subscriptions-ci
 ```
 
 To deploy to production, you will not need the db, so you can run:
 ```
-make oc-create-yupana-app
+make oc-create-yupana-app NAMESPACE=subscriptions-prod
 ```

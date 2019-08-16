@@ -20,11 +20,20 @@ Add `172.30.1.1` to the list of proxies to bypass. This can be found at Docker -
 
 ## Running Locally in OpenShift
 
-To start a barebones OpenShift cluster that will persist configuration between restarts, you can run the following:
+OpenShift templates are provided for all service resources. Each template includes parameters to enable customization to the target environment.
+
+The `Makefile` targets include scripting to dynamically pass parameter values into the OpenShift templates. A developer may define parameter values by placing a parameter file into the `yupana.git/openshift/parameters` directory.
+
+Examples of parameter files are provided in the `yupana.git/openshift/parameters/examples` directory. For development, you can copy each of the example environment files into the `parameters` directory and remove the `.example` extension.
+
+The `Makefile` scripting applies parameter values only to matching templates based on matching the filenames of each file. For example, parameters defined in `secret.env` are applied *only* to the `secret.yaml` template. As a result, common parameters like `NAMESPACE` must be defined consistently within *each* parameter file.
+
+Once you have set up the environment files for the templates, you can begin deploying using the provided make commands. To start a barebones OpenShift cluster that will persist configuration between restarts, you can run the following:
 
 ```
 
     make oc-up
+    
 ```
 
  Once the cluster is running, you can deploy Yupana and PostgreSQL by running the following:
@@ -89,17 +98,6 @@ There are also other make targets available to step through the project deployme
     make oc-refresh
 
 ```
-
-## OpenShift Templates
-
-OpenShift templates are provided for all service resources. Each template includes parameters to enable customization to the target environment.
-
-The `Makefile` targets include scripting to dynamically pass parameter values into the OpenShift templates. A developer may define parameter values by placing a parameter file into the `yupana.git/openshift/parameters` directory.
-
-Examples of parameter files are provided in the `yupana.git/openshift/parameters/examples` directory.
-
-The `Makefile` scripting applies parameter values only to matching templates based on matching the filenames of each file. For example, parameters defined in `secret.env` are applied *only* to the `secret.yaml` template. As a result, common parameters like `NAMESPACE` must be defined consistently within *each* parameter file.
-
 
 ## Fedora
 

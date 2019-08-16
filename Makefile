@@ -19,7 +19,6 @@ NAMESPACE = 'yupana'
 OC_SOURCE=registry.access.redhat.com/openshift3/ose
 OC_VERSION=v3.9
 OC_DATA_DIR=${HOME}/.oc/openshift.local.data
-OPENSHIFT_PROJECT_DEV='yupana'
 
 OS := $(shell uname)
 ifeq ($(OS),Darwin)
@@ -212,8 +211,8 @@ oc-login-developer:
 	oc login -u developer -p developer --insecure-skip-tls-verify
 
 oc-project:
-	oc new-project ${OPENSHIFT_PROJECT_DEV}
-	oc project ${OPENSHIFT_PROJECT_DEV}
+	oc new-project ${NAMESPACE}
+	oc project ${NAMESPACE}
 
 oc-delete-yupana-data:
 	oc delete all -l app=yupana
@@ -235,6 +234,7 @@ oc-up-dev: oc-up oc-project oc-create-yupana-and-db
 oc-up-db: oc-up oc-project oc-create-database
 
 oc-create-yupana-and-db: oc-project oc-create-imagestream oc-create-configmap oc-create-secret oc-create-standalone-db oc-create-yupana
+	oc start-build yupana
 
 oc-refresh: oc-create-imagestream oc-create-configmap oc-create-secret oc-create-standalone-db oc-create-yupana
 	oc start-build yupana
@@ -261,7 +261,7 @@ serve-with-oc: oc-forward-ports
 oc-create-yupana-app: OC_OBJECT = 'bc/$(NAME) dc/$(NAME)'
 oc-create-yupana-app: OC_PARAMETER_FILE = $(NAME).env
 oc-create-yupana-app: OC_TEMPLATE_FILE = $(NAME).yaml
-oc-create-yupana-app: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE)
+oc-create-yupana-app: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
 oc-create-yupana-app:
 	$(OC_PARAMS) $(MAKE) oc-create-imagestream
 	$(OC_PARAMS) $(MAKE) oc-create-configmap
@@ -272,7 +272,7 @@ oc-create-yupana-app:
 oc-create-secret: OC_OBJECT = 'secret -l app=$(NAME)'
 oc-create-secret: OC_PARAMETER_FILE = secret.env
 oc-create-secret: OC_TEMPLATE_FILE = secret.yaml
-oc-create-secret: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE)
+oc-create-secret: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
 oc-create-secret:
 	$(OC_PARAMS) $(MAKE) __oc-apply-object
 	$(OC_PARAMS) $(MAKE) __oc-create-object
@@ -280,15 +280,15 @@ oc-create-secret:
 oc-create-configmap: OC_OBJECT = 'configmap -l app=$(NAME)'
 oc-create-configmap: OC_PARAMETER_FILE = configmap.env
 oc-create-configmap: OC_TEMPLATE_FILE = configmap.yaml
-oc-create-configmap: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE)
+oc-create-configmap: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
 oc-create-configmap:
 	$(OC_PARAMS) $(MAKE) __oc-apply-object
 	$(OC_PARAMS) $(MAKE) __oc-create-object
 
-oc-create-imagestream: OC_OBJECT = 'is/python-36-centos7 is/postgresql'
+oc-create-imagestream: OC_OBJECT := 'is/centos is/python-36-centos7 is/postgresql'
 oc-create-imagestream: OC_PARAMETER_FILE = imagestream.env
 oc-create-imagestream: OC_TEMPLATE_FILE = imagestream.yaml
-oc-create-imagestream: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE)
+oc-create-imagestream: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
 oc-create-imagestream:
 	$(OC_PARAMS) $(MAKE) __oc-apply-object
 	$(OC_PARAMS) $(MAKE) __oc-create-object
@@ -296,7 +296,7 @@ oc-create-imagestream:
 oc-create-yupana: OC_OBJECT = 'bc/$(NAME) dc/$(NAME)'
 oc-create-yupana: OC_PARAMETER_FILE = $(NAME).env
 oc-create-yupana: OC_TEMPLATE_FILE = $(NAME).yaml
-oc-create-yupana: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE)
+oc-create-yupana: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
 oc-create-yupana:
 	$(OC_PARAMS) $(MAKE) __oc-apply-object
 	$(OC_PARAMS) $(MAKE) __oc-create-object
@@ -304,15 +304,15 @@ oc-create-yupana:
 oc-create-standalone-db: OC_OBJECT = 'bc/$(NAME)-db dc/$(NAME)-db'
 oc-create-standalone-db: OC_PARAMETER_FILE = $(NAME)-db.env
 oc-create-standalone-db: OC_TEMPLATE_FILE = $(NAME)-db.yaml
-oc-create-standalone-db: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE)
+oc-create-standalone-db: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
 oc-create-standalone-db:
 	$(OC_PARAMS) $(MAKE) __oc-apply-object
 	$(OC_PARAMS) $(MAKE) __oc-create-object
 
-oc-create-database: OC_OBJECT = 'dc/$(NAME)-db'
+oc-create-database: OC_OBJECT = 'bc/$(NAME)-db dc/$(NAME)-db'
 oc-create-database: OC_PARAMETER_FILE = $(NAME)-db.env
 oc-create-database: OC_TEMPLATE_FILE = $(NAME)-db.yaml
-oc-create-database: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE)
+oc-create-database: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
 oc-create-database:
 	$(OC_PARAMS) $(MAKE) oc-create-imagestream
 	$(OC_PARAMS) $(MAKE) oc-create-configmap
