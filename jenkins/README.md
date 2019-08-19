@@ -21,27 +21,9 @@ After deleting the app, you can redeploy by rerunning the jenkins job by visitin
 
 ## Deploying without Jenkins
 
-If for any reason Jenkins is not working, we have provided make commands that will create and deploy all of the services and objects for a new app, or refresh an existing one.
+If for any reason Jenkins is not working, we have provided make commands and example `.env` files to allow you to deploy the latest changes to each Openshift project.
 
-First make sure that you are logged into the correct cluster and project. Next, make sure that you have the correct values set in your parameter files. Examples of parameter files are provided in the `yupana.git/openshift/parameters/examples` directory. Typically, you will need the following defined in the correct `.env` file for the environment that you want to deploy to:
-```
-NAMESPACE=<OPENSHIFT_NAMESPACE>
-OPENSHIFT_PROJECT=<OPENSHIFT_PROJECT>
-KAFKA_HOST=<KAFKA_HOST>
-KAFKA_PORT=<KAFKA_PORT>
-KAFKA_NAMESPACE=<KAFKA_NAMESPACE>
-INSIGHTS_HOST_INVENTORY_URL=<INSIGHTS_HOST_INVENTORY_URL>
-DEPLOY_BUILD_VERSION=<DEPLOY_BUILD_VERSION>
-POSTGRES_SQL_SERVICE_HOST=<POSTGRES_SQL_SERVICE_HOST>
-```
-
-To deploy to PROD you will need the following in addition to the above:
-```
-DATABASE_ADMIN_PASSWORD=<DATABASE_ADMIN_PASSWORD>
-DATABASE_PASSWORD=<DATABASE_PASSWORD>
-DATABASE_USER=<DATABASE_USER>
-DATABASE_SERVICE_CERT=<DATABASE_SERVICE_CERT>
-```
+First make sure that you are logged into the correct cluster and project. Next, copy all of the `.env.deploy.example` files found in the `yupana.git/openshift/parameters/examples` directory to the `parameters` directory and remove the `.deploy.example` extension. Finally, uncomment & populate each variable with the correct information for the project that you are deploying to.
 
 To deploy a new app to the project, you can run the following where `NAMESPACE` is set to the environment that you wish to deploy to:
 ```
