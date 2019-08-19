@@ -7,23 +7,109 @@ oc login https://${OPENSHIFT_HOST}:${OPENSHIFT_PORT} --token=${OPENSHIFT_TOKEN}
 oc project ${OPENSHIFT_PROJECT}
 
 
-#Is this a new deployment or an existing app? Decide based on whether the project is empty or not
-#If BuildConfig exists, assume that the app is already deployed and we need a rebuild
+# Is this a new object deployment or an existing? Decide based on whether the object exists
+IMAGESTREAM=`oc get -o name 'is/python-36-centos7' 2>/dev/null | tail -1 | awk '{print $1}'`
+CONFIGMAP=`oc get configmap -l app=${APP_NAME} 2>/dev/null | tail -1 | awk '{print $1}'`
+SECRET=`oc get secret -l app=${APP_NAME} 2>/dev/null | tail -1 | awk '{print $1}'`
+DB_CONFIG=`oc get dc ${APP_NAME}-db 2>/dev/null | tail -1 | awk '{print $1}'`
+APP_BUILD_CONFIG=`oc get bc ${APP_NAME} 2>/dev/null | tail -1 | awk '{print $1}'`
 
-BUILD_CONFIG=`oc get bc ${APP_NAME} 2>/dev/null | tail -1 | awk '{print $1}'`
+if [ -z "$IMAGESTREAM" ]; then
 
+# no imagestream so create a new one
+  echo "Creating imagestream."
+  oc process -f ${YUPANA_IMAGESTREAM_TEMPLATE_PATH} \
+      --param NAMESPACE=${OPENSHIFT_PROJECT} \
+      | oc create --save-config=True -n ${OPENSHIFT_PROJECT} -f - 2>&1 | grep -v "already exists" || /usr/bin/true ;\
+else
+  echo "Imagestream exists."
+  oc process -f ${YUPANA_IMAGESTREAM_TEMPLATE_PATH} \
+      --param NAMESPACE=${OPENSHIFT_PROJECT} \
+      | oc apply -f -
+fi
 
-if [ -z "$BUILD_CONFIG" ]; then
+if [ -z "$CONFIGMAP" ]; then
+  echo "Creating configmap."
+  oc process -f ${YUPANA_CONFIGMAP_TEMPLATE_PATH} \
+      --param NAMESPACE=${OPENSHIFT_PROJECT} \
+      --param KAFKA_HOST=${KAFKA_HOST} \
+      --param KAFKA_PORT=${KAFKA_PORT} \
+      --param KAFKA_NAMESPACE=${KAFKA_NAMESPACE} \
+      --param INSIGHTS_HOST_INVENTORY_URL=${INSIGHTS_HOST_INVENTORY_URL} \
+      --param POSTGRES_SQL_SERVICE_HOST=${POSTGRES_SQL_SERVICE_HOST} \
+      --param MINIMUM_REPLICAS=${MINIMUM_REPLICAS} \
+      --param MAXIMUM_REPLICAS=${MAXIMUM_REPLICAS} \
+      --param TARGET_CPU_UTILIZATION=${TARGET_CPU_UTILIZATION} \
+      --param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
+      --param MAX_THREADS=${MAX_THREADS} \
+      --param BUILD_VERSION=${BUILD_VERSION} \
+      --param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
+      --param HOST_INVENTORY_UPLOAD_MODE=${HOST_INVENTORY_UPLOAD_MODE} \
+      --param HOSTS_UPLOAD_TIMEOUT=${HOSTS_UPLOAD_TIMEOUT} \
+      --param HOSTS_UPLOAD_FUTURES_COUNT=${HOSTS_UPLOAD_FUTURES_COUNT} \
+      | oc create --save-config=True -n ${OPENSHIFT_PROJECT} -f - 2>&1 | grep -v "already exists" || /usr/bin/true ;\
+
+else
+  echo "Updating configmap."
+  oc process -f ${YUPANA_CONFIGMAP_TEMPLATE_PATH} \
+      --param NAMESPACE=${OPENSHIFT_PROJECT} \
+      --param KAFKA_HOST=${KAFKA_HOST} \
+      --param KAFKA_PORT=${KAFKA_PORT} \
+      --param KAFKA_NAMESPACE=${KAFKA_NAMESPACE} \
+      --param INSIGHTS_HOST_INVENTORY_URL=${INSIGHTS_HOST_INVENTORY_URL} \
+      --param POSTGRES_SQL_SERVICE_HOST=${POSTGRES_SQL_SERVICE_HOST} \
+      --param MINIMUM_REPLICAS=${MINIMUM_REPLICAS} \
+      --param MAXIMUM_REPLICAS=${MAXIMUM_REPLICAS} \
+      --param TARGET_CPU_UTILIZATION=${TARGET_CPU_UTILIZATION} \
+      --param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
+      --param MAX_THREADS=${MAX_THREADS} \
+      --param BUILD_VERSION=${BUILD_VERSION} \
+      --param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
+      --param HOST_INVENTORY_UPLOAD_MODE=${HOST_INVENTORY_UPLOAD_MODE} \
+      --param HOSTS_UPLOAD_TIMEOUT=${HOSTS_UPLOAD_TIMEOUT} \
+      --param HOSTS_UPLOAD_FUTURES_COUNT=${HOSTS_UPLOAD_FUTURES_COUNT} \
+      | oc apply -f -
+fi
+
+if [ -z "$SECRET" ]; then
+
+# no secret exists for yupana
+  echo "Creating secret for yupana."
+  oc process -f ${YUPANA_SECRET_TEMPLATE_PATH} \
+      --param NAMESPACE=${OPENSHIFT_PROJECT} \
+      --param DATABASE_PASSWORD=${DATABASE_PASSWORD} \
+      --param DATABASE_USER=${DATABASE_USER} \
+      | oc create --save-config=True -n ${OPENSHIFT_PROJECT} -f - 2>&1 | grep -v "already exists" || /usr/bin/true ;\
+
+else
+  echo "Updating yupana secret."
+  oc process -f ${YUPANA_SECRET_TEMPLATE_PATH} \
+      --param NAMESPACE=${OPENSHIFT_PROJECT} \
+      --param DATABASE_PASSWORD=${DATABASE_PASSWORD} \
+      --param DATABASE_USER=${DATABASE_USER} \
+      | oc apply -f -
+fi
+
+if [ -z "$DB_CONFIG" ]; then
+  echo "Creating DB config."
+  oc process -f ${YUPANA_DB_TEMPLATE_PATH} \
+      --param NAMESPACE=${OPENSHIFT_PROJECT} \
+      | oc create --save-config=True -n ${OPENSHIFT_PROJECT} -f - 2>&1 | grep -v "already exists" || /usr/bin/true ;\
+
+else
+  echo "Updating DB config."
+  oc process -f ${YUPANA_DB_TEMPLATE_PATH} \
+      --param NAMESPACE=${OPENSHIFT_PROJECT} \
+      | oc apply -f -
+fi
+
+if [ -z "$APP_BUILD_CONFIG" ]; then
 
 # no app found so create a new one
   echo "Create a new app"
   curl -d "{\"text\": \"${OPENSHIFT_PROJECT}/${APP_NAME} (STATUS) - Create a new app.\"}" -H "Content-Type: application/json" -X POST ${SLACK_QPC_BOTS}
 
-
-  oc apply -f ${OPENSHIFT_TEMPLATE_PATH}
-
-
-  oc new-app --template ${OPENSHIFT_PROJECT}/$(basename ${OPENSHIFT_TEMPLATE_PATH} .yaml) \
+  oc process -f ${YUPANA_APP_TEMPLATE_PATH}  \
       --param NAMESPACE=${OPENSHIFT_PROJECT} \
       --param SOURCE_REPOSITORY_URL=${GIT_URL} \
       --param SOURCE_REPOSITORY_REF=${GIT_BRANCH} \
@@ -39,6 +125,12 @@ if [ -z "$BUILD_CONFIG" ]; then
       --param BUILD_VERSION=${BUILD_VERSION} \
       --param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
       --param POSTGRES_SQL_SERVICE_HOST=${POSTGRES_SQL_SERVICE_HOST} \
+      --param HOST_INVENTORY_UPLOAD_MODE=${HOST_INVENTORY_UPLOAD_MODE} \
+      --param DATABASE_PASSWORD=${DATABASE_PASSWORD} \
+      --param DATABASE_USER=${DATABASE_USER} \
+      --param HOSTS_UPLOAD_TIMEOUT=${HOSTS_UPLOAD_TIMEOUT} \
+      --param HOSTS_UPLOAD_FUTURES_COUNT=${HOSTS_UPLOAD_FUTURES_COUNT} \
+      | oc create --save-config=True -n ${OPENSHIFT_PROJECT} -f - 2>&1 | grep -v "already exists" || /usr/bin/true ;\
 
   echo "Find build id"
   BUILD_ID=`oc get builds | grep ${APP_NAME} | tail -1 | awk '{print $1}'`
@@ -67,7 +159,8 @@ else
   # Application already exists, just need to start a new build
   echo "App Exists. Triggering application build and deployment"
   curl -d "{\"text\": \"${OPENSHIFT_PROJECT}/${APP_NAME} (STATUS) - App Exists. Triggering application build and deployment.\"}" -H "Content-Type: application/json" -X POST ${SLACK_QPC_BOTS}
-  oc process -f ${OPENSHIFT_TEMPLATE_PATH}  \
+
+  oc process -f ${YUPANA_APP_TEMPLATE_PATH}  \
       --param NAMESPACE=${OPENSHIFT_PROJECT} \
       --param SOURCE_REPOSITORY_URL=${GIT_URL} \
       --param SOURCE_REPOSITORY_REF=${GIT_BRANCH} \
@@ -83,8 +176,13 @@ else
       --param BUILD_VERSION=${BUILD_VERSION} \
       --param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
       --param POSTGRES_SQL_SERVICE_HOST=${POSTGRES_SQL_SERVICE_HOST} \
+      --param HOST_INVENTORY_UPLOAD_MODE=${HOST_INVENTORY_UPLOAD_MODE} \
+      --param DATABASE_PASSWORD=${DATABASE_PASSWORD} \
+      --param DATABASE_USER=${DATABASE_USER} \
+      --param HOSTS_UPLOAD_TIMEOUT=${HOSTS_UPLOAD_TIMEOUT} \
+      --param HOSTS_UPLOAD_FUTURES_COUNT=${HOSTS_UPLOAD_FUTURES_COUNT} \
       | oc apply -f -
-  BUILD_ID=`oc start-build ${BUILD_CONFIG} | awk '{print $2}' | sed -e 's/^"//' -e 's/"$//'`
+  BUILD_ID=`oc start-build ${APP_BUILD_CONFIG} | awk '{print $2}' | sed -e 's/^"//' -e 's/"$//'`
 fi
 
 echo "Waiting for build ${BUILD_ID} to start"
@@ -122,7 +220,6 @@ done
 oc logs -f bc/${APP_NAME}
 
 
-
 echo "Checking build result status"
 rc=1
 count=0
@@ -151,6 +248,12 @@ if [ $rc -ne 0 ]; then
     curl -d "{\"text\": \"${OPENSHIFT_PROJECT}/${APP_NAME} (FAIL) - Build did not complete in a reasonable period of time.\"}" -H "Content-Type: application/json" -X POST ${SLACK_QPC_BOTS}
     exit 1
 fi
+
+# scale up the test deployment
+# RC_ID=`oc get rc | tail -1 | awk '{print $1}'`
+
+# echo "Scaling up new deployment $test_rc_id"
+# oc scale --replicas=1 rc $RC_ID
 
 echo "Checking for successful deployment at http://${APP_NAME}-${OPENSHIFT_PROJECT}.${OPENSHIFT_APP_DOMAIN}${APP_READINESS_PROBE}"
 set +e

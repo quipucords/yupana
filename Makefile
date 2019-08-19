@@ -7,27 +7,18 @@ PYDIR=yupana
 APIDOC=apidoc
 STATIC=staticfiles
 
+# OC Params
+OC_TEMPLATE_DIR = $(TOPDIR)/openshift
+OC_PARAM_DIR = $(OC_TEMPLATE_DIR)/parameters
+
+# required OpenShift template parameters
+NAME = 'yupana'
+NAMESPACE = 'yupana'
+
 # OC dev variables
 OC_SOURCE=registry.access.redhat.com/openshift3/ose
 OC_VERSION=v3.9
 OC_DATA_DIR=${HOME}/.oc/openshift.local.data
-OPENSHIFT_PROJECT_DEV='yupana'
-OPENSHIFT_TEMPLATE_PATH='openshift/yupana-template.yaml'
-TEMPLATE='yupana-template'
-CODE_REPO='https://github.com/quipucords/yupana.git'
-REPO_BRANCH='master'
-EMAIL_SERVICE_PASSWORD=$EMAIL_SERVICE_PASSWORD
-PGSQL_VERSION=9.6
-MINIMUM_REPLICAS=1
-MAXIMUM_REPLICAS=3
-PROD_MAXIMUM_REPLICAS=1
-TARGET_CPU_UTILIZATION=75
-HOSTS_PER_REQ=250
-MAX_THREADS=10
-PROD_MAX_THREADS=2
-BUILD_VERSION=0.0.0
-PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=False
-DEV_POSTGRES_SQL_SERVICE_HOST='yupana-pgsql.yupana.svc'
 
 OS := $(shell uname)
 ifeq ($(OS),Darwin)
@@ -61,18 +52,20 @@ help:
 	@echo "oc-up                    initialize an openshift cluster"
 	@echo "oc-up-dev                run yupana app in openshift cluster"
 	@echo "oc-down                  stop app & openshift cluster"
-	@echo "oc-create-yupana         create the Yupana app in an initialized openshift cluster"
+	@echo "oc-create-yupana         create just the Yupana app in an initialized openshift cluster"
+	@echo "oc-create-yupana-and-db  create the Yupana app and Postgres DB in an initialized openshift cluster"
+	@echo "oc-create-yupana-app     create the Yupana app all dependencies except db in an initialized openshift cluster"
+	@echo "oc-create-secret         create secret in an initialized openshift cluster"
+	@echo "oc-create-configmap      create the configmaps in an initialized openshift cluster"
+	@echo "oc-create-imagestream    create the imagestream in an initialized openshift cluster"
+	@echo "oc-create-standalone-db  create the Postgres DB in an initialized openshift cluster"
+	@echo "oc-create-database       create the Postgres DB and all app dependencies in an initialized openshift cluster"
 	@echo "oc-login-admin           login to openshift as admin"
 	@echo "oc-login-developer       login to openshift as developer"
 	@echo "oc-server-migrate        run migrations"
-	@echo "oc-update-template       update template and build"
 	@echo "oc-delete-yupana         delete the yupana project, app, and data"
 	@echo "oc-delete-yupana-data    delete the yupana app and data"
-	@echo "oc-dev-new-app           create new app to local openshift"
-	@echo "oc-new-app               create new app in openshift dedicated"
-	@echo "oc-dev-refresh           apply template changes to locally deployed app"
 	@echo "oc-refresh               apply template changes to openshift dedicated"
-	@echo "oc-refresh-prod          apply template changes to openshift dedicated in production"
 	@echo ""
 	@echo "--- Commands to upload data to Insights ---"
 	@echo "sample-data                                 ready sample data for upload to Insights"
@@ -135,173 +128,6 @@ validate-swagger:
 build:
 	docker build -t $(IMAGE_NAME) .
 
-oc-up:
-	oc cluster up \
-		--image=$(OC_SOURCE) \
-		--version=$(OC_VERSION) \
-		--host-data-dir=$(OC_DATA_DIR) \
-		--use-existing-config=true
-	sleep 60
-
-oc-down:
-	oc cluster down
-
-oc-clean: oc-down
-	$(PREFIX) rm -rf $(OC_DATA_DIR)
-
-oc-login-admin:
-	oc login -u system:admin
-
-oc-login-developer:
-	oc login -u developer -p developer --insecure-skip-tls-verify
-
-oc-project:
-	oc new-project ${OPENSHIFT_PROJECT_DEV}
-	oc project ${OPENSHIFT_PROJECT_DEV}
-
-oc-new-app:
-	oc new-app --template ${OPENSHIFT_PROJECT}/${TEMPLATE} \
-		--param NAMESPACE=${OPENSHIFT_PROJECT} \
-		--param SOURCE_REPOSITORY_URL=${CODE_REPO} \
-		--param SOURCE_REPOSITORY_REF=${REPO_BRANCH} \
-		--param KAFKA_HOST=${KAFKA_HOST} \
-		--param KAFKA_PORT=${KAFKA_PORT} \
-		--param KAFKA_NAMESPACE=${KAFKA_NAMESPACE} \
-		--param INSIGHTS_HOST_INVENTORY_URL=${INSIGHTS_HOST_INVENTORY_URL} \
-		--param MINIMUM_REPLICAS=${MINIMUM_REPLICAS} \
-		--param MAXIMUM_REPLICAS=${MAXIMUM_REPLICAS} \
-		--param TARGET_CPU_UTILIZATION=${TARGET_CPU_UTILIZATION} \
-		--param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
-		--param MAX_THREADS=${MAX_THREADS} \
-		--param BUILD_VERSION=${DEPLOY_BUILD_VERSION} \
-		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
-		--param POSTGRES_SQL_SERVICE_HOST=${POSTGRES_SQL_SERVICE_HOST} \
-
-oc-refresh:
-	oc process -f ${OPENSHIFT_TEMPLATE_PATH} \
-		--param NAMESPACE=${OPENSHIFT_PROJECT} \
-		--param SOURCE_REPOSITORY_URL=${CODE_REPO} \
-		--param SOURCE_REPOSITORY_REF=${REPO_BRANCH} \
-		--param KAFKA_HOST=${KAFKA_HOST} \
-		--param KAFKA_PORT=${KAFKA_PORT} \
-		--param KAFKA_NAMESPACE=${KAFKA_NAMESPACE} \
-		--param INSIGHTS_HOST_INVENTORY_URL=${INSIGHTS_HOST_INVENTORY_URL} \
-		--param MINIMUM_REPLICAS=${MINIMUM_REPLICAS} \
-		--param MAXIMUM_REPLICAS=${MAXIMUM_REPLICAS} \
-		--param TARGET_CPU_UTILIZATION=${TARGET_CPU_UTILIZATION} \
-		--param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
-		--param MAX_THREADS=${MAX_THREADS} \
-		--param BUILD_VERSION=${DEPLOY_BUILD_VERSION} \
-		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
-		--param POSTGRES_SQL_SERVICE_HOST=${POSTGRES_SQL_SERVICE_HOST} \
-		| oc apply -f -
-	oc start-build yupana
-
-oc-refresh-prod:
-	oc process -f ${OPENSHIFT_TEMPLATE_PATH} \
-		--param NAMESPACE=${OPENSHIFT_PROJECT} \
-		--param SOURCE_REPOSITORY_URL=${CODE_REPO} \
-		--param SOURCE_REPOSITORY_REF=${REPO_BRANCH} \
-		--param KAFKA_HOST=${KAFKA_HOST} \
-		--param KAFKA_PORT=${KAFKA_PORT} \
-		--param KAFKA_NAMESPACE=${KAFKA_NAMESPACE} \
-		--param INSIGHTS_HOST_INVENTORY_URL=${INSIGHTS_HOST_INVENTORY_URL} \
-		--param MINIMUM_REPLICAS=${MINIMUM_REPLICAS} \
-		--param MAXIMUM_REPLICAS=${PROD_MAXIMUM_REPLICAS} \
-		--param TARGET_CPU_UTILIZATION=${TARGET_CPU_UTILIZATION} \
-		--param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
-		--param MAX_THREADS=${PROD_MAX_THREADS} \
-		--param BUILD_VERSION=${DEPLOY_BUILD_VERSION} \
-		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
-		--param POSTGRES_SQL_SERVICE_HOST=${POSTGRES_SQL_SERVICE_HOST} \
-		--param DATABASE_ADMIN_PASSWORD=${DATABASE_ADMIN_PASSWORD} \
-		--param DATABASE_PASSWORD=${DATABASE_PASSWORD} \
-		--param DATABASE_USER=${DATABASE_USER} \
-		--param DATABASE_SERVICE_CERT=${DATABASE_SERVICE_CERT} \
-		| oc apply -f -
-	oc start-build yupana
-
-oc-dev-new-app:
-	oc new-app --template ${OPENSHIFT_PROJECT_DEV}/${TEMPLATE} \
-        --param NAMESPACE=${OPENSHIFT_PROJECT_DEV} \
-        --param SOURCE_REPOSITORY_URL=${CODE_REPO} \
-        --param SOURCE_REPOSITORY_REF=${REPO_BRANCH} \
-        --param MINIMUM_REPLICAS=${MINIMUM_REPLICAS} \
-      	--param MAXIMUM_REPLICAS=${MAXIMUM_REPLICAS} \
-		--param TARGET_CPU_UTILIZATION=${TARGET_CPU_UTILIZATION} \
-		--param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
-		--param MAX_THREADS=${MAX_THREADS} \
-		--param BUILD_VERSION=${BUILD_VERSION} \
-		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
-		--param POSTGRES_SQL_SERVICE_HOST=${DEV_POSTGRES_SQL_SERVICE_HOST} \
-
-oc-dev-refresh:
-	oc process -f ${OPENSHIFT_TEMPLATE_PATH} \
-		--param NAMESPACE=${OPENSHIFT_PROJECT_DEV} \
-        --param SOURCE_REPOSITORY_URL=${CODE_REPO} \
-        --param SOURCE_REPOSITORY_REF=${REPO_BRANCH} \
-        --param MINIMUM_REPLICAS=${MINIMUM_REPLICAS} \
-      	--param MAXIMUM_REPLICAS=${MAXIMUM_REPLICAS} \
-		--param TARGET_CPU_UTILIZATION=${TARGET_CPU_UTILIZATION} \
-		--param HOSTS_PER_REQ=${HOSTS_PER_REQ} \
-		--param MAX_THREADS=${MAX_THREADS} \
-		--param BUILD_VERSION=${BUILD_VERSION} \
-		--param PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE=${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE} \
-		--param POSTGRES_SQL_SERVICE_HOST=${DEV_POSTGRES_SQL_SERVICE_HOST} \
-		| oc apply -f -
-	oc start-build yupana -n yupana
-
-oc-apply:
-	oc apply -f ${OPENSHIFT_TEMPLATE_PATH}
-
-oc-update-template:
-	oc process -f ${OPENSHIFT_TEMPLATE_PATH} | oc apply -f -
-	oc start-build yupana -n yupana
-
-oc-delete-yupana-data:
-	oc delete all -l app=yupana
-	oc delete persistentvolumeclaim yupana-pgsql
-	oc delete configmaps yupana-env
-	oc delete secret yupana-secret
-	oc delete secret yupana-pgsql
-
-oc-delete-project:
-	oc delete project yupana
-
-oc-delete-yupana:
-	oc-delete-yupana-data oc-delete-project
-
-oc-up-dev: oc-up oc-project oc-apply oc-dev-new-app
-
-oc-create-all: oc-login-developer oc-project oc-create-tags oc-apply oc-dev-new-app
-
-oc-create-yupana: oc-login-developer oc-project oc-apply oc-dev-new-app
-
-oc-create-tags:
-	oc get istag postgresql:$(PGSQL_VERSION) || oc create istag postgresql:$(PGSQL_VERSION) --from-image=centos/postgresql-96-centos7
-
-oc-create-db:
-	oc process openshift//postgresql-persistent \
-		-p NAMESPACE=yupana \
-		-p POSTGRESQL_USER=yupanaadmin \
-		-p POSTGRESQL_PASSWORD=admin123 \
-		-p POSTGRESQL_DATABASE=yupana \
-		-p POSTGRESQL_VERSION=$(PGSQL_VERSION) \
-		-p DATABASE_SERVICE_NAME=yupana-pgsql \
-	| oc create -f -
-
-oc-server-migrate: oc-forward-ports
-	sleep 3
-	DJANGO_READ_DOT_ENV_FILE=True $(PYTHON) $(PYDIR)/manage.py migrate
-	make oc-stop-forwarding-ports
-
-oc-stop-forwarding-ports:
-	kill -HUP $$(ps -eo pid,command | grep "oc port-forward" | grep -v grep | awk '{print $$1}')
-
-oc-forward-ports:
-	-make oc-stop-forwarding-ports 2>/dev/null
-	oc port-forward $$(oc get pods -o jsonpath='{.items[*].metadata.name}' -l name=yupana-pgsql) 15432:5432 >/dev/null 2>&1 &
-
 clean-db:
 	$(PREFIX) rm -rf $(TOPDIR)/pg_data
 	make compose-down
@@ -313,13 +139,6 @@ compose-down:
 	docker-compose down
 
 reinit-db: compose-down clean-db start-db server-migrate
-
-oc-up-db: oc-up oc-create-db
-
-serve-with-oc: oc-forward-ports
-	sleep 3
-	DJANGO_READ_DOT_ENV_FILE=True $(PYTHON) $(PYDIR)/manage.py runserver
-	make oc-stop-forwarding-ports
 
 sample-data:
 	mkdir -p temp/reports
@@ -369,3 +188,178 @@ local-upload-data:
 		-F "file=@$(file);type=application/vnd.redhat.qpc.tar+tgz" \
 		-H "x-rh-insights-request-id: 52df9f748eabcfea" \
 		localhost:8080/api/ingress/v1/upload
+
+# Local commands for working with OpenShift
+oc-up:
+	oc cluster up \
+		--image=$(OC_SOURCE) \
+		--version=$(OC_VERSION) \
+		--host-data-dir=$(OC_DATA_DIR) \
+		--use-existing-config=true
+	sleep 60
+
+oc-down:
+	oc cluster down
+
+oc-clean: oc-down
+	$(PREFIX) rm -rf $(OC_DATA_DIR)
+
+oc-login-admin:
+	oc login -u system:admin
+
+oc-login-developer:
+	oc login -u developer -p developer --insecure-skip-tls-verify
+
+oc-project:
+	oc new-project ${NAMESPACE}
+	oc project ${NAMESPACE}
+
+oc-delete-yupana-data:
+	oc delete all -l app=yupana
+	oc delete persistentvolumeclaim yupana-db
+	oc delete configmaps yupana-env
+	oc delete configmaps yupana-db
+	oc delete configmaps yupana-app
+	oc delete configmaps yupana-messaging
+	oc delete secret yupana-secret
+	oc delete secret yupana-db
+
+oc-delete-project:
+	oc delete project yupana
+
+oc-delete-yupana: oc-delete-yupana-data oc-delete-project
+
+oc-up-dev: oc-up oc-project oc-create-yupana-and-db
+
+oc-up-db: oc-up oc-project oc-create-database
+
+oc-create-yupana-and-db: oc-project oc-create-imagestream oc-create-configmap oc-create-secret oc-create-standalone-db oc-create-yupana
+	oc start-build yupana
+
+oc-refresh: oc-create-imagestream oc-create-configmap oc-create-secret oc-create-standalone-db oc-create-yupana
+	oc start-build yupana
+
+oc-server-migrate: oc-forward-ports
+	sleep 3
+	DJANGO_READ_DOT_ENV_FILE=True $(PYTHON) $(PYDIR)/manage.py migrate
+	make oc-stop-forwarding-ports
+
+# internal command used by server-migrate & serve with oc
+oc-stop-forwarding-ports:
+	kill -HUP $$(ps -eo pid,command | grep "oc port-forward" | grep -v grep | awk '{print $$1}')
+
+# internal command used by server-migrate & serve with oc
+oc-forward-ports:
+	-make oc-stop-forwarding-ports 2>/dev/null
+	oc port-forward $$(oc get pods -o jsonpath='{.items[*].metadata.name}' -l name=yupana-db) 15432:5432 >/dev/null 2>&1 &
+
+serve-with-oc: oc-forward-ports
+	sleep 3
+	DJANGO_READ_DOT_ENV_FILE=True $(PYTHON) $(PYDIR)/manage.py runserver
+	make oc-stop-forwarding-ports
+
+oc-create-yupana-app: OC_OBJECT = 'bc/$(NAME) dc/$(NAME)'
+oc-create-yupana-app: OC_PARAMETER_FILE = $(NAME).env
+oc-create-yupana-app: OC_TEMPLATE_FILE = $(NAME).yaml
+oc-create-yupana-app: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
+oc-create-yupana-app:
+	$(OC_PARAMS) $(MAKE) oc-create-imagestream
+	$(OC_PARAMS) $(MAKE) oc-create-configmap
+	$(OC_PARAMS) $(MAKE) oc-create-secret
+	$(OC_PARAMS) $(MAKE) __oc-create-object
+	$(OC_PARAMS) $(MAKE) __oc-apply-object
+
+oc-create-secret: OC_OBJECT = 'secret -l app=$(NAME)'
+oc-create-secret: OC_PARAMETER_FILE = secret.env
+oc-create-secret: OC_TEMPLATE_FILE = secret.yaml
+oc-create-secret: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
+oc-create-secret:
+	$(OC_PARAMS) $(MAKE) __oc-apply-object
+	$(OC_PARAMS) $(MAKE) __oc-create-object
+
+oc-create-configmap: OC_OBJECT = 'configmap -l app=$(NAME)'
+oc-create-configmap: OC_PARAMETER_FILE = configmap.env
+oc-create-configmap: OC_TEMPLATE_FILE = configmap.yaml
+oc-create-configmap: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
+oc-create-configmap:
+	$(OC_PARAMS) $(MAKE) __oc-apply-object
+	$(OC_PARAMS) $(MAKE) __oc-create-object
+
+oc-create-imagestream: OC_OBJECT := 'is/centos is/python-36-centos7 is/postgresql'
+oc-create-imagestream: OC_PARAMETER_FILE = imagestream.env
+oc-create-imagestream: OC_TEMPLATE_FILE = imagestream.yaml
+oc-create-imagestream: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
+oc-create-imagestream:
+	$(OC_PARAMS) $(MAKE) __oc-apply-object
+	$(OC_PARAMS) $(MAKE) __oc-create-object
+
+oc-create-yupana: OC_OBJECT = 'bc/$(NAME) dc/$(NAME)'
+oc-create-yupana: OC_PARAMETER_FILE = $(NAME).env
+oc-create-yupana: OC_TEMPLATE_FILE = $(NAME).yaml
+oc-create-yupana: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
+oc-create-yupana:
+	$(OC_PARAMS) $(MAKE) __oc-apply-object
+	$(OC_PARAMS) $(MAKE) __oc-create-object
+
+oc-create-standalone-db: OC_OBJECT = 'bc/$(NAME)-db dc/$(NAME)-db'
+oc-create-standalone-db: OC_PARAMETER_FILE = $(NAME)-db.env
+oc-create-standalone-db: OC_TEMPLATE_FILE = $(NAME)-db.yaml
+oc-create-standalone-db: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
+oc-create-standalone-db:
+	$(OC_PARAMS) $(MAKE) __oc-apply-object
+	$(OC_PARAMS) $(MAKE) __oc-create-object
+
+oc-create-database: OC_OBJECT = 'bc/$(NAME)-db dc/$(NAME)-db'
+oc-create-database: OC_PARAMETER_FILE = $(NAME)-db.env
+oc-create-database: OC_TEMPLATE_FILE = $(NAME)-db.yaml
+oc-create-database: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
+oc-create-database:
+	$(OC_PARAMS) $(MAKE) oc-create-imagestream
+	$(OC_PARAMS) $(MAKE) oc-create-configmap
+	$(OC_PARAMS) $(MAKE) oc-create-secret
+	$(OC_PARAMS) $(MAKE) __oc-apply-object
+	$(OC_PARAMS) $(MAKE) __oc-create-object
+##################################
+### Internal openshift targets ###
+##################################
+
+__oc-create-project:
+	@if [[ ! $$(oc get -o name project/$(NAMESPACE) 2>/dev/null) ]]; then \
+		oc new-project $(NAMESPACE) ;\
+	fi
+
+# if object doesn't already exist,
+# create it from the provided template and parameters
+__oc-create-object: __oc-create-project
+	@if [[ $$(oc get -o name $(OC_OBJECT) 2>&1) == '' ]] || \
+	[[ $$(oc get -o name $(OC_OBJECT) 2>&1 | grep 'not found') ]]; then \
+		if [ -f $(OC_PARAM_DIR)/$(OC_PARAMETER_FILE) ]; then \
+			oc process -f $(OC_TEMPLATE_DIR)/$(OC_TEMPLATE_FILE) \
+				--param-file=$(OC_PARAM_DIR)/$(OC_PARAMETER_FILE) \
+			| oc create --save-config=True -n $(NAMESPACE) -f - 2>&1 | grep -v "already exists" || /usr/bin/true ;\
+		else \
+			oc process -f $(OC_TEMPLATE_DIR)/$(OC_TEMPLATE_FILE) \
+				$(foreach PARAM, $(OC_PARAMETERS), -p $(PARAM)) \
+			| oc create --save-config=True -n $(NAMESPACE) -f - 2>&1 | grep -v "already exists" || /usr/bin/true ;\
+		fi ;\
+	fi
+
+ __oc-apply-object: __oc-create-project
+	@if [[ $$(oc get -o name $(OC_OBJECT) 2>&1) != '' ]] || \
+	[[ $$(oc get -o name $(OC_OBJECT) 2>&1 | grep -v 'not found') ]]; then \
+		echo "WARNING: Resources matching 'oc get $(OC_OBJECT)' exists. Updating template. Skipping object creation." ;\
+		if [ -f $(OC_PARAM_DIR)/$(OC_PARAMETER_FILE) ]; then \
+			oc process -f $(OC_TEMPLATE_DIR)/$(OC_TEMPLATE_FILE) \
+				--param-file=$(OC_PARAM_DIR)/$(OC_PARAMETER_FILE) \
+			| oc apply -f - ;\
+		else \
+			oc process -f $(OC_TEMPLATE_DIR)/$(OC_TEMPLATE_FILE) \
+				$(foreach PARAM, $(OC_PARAMETERS), -p $(PARAM)) \
+			| oc apply -f - ;\
+		fi ;\
+	fi
+
+#
+# Phony targets
+#
+.PHONY: docs __oc-create-object __oc-create-project __oc-apply-object
