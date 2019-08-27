@@ -75,6 +75,13 @@ HOSTS_UPLOAD_FUTURES_COUNT = ENVIRONMENT.get_value('HOSTS_UPLOAD_FUTURES_COUNT',
 # this is the timeout for each kafka producer send
 HOSTS_UPLOAD_TIMEOUT = ENVIRONMENT.get_value('HOSTS_UPLOAD_TIMEOUT', default=120)
 
+# this is the retention limit of the report & slice archives (in weeks)
+ARCHIVE_RECORD_RETENTION_PERIOD = ENVIRONMENT.get_value(
+    'ARCHIVE_RECORD_RETENTION_PERIOD', default=4)
+
+# this is the interval at which garbage collection should run (in weeks)
+GARBAGE_COLLECTION_INTERVAL = ENVIRONMENT.get_value('GARBAGE_COLLECTION_INTERVAL', default=1)
+
 # Logging
 # https://docs.djangoproject.com/en/dev/topics/logging/
 # https://docs.python.org/3.6/library/logging.html
