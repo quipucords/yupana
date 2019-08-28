@@ -94,6 +94,34 @@ class GarbageCollectorTests(TestCase):
         with self.assertRaises(ReportSliceArchive.DoesNotExist):
             ReportSliceArchive.objects.get(id=self.archive_slice.id)
 
+    def test_deleting_multiple_report_archives(self):
+        """Test deleting multiple report archives."""
+        current_time = datetime.now(pytz.utc)
+        weeks_old_time = current_time - timedelta(weeks=6)
+        archive_report2 = ReportArchive(
+            upload_srv_kafka_msg=json.dumps({}),
+            account='12345',
+            state=Report.NEW,
+            state_info=json.dumps([Report.NEW]),
+            last_update_time=datetime.now(pytz.utc),
+            retry_count=0,
+            ready_to_archive=False,
+            source='satellite',
+            arrival_time=datetime.now(pytz.utc),
+            processing_start_time=datetime.now(pytz.utc),
+            processing_end_time=weeks_old_time)
+        archive_report2.save()
+        self.archive_report.processing_end_time = weeks_old_time
+        self.archive_report.save()
+        self.garbage_collector.remove_outdated_archives()
+        # assert the report doesn't exist
+        with self.assertRaises(ReportArchive.DoesNotExist):
+            ReportArchive.objects.get(id=archive_report2.id)
+        with self.assertRaises(ReportArchive.DoesNotExist):
+            ReportArchive.objects.get(id=self.archive_report.id)
+        with self.assertRaises(ReportSliceArchive.DoesNotExist):
+            ReportSliceArchive.objects.get(id=self.archive_slice.id)
+
     def test_deleting_archive_not_ready(self):
         """Test that delete fails if archive not ready."""
         current_time = datetime.now(pytz.utc)
