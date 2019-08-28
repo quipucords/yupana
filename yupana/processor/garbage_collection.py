@@ -65,20 +65,16 @@ class GarbageCollector():
         """Query for archived reports and delete them if they have come of age."""
         current_time = datetime.now(pytz.utc)
         created_time_limit = current_time - timedelta(weeks=ARCHIVE_RECORD_RETENTION_PERIOD)
-        garbage_collection_query = ReportArchive.objects.filter(
-            processing_end_time__lte=created_time_limit)
         # we only have to delete the archived reports because deleting an archived report deletes
         # all of the associated archived report slices
-        if garbage_collection_query:
-            for archived_report in garbage_collection_query:
-                LOG.info(
-                    format_message(
-                        self.prefix,
-                        'Deleting archived report with id: %s' % archived_report.id))
-                try:
-                    ReportArchive.objects.get(id=archived_report.id).delete()
-                except ReportArchive.DoesNotExist:
-                    pass
+        outdated_archives = ReportArchive.objects.filter(
+            processing_end_time__lte=created_time_limit)
+        if outdated_archives:
+            outdated_archives.delete()
+            LOG.info(format_message(
+                self.prefix,
+                'Deleted all archived reports & '
+                'report slices older than %s weeks.' % ARCHIVE_RECORD_RETENTION_PERIOD))
         else:
             LOG.info(
                 format_message(
