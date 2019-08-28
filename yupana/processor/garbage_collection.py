@@ -32,7 +32,7 @@ LOG = logging.getLogger(__name__)
 GARBAGE_COLLECTION_LOOP = asyncio.new_event_loop()
 # this is how often we want garbage collection to run
 # (set to weeks & we convert to seconds below for asyncio)
-GARBAGE_COLLECTION_INTERVAL = int(GARBAGE_COLLECTION_INTERVAL) * 604800
+GARBAGE_COLLECTION_INTERVAL_SECONDS = int(GARBAGE_COLLECTION_INTERVAL) * 604800
 # this is the number of weeks that we want to delete objects after
 ARCHIVE_RECORD_RETENTION_PERIOD = int(ARCHIVE_RECORD_RETENTION_PERIOD)
 
@@ -52,14 +52,16 @@ class GarbageCollector():
         manipulate the class variable should_run.
         """
         while self.should_run:
-            self.collect_the_garbage()
+            self.remove_outdated_archives()
             LOG.info(
                 format_message(
                     self.prefix,
-                    'Going to sleep. Checking again in %s minutes.' % GARBAGE_COLLECTION_INTERVAL))
-            await asyncio.sleep(GARBAGE_COLLECTION_INTERVAL)
+                    'Going to sleep. '
+                    'Will check again for outdated archives in %s week(s).'
+                    % GARBAGE_COLLECTION_INTERVAL))
+            await asyncio.sleep(GARBAGE_COLLECTION_INTERVAL_SECONDS)
 
-    def collect_the_garbage(self):
+    def remove_outdated_archives(self):
         """Query for archived reports and delete them if they have come of age."""
         current_time = datetime.now(pytz.utc)
         created_time_limit = current_time - timedelta(weeks=ARCHIVE_RECORD_RETENTION_PERIOD)
