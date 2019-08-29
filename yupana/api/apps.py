@@ -44,6 +44,7 @@ class ApiConfig(AppConfig):
             self.start_upload_report_consumer()
             self.start_report_processor()
             self.start_report_slice_processor()
+            self.start_garbage_collection()
         except (OperationalError, ProgrammingError) as op_error:
             if 'no such table' in str(op_error) or \
                     'does not exist' in str(op_error):
@@ -119,6 +120,13 @@ class ApiConfig(AppConfig):
             from processor.report_slice_processor import initialize_report_slice_processor
             logger.info('Initializing the report slice processor.')
             initialize_report_slice_processor()
+
+    @staticmethod
+    def start_garbage_collection():
+        """Start the garbage collector loop."""
+        from processor.garbage_collection import initialize_garbage_collection_loop
+        logger.info('Initializing the garbage collector.')
+        initialize_garbage_collection_loop()
 
     def check_and_create_service_admin(self):  # pylint: disable=R0201
         """Check for the service admin and create it if necessary."""
