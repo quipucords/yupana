@@ -147,7 +147,7 @@ class GarbageCollectorTests(TestCase):
                    side_effect=run_side_effect):
             await self.garbage_collector.run()
 
-    @patch('processor.garbage_collection.GARBAGE_COLLECTION_INTERVAL_SECONDS', 1)
+    @patch('processor.garbage_collection.GARBAGE_COLLECTION_INTERVAL', 1)
     def test_run_method(self):
         """Test the async run function."""
         event_loop = asyncio.new_event_loop()

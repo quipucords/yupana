@@ -31,9 +31,9 @@ from config.settings.base import (ARCHIVE_RECORD_RETENTION_PERIOD,
 LOG = logging.getLogger(__name__)
 GARBAGE_COLLECTION_LOOP = asyncio.new_event_loop()
 # this is how often we want garbage collection to run
-# (set to weeks & we convert to seconds below for asyncio)
-GARBAGE_COLLECTION_INTERVAL_SECONDS = int(GARBAGE_COLLECTION_INTERVAL) * 604800
-# this is the number of weeks that we want to delete objects after
+# (set to seconds) - default value is 1 week
+GARBAGE_COLLECTION_INTERVAL = int(GARBAGE_COLLECTION_INTERVAL)
+# this is the period in seconds for which we keep archives - default value is 4 weeks
 ARCHIVE_RECORD_RETENTION_PERIOD = int(ARCHIVE_RECORD_RETENTION_PERIOD)
 
 
@@ -57,24 +57,27 @@ class GarbageCollector():
                 format_message(
                     self.prefix,
                     'Going to sleep. '
-                    'Will check again for outdated archives in %s week(s).'
-                    % GARBAGE_COLLECTION_INTERVAL))
-            await asyncio.sleep(GARBAGE_COLLECTION_INTERVAL_SECONDS)
+                    'Will check again for outdated archives in %s seconds.'
+                    % int(GARBAGE_COLLECTION_INTERVAL)))
+            await asyncio.sleep(GARBAGE_COLLECTION_INTERVAL)
 
     def remove_outdated_archives(self):
         """Query for archived reports and delete them if they have come of age."""
         current_time = datetime.now(pytz.utc)
-        created_time_limit = current_time - timedelta(weeks=ARCHIVE_RECORD_RETENTION_PERIOD)
+        created_time_limit = current_time - timedelta(seconds=ARCHIVE_RECORD_RETENTION_PERIOD)
         # we only have to delete the archived reports because deleting an archived report deletes
         # all of the associated archived report slices
-        outdated_archives = ReportArchive.objects.filter(
+        outdated_report_archives = ReportArchive.objects.filter(
             processing_end_time__lte=created_time_limit)
-        if outdated_archives:
-            outdated_archives.delete()
+        if outdated_report_archives:
+            _, deleted_info = outdated_report_archives.delete()
+            report_total = deleted_info.get('api.ReportArchive')
+            report_slice_total = deleted_info.get('api.ReportSliceArchive')
             LOG.info(format_message(
                 self.prefix,
-                'Deleted all archived reports & '
-                'report slices older than %s weeks.' % ARCHIVE_RECORD_RETENTION_PERIOD))
+                'Deleted %s archived report(s) & '
+                '%s archived report slice(s) older than %s seconds.' %
+                (report_total, report_slice_total, int(ARCHIVE_RECORD_RETENTION_PERIOD))))
         else:
             LOG.info(
                 format_message(
