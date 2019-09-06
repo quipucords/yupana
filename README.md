@@ -83,6 +83,8 @@ docker_minio_1
 docker_zookeeper_1
 yupana_db_1
 yupana_db-host-inventory_1
+prometheus
+grafana
 ```
 
 ### Sending data to local yupana
@@ -106,6 +108,15 @@ To send the sample data, run the following commands:
     ```
 
 5. Look at the yupana logs to follow the report processing to completion.
+
+### Using Prometheus & Grafana
+
+Once all of the services have been brought up you can view the running Prometheus server at [http://localhost:9090](http://localhost:9090). Here, you can execute queries by typing in the name of the metric you want and pressing the `execute` button. You can also view the target that we are monitoring (our metrics endpoint) and the configuration of the Prometheus server.
+
+In order to visualize the metrics that we are collecting, log in to Grafana at [http://localhost:3000](http://localhost:3000). The username is `admin` and the password is `secret`. Once you are logged in, click on `Create your first data source`, and select `Prometheus`. Leave all ofthe defaults, but enter `http://docker.for.mac.localhost:9090` into the field for the url. Scroll down and click `Save & Test`.
+
+Now you can import our development dashboard. Click on the `+` in the lefthand toolbar and select `Import`. Next, select `Upload .json file`. Now, import [yupana-grafana.json](https://github.com/quipucords/yupana/blob/master/scripts/config/yupana-grafana.json). Next click `Import`.
+
 
 ### Bringing down yupana and all services
 To bring down all services run:

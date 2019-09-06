@@ -1,0 +1,556 @@
+{
+    "__inputs": [],
+    "__requires": [{
+            "type": "grafana",
+            "id": "grafana",
+            "name": "Grafana",
+            "version": "6.3.5"
+        },
+        {
+            "type": "panel",
+            "id": "graph",
+            "name": "Graph",
+            "version": ""
+        }
+    ],
+    "annotations": {
+        "list": [{
+            "builtIn": 1,
+            "datasource": "-- Grafana --",
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+        }]
+    },
+    "editable": true,
+    "gnetId": null,
+    "graphTooltip": 0,
+    "id": null,
+    "links": [],
+    "panels": [{
+            "aliasColors": {},
+            "bars": false,
+            "dashLength": 10,
+            "dashes": false,
+            "fill": 1,
+            "fillGradient": 0,
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 0
+            },
+            "id": 12,
+            "legend": {
+                "avg": false,
+                "current": false,
+                "max": false,
+                "min": false,
+                "show": true,
+                "total": false,
+                "values": false
+            },
+            "lines": true,
+            "linewidth": 1,
+            "nullPointMode": "null",
+            "options": {
+                "dataLinks": []
+            },
+            "percentage": false,
+            "pointradius": 2,
+            "points": false,
+            "renderer": "flot",
+            "seriesOverrides": [],
+            "spaceLength": 10,
+            "stack": false,
+            "steppedLine": false,
+            "targets": [{
+                "expr": "failed_validation_total",
+                "legendFormat": "Hosts that failed validation",
+                "refId": "A"
+            }],
+            "thresholds": [],
+            "timeFrom": null,
+            "timeRegions": [],
+            "timeShift": null,
+            "title": "Hosts that failed validation",
+            "tooltip": {
+                "shared": true,
+                "sort": 0,
+                "value_type": "individual"
+            },
+            "type": "graph",
+            "xaxis": {
+                "buckets": null,
+                "mode": "time",
+                "name": null,
+                "show": true,
+                "values": []
+            },
+            "yaxes": [{
+                    "format": "short",
+                    "label": null,
+                    "logBase": 1,
+                    "max": null,
+                    "min": null,
+                    "show": true
+                },
+                {
+                    "format": "short",
+                    "label": null,
+                    "logBase": 1,
+                    "max": null,
+                    "min": null,
+                    "show": true
+                }
+            ],
+            "yaxis": {
+                "align": false,
+                "alignLevel": null
+            }
+        },
+        {
+            "aliasColors": {},
+            "bars": false,
+            "dashLength": 10,
+            "dashes": false,
+            "fill": 1,
+            "fillGradient": 0,
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 8
+            },
+            "id": 10,
+            "legend": {
+                "avg": false,
+                "current": false,
+                "max": false,
+                "min": false,
+                "show": true,
+                "total": false,
+                "values": false
+            },
+            "lines": true,
+            "linewidth": 1,
+            "nullPointMode": "null",
+            "options": {
+                "dataLinks": []
+            },
+            "percentage": false,
+            "pointradius": 2,
+            "points": false,
+            "renderer": "flot",
+            "seriesOverrides": [],
+            "spaceLength": 10,
+            "stack": false,
+            "steppedLine": false,
+            "targets": [{
+                "expr": "hosts_per_qpc_rep + hosts_per_sat_rep",
+                "format": "time_series",
+                "legendFormat": "total_hosts",
+                "refId": "A"
+            }],
+            "thresholds": [],
+            "timeFrom": null,
+            "timeRegions": [],
+            "timeShift": null,
+            "title": "Total hosts uploaded",
+            "tooltip": {
+                "shared": true,
+                "sort": 0,
+                "value_type": "individual"
+            },
+            "type": "graph",
+            "xaxis": {
+                "buckets": null,
+                "mode": "time",
+                "name": null,
+                "show": true,
+                "values": []
+            },
+            "yaxes": [{
+                    "format": "short",
+                    "label": null,
+                    "logBase": 1,
+                    "max": null,
+                    "min": null,
+                    "show": true
+                },
+                {
+                    "format": "short",
+                    "label": null,
+                    "logBase": 1,
+                    "max": null,
+                    "min": null,
+                    "show": true
+                }
+            ],
+            "yaxis": {
+                "align": false,
+                "alignLevel": null
+            }
+        },
+        {
+            "aliasColors": {},
+            "bars": false,
+            "dashLength": 10,
+            "dashes": false,
+            "fill": 1,
+            "fillGradient": 0,
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 16
+            },
+            "id": 8,
+            "legend": {
+                "avg": false,
+                "current": false,
+                "max": false,
+                "min": false,
+                "show": true,
+                "total": false,
+                "values": false
+            },
+            "lines": true,
+            "linewidth": 1,
+            "nullPointMode": "null",
+            "options": {
+                "dataLinks": []
+            },
+            "percentage": false,
+            "pointradius": 2,
+            "points": false,
+            "renderer": "flot",
+            "seriesOverrides": [],
+            "spaceLength": 10,
+            "stack": false,
+            "steppedLine": false,
+            "targets": [{
+                "expr": "report_processing_latency_sum/report_processing_latency_count",
+                "legendFormat": "Report Processing Average",
+                "refId": "A"
+            }],
+            "thresholds": [],
+            "timeFrom": null,
+            "timeRegions": [],
+            "timeShift": null,
+            "title": "Report Processing Latency",
+            "tooltip": {
+                "shared": true,
+                "sort": 0,
+                "value_type": "individual"
+            },
+            "type": "graph",
+            "xaxis": {
+                "buckets": null,
+                "mode": "time",
+                "name": null,
+                "show": true,
+                "values": []
+            },
+            "yaxes": [{
+                    "format": "short",
+                    "label": null,
+                    "logBase": 1,
+                    "max": null,
+                    "min": null,
+                    "show": true
+                },
+                {
+                    "format": "short",
+                    "label": null,
+                    "logBase": 1,
+                    "max": null,
+                    "min": null,
+                    "show": true
+                }
+            ],
+            "yaxis": {
+                "align": false,
+                "alignLevel": null
+            }
+        },
+        {
+            "aliasColors": {},
+            "bars": false,
+            "dashLength": 10,
+            "dashes": false,
+            "fill": 1,
+            "fillGradient": 0,
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 24
+            },
+            "id": 6,
+            "interval": "",
+            "legend": {
+                "avg": false,
+                "current": false,
+                "max": false,
+                "min": false,
+                "show": true,
+                "total": false,
+                "values": false
+            },
+            "lines": true,
+            "linewidth": 1,
+            "nullPointMode": "null",
+            "options": {
+                "dataLinks": []
+            },
+            "percentage": false,
+            "pointradius": 2,
+            "points": false,
+            "renderer": "flot",
+            "seriesOverrides": [],
+            "spaceLength": 10,
+            "stack": false,
+            "steppedLine": false,
+            "targets": [{
+                    "expr": "hosts_per_qpc_rep",
+                    "legendFormat": "Hosts per QPC report",
+                    "refId": "A"
+                },
+                {
+                    "expr": "hosts_per_sat_rep",
+                    "legendFormat": "Hosts per SAT report",
+                    "refId": "B"
+                }
+            ],
+            "thresholds": [],
+            "timeFrom": null,
+            "timeRegions": [],
+            "timeShift": null,
+            "title": "Hosts Uploaded per Source ",
+            "tooltip": {
+                "shared": true,
+                "sort": 0,
+                "value_type": "individual"
+            },
+            "type": "graph",
+            "xaxis": {
+                "buckets": null,
+                "mode": "time",
+                "name": null,
+                "show": true,
+                "values": []
+            },
+            "yaxes": [{
+                    "format": "short",
+                    "label": null,
+                    "logBase": 1,
+                    "max": null,
+                    "min": null,
+                    "show": true
+                },
+                {
+                    "format": "short",
+                    "label": null,
+                    "logBase": 1,
+                    "max": null,
+                    "min": null,
+                    "show": true
+                }
+            ],
+            "yaxis": {
+                "align": false,
+                "alignLevel": null
+            }
+        },
+        {
+            "aliasColors": {},
+            "bars": false,
+            "dashLength": 10,
+            "dashes": false,
+            "fill": 1,
+            "fillGradient": 0,
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 32
+            },
+            "id": 4,
+            "legend": {
+                "avg": false,
+                "current": false,
+                "max": false,
+                "min": false,
+                "show": true,
+                "total": false,
+                "values": false
+            },
+            "lines": true,
+            "linewidth": 1,
+            "nullPointMode": "null",
+            "options": {
+                "dataLinks": []
+            },
+            "percentage": false,
+            "pointradius": 2,
+            "points": false,
+            "renderer": "flot",
+            "seriesOverrides": [],
+            "spaceLength": 10,
+            "stack": false,
+            "steppedLine": false,
+            "targets": [{
+                "expr": "uploaded_messages_total",
+                "legendFormat": "uploaded_messages",
+                "refId": "A"
+            }],
+            "thresholds": [],
+            "timeFrom": null,
+            "timeRegions": [],
+            "timeShift": null,
+            "title": "Uploaded Reports",
+            "tooltip": {
+                "shared": true,
+                "sort": 0,
+                "value_type": "individual"
+            },
+            "type": "graph",
+            "xaxis": {
+                "buckets": null,
+                "mode": "time",
+                "name": null,
+                "show": true,
+                "values": []
+            },
+            "yaxes": [{
+                    "format": "short",
+                    "label": null,
+                    "logBase": 1,
+                    "max": null,
+                    "min": null,
+                    "show": true
+                },
+                {
+                    "format": "short",
+                    "label": null,
+                    "logBase": 1,
+                    "max": null,
+                    "min": null,
+                    "show": true
+                }
+            ],
+            "yaxis": {
+                "align": false,
+                "alignLevel": null
+            }
+        },
+        {
+            "aliasColors": {},
+            "bars": false,
+            "dashLength": 10,
+            "dashes": false,
+            "description": "Visualization of all of the queued reports & report slices",
+            "fill": 1,
+            "fillGradient": 0,
+            "gridPos": {
+                "h": 9,
+                "w": 12,
+                "x": 0,
+                "y": 40
+            },
+            "id": 2,
+            "legend": {
+                "avg": false,
+                "current": false,
+                "max": false,
+                "min": false,
+                "show": true,
+                "total": false,
+                "values": false
+            },
+            "lines": true,
+            "linewidth": 1,
+            "nullPointMode": "null",
+            "options": {
+                "dataLinks": []
+            },
+            "percentage": false,
+            "pointradius": 2,
+            "points": false,
+            "renderer": "flot",
+            "seriesOverrides": [],
+            "spaceLength": 10,
+            "stack": false,
+            "steppedLine": false,
+            "targets": [{
+                    "expr": "queued_report_slices",
+                    "instant": false,
+                    "legendFormat": "queued_report_slices",
+                    "refId": "A"
+                },
+                {
+                    "expr": "queued_reports",
+                    "legendFormat": "queued_reports",
+                    "refId": "B"
+                }
+            ],
+            "thresholds": [],
+            "timeFrom": null,
+            "timeRegions": [],
+            "timeShift": null,
+            "title": "Queued Reports & Slices",
+            "tooltip": {
+                "shared": true,
+                "sort": 0,
+                "value_type": "individual"
+            },
+            "type": "graph",
+            "xaxis": {
+                "buckets": null,
+                "mode": "time",
+                "name": null,
+                "show": true,
+                "values": []
+            },
+            "yaxes": [{
+                    "format": "short",
+                    "label": null,
+                    "logBase": 1,
+                    "max": null,
+                    "min": null,
+                    "show": true
+                },
+                {
+                    "format": "short",
+                    "label": null,
+                    "logBase": 1,
+                    "max": null,
+                    "min": null,
+                    "show": true
+                }
+            ],
+            "yaxis": {
+                "align": false,
+                "alignLevel": null
+            }
+        }
+    ],
+    "schemaVersion": 19,
+    "style": "dark",
+    "tags": [],
+    "templating": {
+        "list": []
+    },
+    "time": {
+        "from": "now-6h",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "Yupana Dev",
+    "uid": "KYkcp45Wk",
+    "version": 9
+}
