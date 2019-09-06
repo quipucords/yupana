@@ -36,6 +36,7 @@ from processor.abstract_processor import (
 from processor.report_consumer import (KafkaMsgHandlerError,
                                        QPCReportException,
                                        format_message)
+from prometheus_client import Counter, Gauge, Summary
 
 from api.models import (Report, ReportSlice, Status)
 from api.serializers import ReportSerializer, ReportSliceSerializer
@@ -52,6 +53,8 @@ FAILURE_CONFIRM_STATUS = 'failure'
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
 MAX_HOSTS_PER_REP = int(MAX_HOSTS_PER_REP)
+HOSTS_PER_REPORT_SATELLITE = Gauge('hosts_per_sat_rep', 'Hosts count in a satellite report')
+HOSTS_PER_REPORT_QPC = Gauge('hosts_per_qpc_rep', 'Hosts count in a satellite report')
 
 
 class FailDownloadException(Exception):
@@ -469,7 +472,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
 
         self.report_platform_id = metadata_json.get('report_id')
         host_inventory_api_version = metadata_json.get('host_inventory_api_version')
-        source = metadata_json.get('source')
+        source = metadata_json.get('source', '')
         # we should save the above information into the report object
         options = {
             'report_platform_id': self.report_platform_id,
@@ -492,12 +495,19 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         valid_slice_ids = {}
         report_slices = metadata_json.get('report_slices', {})
         # we need to verify that the report slices have the appropriate number of hosts
+        total_hosts_in_report = 0
         for report_slice_id, report_info in report_slices.items():
             num_hosts = int(report_info.get('number_hosts', MAX_HOSTS_PER_REP + 1))
             if num_hosts <= MAX_HOSTS_PER_REP:
+                total_hosts_in_report += num_hosts
                 valid_slice_ids[report_slice_id] = num_hosts
             else:
                 invalid_slice_ids[report_slice_id] = num_hosts
+        # record how many hosts there were for grafana charts
+        if source.lower() == 'qpc':
+            HOSTS_PER_REPORT_QPC.set(total_hosts_in_report)
+        elif source.lower() == 'satellite':
+            HOSTS_PER_REPORT_SATELLITE.set(total_hosts_in_report)
         # if any reports were over the max number of hosts, we need to log
         if invalid_slice_ids:
             for report_slice_id, num_hosts in invalid_slice_ids.items():

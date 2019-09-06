@@ -51,7 +51,8 @@ RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
 
 # setup for prometheus metrics
-QUEUED_OBJECTS = Gauge('queued_objects', 'Reports & Report slices waiting to be processed')
+QUEUED_REPORTS = Gauge('queued_reports', 'Reports waiting to be processed')
+QUEUED_REPORT_SLICES = Gauge('queued_report_slices', 'Report Slices waiting to be processed')
 ARCHIVED_FAIL = Counter('archived_fail', 'Reports that have been archived as failures')
 ARCHIVED_SUCCESS = Counter('archived_success', 'Reports that have been archived as successes')
 FAILED_TO_DOWNLOAD = Counter('failed_download', 'Reports that failed to downlaod')
@@ -60,9 +61,12 @@ INVALID_REPORTS = Counter('invalid_reports', 'Reports containing invalid syntax'
 TIME_RETRIES = Counter('time_retries', 'The total number of retries based on time for all reports')
 COMMIT_RETRIES = Counter('commit_retries',
                          'The total number of retries based on commit for all reports')
-HOST_UPLOAD_REQUEST_LATENCY = Summary(
-    'inventory_upload_latency',
-    'The time in seconds that it takes to post to the host inventory')
+
+REPORT_PROCESSING_LATENCY = Summary(
+    'report_processing_latency',
+    'The time in seconds that it takes to process a report'
+)
+
 UPLOAD_GROUP_SIZE = Gauge('upload_group_size',
                           'The amount of hosts being uploaded in a single bulk request.')
 VALIDATION_LATENCY = Summary('validation_latency', 'The time it takes to validate a report')
@@ -181,7 +185,10 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         status_info = Status()
         current_time = datetime.now(pytz.utc)
         objects_count = self.calculate_queued_objects(current_time, status_info)
-        QUEUED_OBJECTS.set(objects_count)
+        if self.object_class == Report:
+            QUEUED_REPORTS.set(objects_count)
+        elif self.object_class == ReportSlice:
+            QUEUED_REPORT_SLICES.set(objects_count)
         LOG.info(format_message(
             self.prefix,
             'Number of %s waiting to be processed: %s' %
@@ -486,6 +493,10 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             (processing_end_time - processing_start_time).total_seconds() % 60)
         time_processing = '{}h {}m {}s'.format(
             total_processing_hours, total_processing_minutes, total_processing_seconds)
+
+        total_processing_time_in_seconds = \
+            int((processing_end_time - processing_start_time).total_seconds() % 60)
+        REPORT_PROCESSING_LATENCY.observe(total_processing_time_in_seconds)
 
         report_time_facts = '\nArrival date & time: {} '\
                             '\nTime spent in queue: {}'\
