@@ -36,7 +36,7 @@ from processor.abstract_processor import (
 from processor.report_consumer import (KafkaMsgHandlerError,
                                        QPCReportException,
                                        format_message)
-from prometheus_client import Counter, Gauge, Summary
+from prometheus_client import Gauge
 
 from api.models import (Report, ReportSlice, Status)
 from api.serializers import ReportSerializer, ReportSliceSerializer
