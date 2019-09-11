@@ -53,27 +53,25 @@ RETRY_TIME = int(RETRY_TIME)
 # setup for prometheus metrics
 QUEUED_REPORTS = Gauge('queued_reports', 'Reports waiting to be processed')
 QUEUED_REPORT_SLICES = Gauge('queued_report_slices', 'Report Slices waiting to be processed')
-ARCHIVED_FAIL = Counter('archived_fail', 'Reports that have been archived as failures')
-ARCHIVED_SUCCESS = Counter('archived_success', 'Reports that have been archived as successes')
+ARCHIVED_FAIL_REPORTS = Counter('archived_fail_reports',
+                                'Reports that have been archived as failures')
+ARCHIVED_SUCCESS_REPORTS = Counter('archived_success_reports',
+                                   'Reports that have been archived as successes')
+ARCHIVED_FAIL_SLICES = Counter('archived_fail_slices',
+                                'Slices that have been archived as failures')
+ARCHIVED_SUCCESS_SLICES = Counter('archived_success_slices',
+                                   'SLICES that have been archived as successes')
 FAILED_TO_DOWNLOAD = Counter('failed_download', 'Reports that failed to downlaod')
 FAILED_TO_VALIDATE = Counter('failed_validation', 'Reports that could not be validated')
 INVALID_REPORTS = Counter('invalid_reports', 'Reports containing invalid syntax')
 TIME_RETRIES = Counter('time_retries', 'The total number of retries based on time for all reports')
 COMMIT_RETRIES = Counter('commit_retries',
                          'The total number of retries based on commit for all reports')
-
 REPORT_PROCESSING_LATENCY = Summary(
     'report_processing_latency',
     'The time in seconds that it takes to process a report'
 )
-
-UPLOAD_GROUP_SIZE = Gauge('upload_group_size',
-                          'The amount of hosts being uploaded in a single bulk request.')
 VALIDATION_LATENCY = Summary('validation_latency', 'The time it takes to validate a report')
-INVALID_HOSTS = Gauge('invalid_hosts_per_report', 'The total number of invalid hosts per report')
-VALID_HOSTS = Gauge('valid_hosts_per_report', 'The total number of valid hosts per report')
-HOSTS_UPLOADED_SUCCESS = Gauge('hosts_uploaded', 'The total number of hosts successfully uploaded')
-HOSTS_UPLOADED_FAILED = Gauge('hosts_failed', 'The total number of hosts that fail to upload')
 
 
 # pylint: disable=broad-except, too-many-lines, too-many-public-methods
@@ -564,9 +562,9 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             failed_states = [Report.FAILED_DOWNLOAD, Report.FAILED_VALIDATION,
                              Report.FAILED_VALIDATION_REPORTING]
             if report.state in failed_states or failed:
-                ARCHIVED_FAIL.inc()
+                ARCHIVED_FAIL_REPORTS.inc()
             else:
-                ARCHIVED_SUCCESS.inc()
+                ARCHIVED_SUCCESS_REPORTS.inc()
 
             # loop through the associated reports & archive them
             for report_slice in all_report_slices:
@@ -598,9 +596,9 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 failed_states = [ReportSlice.FAILED_VALIDATION,
                                  ReportSlice.FAILED_HOSTS_UPLOAD]
                 if report_slice.state in failed_states:
-                    ARCHIVED_FAIL.inc()
+                    ARCHIVED_FAIL_SLICES.inc()
                 else:
-                    ARCHIVED_SUCCESS.inc()
+                    ARCHIVED_SUCCESS_SLICES.inc()
                 LOG.info(format_message(
                     self.prefix,
                     'Archiving report slice %s.' % report_slice.report_slice_id,
@@ -628,6 +626,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                                     report_platform_id=self.report_platform_id))
             self.reset_variables()
 
+    @VALIDATION_LATENCY.time()
     def _validate_report_details(self):  # pylint: disable=too-many-locals
         """
         Verify that the report contents are a valid Insights report.

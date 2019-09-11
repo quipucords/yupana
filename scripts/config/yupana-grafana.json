@@ -1,18 +1,4 @@
 {
-    "__inputs": [],
-    "__requires": [{
-            "type": "grafana",
-            "id": "grafana",
-            "name": "Grafana",
-            "version": "6.3.5"
-        },
-        {
-            "type": "panel",
-            "id": "graph",
-            "name": "Graph",
-            "version": ""
-        }
-    ],
     "annotations": {
         "list": [{
             "builtIn": 1,
@@ -27,7 +13,7 @@
     "editable": true,
     "gnetId": null,
     "graphTooltip": 0,
-    "id": null,
+    "id": 1,
     "links": [],
     "panels": [{
             "aliasColors": {},
@@ -42,7 +28,7 @@
                 "x": 0,
                 "y": 0
             },
-            "id": 12,
+            "id": 16,
             "legend": {
                 "avg": false,
                 "current": false,
@@ -67,15 +53,26 @@
             "stack": false,
             "steppedLine": false,
             "targets": [{
-                "expr": "failed_validation_total",
-                "legendFormat": "Hosts that failed validation",
-                "refId": "A"
-            }],
+                    "expr": "time_retries_total",
+                    "legendFormat": "Time Retries",
+                    "refId": "A"
+                },
+                {
+                    "expr": "commit_retries_total",
+                    "legendFormat": "Commit Retries",
+                    "refId": "B"
+                },
+                {
+                    "expr": "time_retries_total + commit_retries_total",
+                    "legendFormat": "Total Retries",
+                    "refId": "C"
+                }
+            ],
             "thresholds": [],
             "timeFrom": null,
             "timeRegions": [],
             "timeShift": null,
-            "title": "Hosts that failed validation",
+            "title": "Retries ",
             "tooltip": {
                 "shared": true,
                 "sort": 0,
@@ -124,7 +121,7 @@
                 "x": 0,
                 "y": 8
             },
-            "id": 10,
+            "id": 14,
             "legend": {
                 "avg": false,
                 "current": false,
@@ -149,16 +146,41 @@
             "stack": false,
             "steppedLine": false,
             "targets": [{
-                "expr": "hosts_per_qpc_rep + hosts_per_sat_rep",
-                "format": "time_series",
-                "legendFormat": "total_hosts",
-                "refId": "A"
-            }],
+                    "expr": "archived_fail_reports_total",
+                    "legendFormat": "Archived Failed Reports",
+                    "refId": "A"
+                },
+                {
+                    "expr": "archived_success_reports_total",
+                    "legendFormat": "Archived Successful Reports",
+                    "refId": "B"
+                },
+                {
+                    "expr": "archived_fail_reports_total + archived_success_reports_total",
+                    "legendFormat": "Total Archived Reports",
+                    "refId": "C"
+                },
+                {
+                    "expr": "archived_success_slices_total",
+                    "legendFormat": "Archived Successful Report Slices",
+                    "refId": "D"
+                },
+                {
+                    "expr": "archived_fail_slices_total",
+                    "legendFormat": "Archived Failed Report Slices",
+                    "refId": "E"
+                },
+                {
+                    "expr": "archived_success_slices_total + archived_fail_slices_total",
+                    "legendFormat": "Total Archived Report Slices",
+                    "refId": "F"
+                }
+            ],
             "thresholds": [],
             "timeFrom": null,
             "timeRegions": [],
             "timeShift": null,
-            "title": "Total hosts uploaded",
+            "title": "Archived Reports & Slices",
             "tooltip": {
                 "shared": true,
                 "sort": 0,
@@ -207,6 +229,99 @@
                 "x": 0,
                 "y": 16
             },
+            "id": 12,
+            "legend": {
+                "avg": false,
+                "current": false,
+                "max": false,
+                "min": false,
+                "show": true,
+                "total": false,
+                "values": false
+            },
+            "lines": true,
+            "linewidth": 1,
+            "nullPointMode": "null",
+            "options": {
+                "dataLinks": []
+            },
+            "percentage": false,
+            "pointradius": 2,
+            "points": false,
+            "renderer": "flot",
+            "seriesOverrides": [],
+            "spaceLength": 10,
+            "stack": false,
+            "steppedLine": false,
+            "targets": [{
+                    "expr": "failed_validation_total",
+                    "legendFormat": "Reports that failed validation",
+                    "refId": "A"
+                },
+                {
+                    "expr": "failed_download_total",
+                    "legendFormat": "Reports that failed to download",
+                    "refId": "B"
+                },
+                {
+                    "expr": "invalid_reports_total",
+                    "legendFormat": "Invalid reports ",
+                    "refId": "C"
+                }
+            ],
+            "thresholds": [],
+            "timeFrom": null,
+            "timeRegions": [],
+            "timeShift": null,
+            "title": "Failed Reports",
+            "tooltip": {
+                "shared": true,
+                "sort": 0,
+                "value_type": "individual"
+            },
+            "type": "graph",
+            "xaxis": {
+                "buckets": null,
+                "mode": "time",
+                "name": null,
+                "show": true,
+                "values": []
+            },
+            "yaxes": [{
+                    "format": "short",
+                    "label": null,
+                    "logBase": 1,
+                    "max": null,
+                    "min": null,
+                    "show": true
+                },
+                {
+                    "format": "short",
+                    "label": null,
+                    "logBase": 1,
+                    "max": null,
+                    "min": null,
+                    "show": true
+                }
+            ],
+            "yaxis": {
+                "align": false,
+                "alignLevel": null
+            }
+        },
+        {
+            "aliasColors": {},
+            "bars": false,
+            "dashLength": 10,
+            "dashes": false,
+            "fill": 1,
+            "fillGradient": 0,
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 24
+            },
             "id": 8,
             "legend": {
                 "avg": false,
@@ -232,10 +347,16 @@
             "stack": false,
             "steppedLine": false,
             "targets": [{
-                "expr": "report_processing_latency_sum/report_processing_latency_count",
-                "legendFormat": "Report Processing Average",
-                "refId": "A"
-            }],
+                    "expr": "report_processing_latency_sum/report_processing_latency_count",
+                    "legendFormat": "Report Processing Latency Average",
+                    "refId": "A"
+                },
+                {
+                    "expr": "validation_latency_sum/validation_latency_count",
+                    "legendFormat": "Validation Latency Average",
+                    "refId": "B"
+                }
+            ],
             "thresholds": [],
             "timeFrom": null,
             "timeRegions": [],
@@ -287,7 +408,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 0,
-                "y": 24
+                "y": 32
             },
             "id": 6,
             "interval": "",
@@ -323,13 +444,18 @@
                     "expr": "hosts_per_sat_rep",
                     "legendFormat": "Hosts per SAT report",
                     "refId": "B"
+                },
+                {
+                    "expr": "hosts_per_sat_rep + hosts_per_qpc_rep",
+                    "legendFormat": "Total hosts",
+                    "refId": "C"
                 }
             ],
             "thresholds": [],
             "timeFrom": null,
             "timeRegions": [],
             "timeShift": null,
-            "title": "Hosts Uploaded per Source ",
+            "title": "Hosts Total",
             "tooltip": {
                 "shared": true,
                 "sort": 0,
@@ -376,7 +502,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 0,
-                "y": 32
+                "y": 40
             },
             "id": 4,
             "legend": {
@@ -459,7 +585,7 @@
                 "h": 9,
                 "w": 12,
                 "x": 0,
-                "y": 40
+                "y": 48
             },
             "id": 2,
             "legend": {
@@ -552,5 +678,5 @@
     "timezone": "",
     "title": "Yupana Dev",
     "uid": "KYkcp45Wk",
-    "version": 9
+    "version": 12
 }
