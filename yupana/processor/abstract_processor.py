@@ -58,9 +58,9 @@ ARCHIVED_FAIL_REPORTS = Counter('archived_fail_reports',
 ARCHIVED_SUCCESS_REPORTS = Counter('archived_success_reports',
                                    'Reports that have been archived as successes')
 ARCHIVED_FAIL_SLICES = Counter('archived_fail_slices',
-                                'Slices that have been archived as failures')
+                               'Slices that have been archived as failures')
 ARCHIVED_SUCCESS_SLICES = Counter('archived_success_slices',
-                                   'SLICES that have been archived as successes')
+                                  'Slices that have been archived as successes')
 FAILED_TO_DOWNLOAD = Counter('failed_download', 'Reports that failed to downlaod')
 FAILED_TO_VALIDATE = Counter('failed_validation', 'Reports that could not be validated')
 INVALID_REPORTS = Counter('invalid_reports', 'Reports containing invalid syntax')
