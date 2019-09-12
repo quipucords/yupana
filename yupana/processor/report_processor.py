@@ -53,8 +53,12 @@ FAILURE_CONFIRM_STATUS = 'failure'
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
 MAX_HOSTS_PER_REP = int(MAX_HOSTS_PER_REP)
-HOSTS_PER_REPORT_SATELLITE = Gauge('hosts_per_sat_rep', 'Hosts count in a satellite report')
-HOSTS_PER_REPORT_QPC = Gauge('hosts_per_qpc_rep', 'Hosts count in a satellite report')
+HOSTS_PER_REPORT_SATELLITE = Gauge('hosts_per_sat_rep',
+                                   'Hosts count in a satellite report',
+                                   ['account_number'])
+HOSTS_PER_REPORT_QPC = Gauge('hosts_per_qpc_rep',
+                             'Hosts count in a QPC report',
+                             ['account_number'])
 
 
 class FailDownloadException(Exception):
@@ -96,8 +100,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             Report.FAILED_VALIDATION: self.archive_report_and_slices,
             Report.FAILED_VALIDATION_REPORTING: self.archive_report_and_slices}
         state_metrics = {
-            Report.FAILED_DOWNLOAD: FAILED_TO_DOWNLOAD.inc,
-            Report.FAILED_VALIDATION: FAILED_TO_VALIDATE.inc
+            Report.FAILED_DOWNLOAD: FAILED_TO_DOWNLOAD,
+            Report.FAILED_VALIDATION: FAILED_TO_VALIDATE
         }
         self.async_states = [Report.VALIDATED]
         super().__init__(pre_delegate=self.pre_delegate,
@@ -505,9 +509,11 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 invalid_slice_ids[report_slice_id] = num_hosts
         # record how many hosts there were for grafana charts
         if source.lower() == 'qpc':
-            HOSTS_PER_REPORT_QPC.set(total_hosts_in_report)
+            HOSTS_PER_REPORT_QPC.labels(
+                account_number=self.account_number).set(total_hosts_in_report)
         elif source.lower() == 'satellite':
-            HOSTS_PER_REPORT_SATELLITE.set(total_hosts_in_report)
+            HOSTS_PER_REPORT_SATELLITE.labels(
+                account_number=self.account_number).set(total_hosts_in_report)
         # if any reports were over the max number of hosts, we need to log
         if invalid_slice_ids:
             for report_slice_id, num_hosts in invalid_slice_ids.items():

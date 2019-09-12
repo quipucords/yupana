@@ -1338,7 +1338,12 @@ class ReportProcessorTests(TransactionTestCase):
     def test_state_to_metric(self):
         """Test the state_to_metric function."""
         self.processor.state = Report.FAILED_DOWNLOAD
-        failed_download_before = REGISTRY.get_sample_value('failed_download_total')
+        self.processor.account_number = '1234'
+        failed_download_before = \
+            REGISTRY.get_sample_value(
+                'failed_download_total', {'account_number': '1234'}) or 0
         self.processor.record_failed_state_metrics()
-        failed_download_after = REGISTRY.get_sample_value('failed_download_total')
-        self.assertEqual(1, failed_download_after - failed_download_before)
+        failed_download_after = REGISTRY.get_sample_value(
+            'failed_download_total', {'account_number': '1234'})
+        self.assertEqual(
+            1, int(failed_download_after) - failed_download_before)

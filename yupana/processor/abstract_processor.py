@@ -54,19 +54,32 @@ RETRY_TIME = int(RETRY_TIME)
 QUEUED_REPORTS = Gauge('queued_reports', 'Reports waiting to be processed')
 QUEUED_REPORT_SLICES = Gauge('queued_report_slices', 'Report Slices waiting to be processed')
 ARCHIVED_FAIL_REPORTS = Counter('archived_fail_reports',
-                                'Reports that have been archived as failures')
+                                'Reports that have been archived as failures',
+                                ['account_number'])
 ARCHIVED_SUCCESS_REPORTS = Counter('archived_success_reports',
-                                   'Reports that have been archived as successes')
+                                   'Reports that have been archived as successes',
+                                   ['account_number'])
 ARCHIVED_FAIL_SLICES = Counter('archived_fail_slices',
-                               'Slices that have been archived as failures')
+                               'Slices that have been archived as failures',
+                               ['account_number'])
 ARCHIVED_SUCCESS_SLICES = Counter('archived_success_slices',
-                                  'Slices that have been archived as successes')
-FAILED_TO_DOWNLOAD = Counter('failed_download', 'Reports that failed to downlaod')
-FAILED_TO_VALIDATE = Counter('failed_validation', 'Reports that could not be validated')
-INVALID_REPORTS = Counter('invalid_reports', 'Reports containing invalid syntax')
-TIME_RETRIES = Counter('time_retries', 'The total number of retries based on time for all reports')
+                                  'Slices that have been archived as successes',
+                                  ['account_number'])
+FAILED_TO_DOWNLOAD = Counter('failed_download',
+                             'Reports that failed to download',
+                             ['account_number'])
+FAILED_TO_VALIDATE = Counter('failed_validation',
+                             'Reports that could not be validated',
+                             ['account_number'])
+INVALID_REPORTS = Counter('invalid_reports',
+                          'Reports containing invalid syntax',
+                          ['account_number'])
+TIME_RETRIES = Counter('time_retries',
+                       'The total number of retries based on time for all reports',
+                       ['account_number'])
 COMMIT_RETRIES = Counter('commit_retries',
-                         'The total number of retries based on commit for all reports')
+                         'The total number of retries based on commit for all reports',
+                         ['account_number'])
 REPORT_PROCESSING_LATENCY = Summary(
     'report_processing_latency',
     'The time in seconds that it takes to process a report'
@@ -429,13 +442,13 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         else:
             self.next_state = current_state
             if retry_type == self.object_class.GIT_COMMIT:
-                COMMIT_RETRIES.inc()
+                COMMIT_RETRIES.labels(account_number=self.account_number).inc()
                 log_message = \
                     'Saving the %s to retry when a new commit '\
                     'is pushed. Retries: %s' % (self.object_prefix.lower(),
                                                 str(self.report_or_slice.retry_count + 1))
             else:
-                TIME_RETRIES.inc()
+                TIME_RETRIES.labels(account_number=self.account_number).inc()
                 log_message = \
                     'Saving the %s to retry at in %s minutes. '\
                     'Retries: %s' % (self.object_prefix.lower(),
@@ -454,7 +467,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
     def record_failed_state_metrics(self):
         """Record the metrics based on the report or slice state."""
         if self.state in self.state_to_metric.keys():
-            self.state_to_metric.get(self.state)()
+            metric = self.state_to_metric.get(self.state)
+            metric.labels(account_number=self.account_number).inc()
 
     def log_time_stats(self, archived_rep):
         """Log the start/completion and processing times of the report."""
@@ -548,7 +562,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             if report.upload_ack_status:
                 if report.upload_ack_status == FAILURE_CONFIRM_STATUS:
                     failed = True
-                    INVALID_REPORTS.inc()
+                    INVALID_REPORTS.labels(account_number=self.account_number).inc()
                 archived_rep_data['upload_ack_status'] = report.upload_ack_status
             if report.report_platform_id:
                 archived_rep_data['report_platform_id'] = report.report_platform_id
@@ -562,9 +576,9 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             failed_states = [Report.FAILED_DOWNLOAD, Report.FAILED_VALIDATION,
                              Report.FAILED_VALIDATION_REPORTING]
             if report.state in failed_states or failed:
-                ARCHIVED_FAIL_REPORTS.inc()
+                ARCHIVED_FAIL_REPORTS.labels(account_number=self.account_number).inc()
             else:
-                ARCHIVED_SUCCESS_REPORTS.inc()
+                ARCHIVED_SUCCESS_REPORTS.labels(account_number=self.account_number).inc()
 
             # loop through the associated reports & archive them
             for report_slice in all_report_slices:
@@ -596,9 +610,9 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 failed_states = [ReportSlice.FAILED_VALIDATION,
                                  ReportSlice.FAILED_HOSTS_UPLOAD]
                 if report_slice.state in failed_states:
-                    ARCHIVED_FAIL_SLICES.inc()
+                    ARCHIVED_FAIL_SLICES.labels(account_number=self.account_number).inc()
                 else:
-                    ARCHIVED_SUCCESS_SLICES.inc()
+                    ARCHIVED_SUCCESS_SLICES.labels(account_number=self.account_number).inc()
                 LOG.info(format_message(
                     self.prefix,
                     'Archiving report slice %s.' % report_slice.report_slice_id,
