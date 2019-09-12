@@ -198,7 +198,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         objects_count = self.calculate_queued_objects(current_time, status_info)
         if self.object_class == Report:
             QUEUED_REPORTS.set(objects_count)
-        elif self.object_class == ReportSlice:
+        else:
             QUEUED_REPORT_SLICES.set(objects_count)
         LOG.info(format_message(
             self.prefix,

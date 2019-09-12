@@ -115,6 +115,8 @@ Once all of the services have been brought up, you can view the metrics collecte
 ## Prometheus
 You can view the running Prometheus server at [http://localhost:9090](http://localhost:9090). Here, you can execute queries by typing in the name of the metric you want and pressing the `execute` button. You can also view the target that we are monitoring (our metrics endpoint) and the configuration of the Prometheus server.
 
+If you would like to change the configuration of the Prometheus server, you can edit the configuration file found [here](https://github.com/quipucords/yupana/blob/master/scripts/config/prometheus.yml). For example, if you would like to have a more accurate representation of the metrics, you can change change the scrape interval for the `yupana` job before bringing the local development services up. Currently we are polling the `/metrics` endpoint every `10s` to mimic the scrape interval used in CI, but you can set this to `1s` for more accurate metrics in development.
+
 ## Grafana
 In order to visualize the metrics that we are collecting, log in to Grafana at [http://localhost:3000](http://localhost:3000):
 1. Log in using `admin` as the username and `secret` as the password.
