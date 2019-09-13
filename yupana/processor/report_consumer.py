@@ -36,7 +36,9 @@ UPLOAD_REPORT_CONSUMER_LOOP = asyncio.get_event_loop()
 REPORT_PENDING_QUEUE = asyncio.Queue()
 QPC_TOPIC = 'platform.upload.qpc'
 
-MSG_UPLOADS = Counter('uploaded_messages', 'Number of messages uploaded to qpc topic')
+MSG_UPLOADS = Counter('uploaded_messages',
+                      'Number of messages uploaded to qpc topic',
+                      ['account_number'])
 
 
 def format_message(prefix, message, account_number=None,
@@ -147,7 +149,7 @@ async def save_message_and_ack(consumer, consumer_record):
                 report_serializer = ReportSerializer(data=uploaded_report)
                 report_serializer.is_valid(raise_exception=True)
                 report_serializer.save()
-                MSG_UPLOADS.inc()
+                MSG_UPLOADS.labels(account_number=account_number).inc()
                 LOG.info(format_message(
                     prefix, 'Upload service message saved. Ready for processing.'))
                 await consumer.commit()

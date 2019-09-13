@@ -51,25 +51,40 @@ RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
 
 # setup for prometheus metrics
-QUEUED_OBJECTS = Gauge('queued_objects', 'Reports & Report slices waiting to be processed')
-ARCHIVED_FAIL = Counter('archived_fail', 'Reports that have been archived as failures')
-ARCHIVED_SUCCESS = Counter('archived_success', 'Reports that have been archived as successes')
-FAILED_TO_DOWNLOAD = Counter('failed_download', 'Reports that failed to downlaod')
-FAILED_TO_VALIDATE = Counter('failed_validation', 'Reports that could not be validated')
-INVALID_REPORTS = Counter('invalid_reports', 'Reports containing invalid syntax')
-TIME_RETRIES = Counter('time_retries', 'The total number of retries based on time for all reports')
+QUEUED_REPORTS = Gauge('queued_reports', 'Reports waiting to be processed')
+QUEUED_REPORT_SLICES = Gauge('queued_report_slices', 'Report Slices waiting to be processed')
+ARCHIVED_FAIL_REPORTS = Counter('archived_fail_reports',
+                                'Reports that have been archived as failures',
+                                ['account_number'])
+ARCHIVED_SUCCESS_REPORTS = Counter('archived_success_reports',
+                                   'Reports that have been archived as successes',
+                                   ['account_number'])
+ARCHIVED_FAIL_SLICES = Counter('archived_fail_slices',
+                               'Slices that have been archived as failures',
+                               ['account_number'])
+ARCHIVED_SUCCESS_SLICES = Counter('archived_success_slices',
+                                  'Slices that have been archived as successes',
+                                  ['account_number'])
+FAILED_TO_DOWNLOAD = Counter('failed_download',
+                             'Reports that failed to download',
+                             ['account_number'])
+FAILED_TO_VALIDATE = Counter('failed_validation',
+                             'Reports that could not be validated',
+                             ['account_number'])
+INVALID_REPORTS = Counter('invalid_reports',
+                          'Reports containing invalid syntax',
+                          ['account_number'])
+TIME_RETRIES = Counter('time_retries',
+                       'The total number of retries based on time for all reports',
+                       ['account_number'])
 COMMIT_RETRIES = Counter('commit_retries',
-                         'The total number of retries based on commit for all reports')
-HOST_UPLOAD_REQUEST_LATENCY = Summary(
-    'inventory_upload_latency',
-    'The time in seconds that it takes to post to the host inventory')
-UPLOAD_GROUP_SIZE = Gauge('upload_group_size',
-                          'The amount of hosts being uploaded in a single bulk request.')
+                         'The total number of retries based on commit for all reports',
+                         ['account_number'])
+REPORT_PROCESSING_LATENCY = Summary(
+    'report_processing_latency',
+    'The time in seconds that it takes to process a report'
+)
 VALIDATION_LATENCY = Summary('validation_latency', 'The time it takes to validate a report')
-INVALID_HOSTS = Gauge('invalid_hosts_per_report', 'The total number of invalid hosts per report')
-VALID_HOSTS = Gauge('valid_hosts_per_report', 'The total number of valid hosts per report')
-HOSTS_UPLOADED_SUCCESS = Gauge('hosts_uploaded', 'The total number of hosts successfully uploaded')
-HOSTS_UPLOADED_FAILED = Gauge('hosts_failed', 'The total number of hosts that fail to upload')
 
 
 # pylint: disable=broad-except, too-many-lines, too-many-public-methods
@@ -181,7 +196,10 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         status_info = Status()
         current_time = datetime.now(pytz.utc)
         objects_count = self.calculate_queued_objects(current_time, status_info)
-        QUEUED_OBJECTS.set(objects_count)
+        if self.object_class == Report:
+            QUEUED_REPORTS.set(objects_count)
+        else:
+            QUEUED_REPORT_SLICES.set(objects_count)
         LOG.info(format_message(
             self.prefix,
             'Number of %s waiting to be processed: %s' %
@@ -424,13 +442,13 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         else:
             self.next_state = current_state
             if retry_type == self.object_class.GIT_COMMIT:
-                COMMIT_RETRIES.inc()
+                COMMIT_RETRIES.labels(account_number=self.account_number).inc()
                 log_message = \
                     'Saving the %s to retry when a new commit '\
                     'is pushed. Retries: %s' % (self.object_prefix.lower(),
                                                 str(self.report_or_slice.retry_count + 1))
             else:
-                TIME_RETRIES.inc()
+                TIME_RETRIES.labels(account_number=self.account_number).inc()
                 log_message = \
                     'Saving the %s to retry at in %s minutes. '\
                     'Retries: %s' % (self.object_prefix.lower(),
@@ -449,7 +467,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
     def record_failed_state_metrics(self):
         """Record the metrics based on the report or slice state."""
         if self.state in self.state_to_metric.keys():
-            self.state_to_metric.get(self.state)()
+            metric = self.state_to_metric.get(self.state)
+            metric.labels(account_number=self.account_number).inc()
 
     def log_time_stats(self, archived_rep):
         """Log the start/completion and processing times of the report."""
@@ -486,6 +505,10 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             (processing_end_time - processing_start_time).total_seconds() % 60)
         time_processing = '{}h {}m {}s'.format(
             total_processing_hours, total_processing_minutes, total_processing_seconds)
+
+        total_processing_time_in_seconds = \
+            int((processing_end_time - processing_start_time).total_seconds() % 60)
+        REPORT_PROCESSING_LATENCY.observe(total_processing_time_in_seconds)
 
         report_time_facts = '\nArrival date & time: {} '\
                             '\nTime spent in queue: {}'\
@@ -539,7 +562,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             if report.upload_ack_status:
                 if report.upload_ack_status == FAILURE_CONFIRM_STATUS:
                     failed = True
-                    INVALID_REPORTS.inc()
+                    INVALID_REPORTS.labels(account_number=self.account_number).inc()
                 archived_rep_data['upload_ack_status'] = report.upload_ack_status
             if report.report_platform_id:
                 archived_rep_data['report_platform_id'] = report.report_platform_id
@@ -553,9 +576,9 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             failed_states = [Report.FAILED_DOWNLOAD, Report.FAILED_VALIDATION,
                              Report.FAILED_VALIDATION_REPORTING]
             if report.state in failed_states or failed:
-                ARCHIVED_FAIL.inc()
+                ARCHIVED_FAIL_REPORTS.labels(account_number=self.account_number).inc()
             else:
-                ARCHIVED_SUCCESS.inc()
+                ARCHIVED_SUCCESS_REPORTS.labels(account_number=self.account_number).inc()
 
             # loop through the associated reports & archive them
             for report_slice in all_report_slices:
@@ -587,9 +610,9 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 failed_states = [ReportSlice.FAILED_VALIDATION,
                                  ReportSlice.FAILED_HOSTS_UPLOAD]
                 if report_slice.state in failed_states:
-                    ARCHIVED_FAIL.inc()
+                    ARCHIVED_FAIL_SLICES.labels(account_number=self.account_number).inc()
                 else:
-                    ARCHIVED_SUCCESS.inc()
+                    ARCHIVED_SUCCESS_SLICES.labels(account_number=self.account_number).inc()
                 LOG.info(format_message(
                     self.prefix,
                     'Archiving report slice %s.' % report_slice.report_slice_id,
@@ -617,6 +640,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                                     report_platform_id=self.report_platform_id))
             self.reset_variables()
 
+    @VALIDATION_LATENCY.time()
     def _validate_report_details(self):  # pylint: disable=too-many-locals
         """
         Verify that the report contents are a valid Insights report.

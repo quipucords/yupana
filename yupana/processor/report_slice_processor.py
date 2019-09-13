@@ -74,7 +74,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             ReportSlice.FAILED_VALIDATION: self.archive_report_and_slices,
             ReportSlice.FAILED_HOSTS_UPLOAD: self.archive_report_and_slices}
         state_metrics = {
-            ReportSlice.FAILED_VALIDATION: FAILED_TO_VALIDATE.inc
+            ReportSlice.FAILED_VALIDATION: FAILED_TO_VALIDATE
         }
         super().__init__(pre_delegate=self.pre_delegate,
                          state_functions=state_functions,
