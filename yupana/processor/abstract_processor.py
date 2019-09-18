@@ -85,6 +85,8 @@ REPORT_PROCESSING_LATENCY = Summary(
     'The time in seconds that it takes to process a report'
 )
 VALIDATION_LATENCY = Summary('validation_latency', 'The time it takes to validate a report')
+INVALID_HOSTS = Gauge('invalid_hosts', 'The number of invalid hosts',
+                      ['account_number', 'source'])
 
 
 # pylint: disable=broad-except, too-many-lines, too-many-public-methods
@@ -647,6 +649,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
 
         :returns: tuple contain list of valid and invalid hosts
         """
+        source_metadata = self.report_or_slice.source_metadata
         self.prefix = 'VALIDATE REPORT STRUCTURE'
         required_keys = ['report_slice_id',
                          'hosts']
@@ -667,27 +670,34 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     report_platform_id=self.report_platform_id))
 
         # validate that hosts is an array
-        invalid_hosts_message = 'Hosts must be a list of dictionaries.'
+        invalid_hosts_message = \
+            'Hosts must be a list of dictionaries. '\
+            'Source metadata: %s' % source_metadata
         hosts = self.report_json.get('hosts')
         if not hosts or not isinstance(hosts, list):
-            raise QPCReportException(
-                format_message(
-                    self.prefix,
-                    invalid_hosts_message,
-                    account_number=self.account_number,
-                    report_platform_id=self.report_platform_id))
-
+            LOG.error(format_message(self.prefix,
+                                     invalid_hosts_message,
+                                     account_number=self.account_number,
+                                     report_platform_id=self.report_platform_id))
+            raise QPCReportException()
+        invalid_hosts_count = 0
         for host in hosts:
             if not isinstance(host, dict):
-                raise QPCReportException(
-                    format_message(
-                        self.prefix,
-                        invalid_hosts_message,
-                        account_number=self.account_number,
-                        report_platform_id=self.report_platform_id))
+                invalid_hosts_count += 1
+        INVALID_HOSTS.labels(account_number=self.account_number,
+                             source=self.report_or_slice.source).set(invalid_hosts_count)
+        if invalid_hosts_count > 0:
+            hosts_count_message = \
+                '%s invalid host(s) found. ' % invalid_hosts_count
+            invalid_hosts_message = hosts_count_message + invalid_hosts_message
+            LOG.error(format_message(self.prefix,
+                                     invalid_hosts_message,
+                                     account_number=self.account_number,
+                                     report_platform_id=self.report_platform_id))
+            raise QPCReportException()
         report_slice_id = self.report_json.get('report_slice_id')
         candidate_hosts, hosts_without_facts = \
-            self._validate_report_hosts(report_slice_id)
+            self._validate_report_hosts(report_slice_id, source_metadata)
         total_fingerprints = len(candidate_hosts)
         total_valid = total_fingerprints - len(hosts_without_facts)
         LOG.info(format_message(
@@ -698,15 +708,14 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             report_platform_id=self.report_platform_id
         ))
         if not candidate_hosts:
-            raise QPCReportException(
-                format_message(
-                    self.prefix,
-                    'report does not contain any valid hosts.',
-                    account_number=self.account_number,
-                    report_platform_id=self.report_platform_id))
+            LOG.error(format_message(self.prefix,
+                                     'report does not contain any valid hosts.',
+                                     account_number=self.account_number,
+                                     report_platform_id=self.report_platform_id))
+            raise QPCReportException()
         return candidate_hosts
 
-    def _validate_report_hosts(self, report_slice_id):
+    def _validate_report_hosts(self, report_slice_id, source_metadata):
         """Verify that report hosts contain canonical facts.
 
         :returns: tuple containing valid & invalid hosts
@@ -733,15 +742,20 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     found_facts = True
                     break
             if not found_facts:
+                INVALID_HOSTS.labels(
+                    account_number=self.account_number, source=self.report_or_slice.source).inc()
                 hosts_without_facts.append({host_uuid: host})
             candidate_hosts.append({host_uuid: host})
-
         if hosts_without_facts:
+            invalid_hosts_message = \
+                '%d host(s) found that contain(s) 0 canonical facts: %s.'\
+                'Source metadata: %s' % (len(hosts_without_facts),
+                                         hosts_without_facts,
+                                         source_metadata)
             LOG.warning(
                 format_message(
                     prefix,
-                    '%d host(s) found that contain(s) 0 canonical facts: %s' % (
-                        len(hosts_without_facts), hosts_without_facts),
+                    invalid_hosts_message,
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id))
 

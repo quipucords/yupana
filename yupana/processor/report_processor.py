@@ -36,7 +36,7 @@ from processor.abstract_processor import (
 from processor.report_consumer import (KafkaMsgHandlerError,
                                        QPCReportException,
                                        format_message)
-from prometheus_client import Gauge
+from prometheus_client import Counter, Gauge
 
 from api.models import (Report, ReportSlice, Status)
 from api.serializers import ReportSerializer, ReportSliceSerializer
@@ -59,6 +59,7 @@ HOSTS_PER_REPORT_SATELLITE = Gauge('hosts_per_sat_rep',
 HOSTS_PER_REPORT_QPC = Gauge('hosts_per_qpc_rep',
                              'Hosts count in a QPC report',
                              ['account_number'])
+HOSTS_COUNTER = Counter('hosts_count', 'Total number of hosts uploaded', ['account_number', 'source'])
 
 
 class FailDownloadException(Exception):
@@ -246,6 +247,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         report_slice_id = options.get('report_slice_id')
         hosts_count = options.get('hosts_count')
         source = options.get('source')
+        source_metadata = options.get('source_metadata')
         LOG.info(
             format_message(
                 self.prefix, 'Creating report slice %s' % report_slice_id,
@@ -278,6 +280,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             'report': self.report_or_slice.id,
             'hosts_count': hosts_count,
             'source': source,
+            'source_metadata': json.dumps(source_metadata),
             'creation_time': datetime.now(pytz.utc)
         }
         slice_serializer = ReportSliceSerializer(data=report_slice)
@@ -508,6 +511,9 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             else:
                 invalid_slice_ids[report_slice_id] = num_hosts
         # record how many hosts there were for grafana charts
+        HOSTS_COUNTER.labels(
+            account_number=self.account_number,
+            source=source).inc(total_hosts_in_report)
         if source.lower() == 'qpc':
             HOSTS_PER_REPORT_QPC.labels(
                 account_number=self.account_number).set(total_hosts_in_report)
@@ -612,7 +618,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                                     'report_json': report_slice_json,
                                     'report_slice_id': report_slice_id,
                                     'hosts_count': num_hosts,
-                                    'source': options.get('source')
+                                    'source': options.get('source'),
+                                    'source_metadata': options.get('source_metadata', {})
                                 }
                                 created = self.create_report_slice(
                                     slice_options)
