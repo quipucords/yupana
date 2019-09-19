@@ -20,6 +20,92 @@
     "panels": [
       {
         "aliasColors": {
+          "kafka_errors_total{instance=\"docker.for.mac.localhost:8001\",job=\"yupana\"}": "dark-blue"
+        },
+        "bars": true,
+        "dashLength": 10,
+        "dashes": false,
+        "fill": 1,
+        "fillGradient": 0,
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "id": 24,
+        "legend": {
+          "avg": false,
+          "current": false,
+          "max": false,
+          "min": false,
+          "show": true,
+          "total": false,
+          "values": false
+        },
+        "lines": true,
+        "linewidth": 1,
+        "nullPointMode": "null",
+        "options": {
+          "dataLinks": []
+        },
+        "percentage": false,
+        "pointradius": 2,
+        "points": false,
+        "renderer": "flot",
+        "seriesOverrides": [],
+        "spaceLength": 10,
+        "stack": false,
+        "steppedLine": false,
+        "targets": [
+          {
+            "expr": "kafka_errors_total",
+            "refId": "A"
+          }
+        ],
+        "thresholds": [],
+        "timeFrom": null,
+        "timeRegions": [],
+        "timeShift": null,
+        "title": "Kafka Errors",
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "type": "graph",
+        "xaxis": {
+          "buckets": null,
+          "mode": "time",
+          "name": null,
+          "show": true,
+          "values": []
+        },
+        "yaxes": [
+          {
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          },
+          {
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          }
+        ],
+        "yaxis": {
+          "align": false,
+          "alignLevel": null
+        }
+      },
+      {
+        "aliasColors": {
           "Hosts per hour": "dark-orange",
           "Hosts per minute": "super-light-green",
           "Hosts uploaded over the last day": "semi-dark-blue",
@@ -41,7 +127,7 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 0
+          "y": 8
         },
         "id": 22,
         "legend": {
@@ -180,7 +266,7 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 8
+          "y": 16
         },
         "id": 18,
         "legend": {
@@ -264,7 +350,7 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 16
+          "y": 24
         },
         "id": 16,
         "legend": {
@@ -363,7 +449,7 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 24
+          "y": 32
         },
         "id": 14,
         "legend": {
@@ -473,7 +559,7 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 32
+          "y": 40
         },
         "id": 12,
         "legend": {
@@ -568,7 +654,7 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 40
+          "y": 48
         },
         "id": 8,
         "legend": {
@@ -666,7 +752,7 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 48
+          "y": 56
         },
         "id": 6,
         "interval": "",
@@ -769,7 +855,7 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 56
+          "y": 64
         },
         "id": 4,
         "legend": {
@@ -881,7 +967,7 @@
           "h": 9,
           "w": 12,
           "x": 0,
-          "y": 64
+          "y": 72
         },
         "id": 2,
         "legend": {
@@ -997,5 +1083,5 @@
     "timezone": "",
     "title": "Yupana Dev",
     "uid": "KYkcp45Wk",
-    "version": 21
+    "version": 4
   }

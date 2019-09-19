@@ -40,6 +40,8 @@ MSG_UPLOADS = Counter('uploaded_messages',
                       'Number of messages uploaded to qpc topic',
                       ['account_number'])
 
+KAFKA_ERRORS = Counter('kafka_errors', 'Number of Kafka errors')
+
 
 def format_message(prefix, message, account_number=None,
                    report_platform_id=None):
@@ -175,6 +177,7 @@ async def loop_save_message_and_ack(consumer):
         await save_message_and_ack(consumer, consumer_record)
 
 
+@KAFKA_ERRORS.count_exceptions()
 async def listen_for_messages(consumer, async_queue, log_message):  # pragma: no cover
     """
     Listen for messages on the qpc topic.
@@ -187,6 +190,7 @@ async def listen_for_messages(consumer, async_queue, log_message):  # pragma: no
     try:
         await consumer.start()
     except KafkaConnectionError:
+        KAFKA_ERRORS.inc()
         await consumer.stop()
         raise KafkaMsgHandlerError('Unable to connect to kafka server.  Closing consumer.')
 
@@ -200,6 +204,7 @@ async def listen_for_messages(consumer, async_queue, log_message):  # pragma: no
         await consumer.stop()
 
 
+@KAFKA_ERRORS.count_exceptions()
 def create_upload_report_consumer_loop(loop):  # pragma: no cover
     """
     Worker thread function to run the asyncio event loop.
@@ -219,6 +224,7 @@ def create_upload_report_consumer_loop(loop):  # pragma: no cover
         log_message = 'Upload report listener started.  Waiting for messages...'
         loop.run_until_complete(listen_for_messages(consumer, REPORT_PENDING_QUEUE, log_message))
     except KafkaMsgHandlerError as err:
+        KAFKA_ERRORS.inc()
         LOG.info('Stopping kafka worker thread.  Error: %s', str(err))
 
 
