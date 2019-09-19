@@ -40,7 +40,7 @@ MSG_UPLOADS = Counter('uploaded_messages',
                       'Number of messages uploaded to qpc topic',
                       ['account_number'])
 
-KAFKA_ERRORS = Counter('kafka_errors', 'Number of Kafka errors')
+KAFKA_ERRORS = Counter('yupana_kafka_errors', 'Number of Kafka errors')
 
 
 def format_message(prefix, message, account_number=None,

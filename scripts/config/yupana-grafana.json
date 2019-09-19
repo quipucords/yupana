@@ -59,7 +59,7 @@
         "steppedLine": false,
         "targets": [
           {
-            "expr": "kafka_errors_total",
+            "expr": "yupana_kafka_errors_total",
             "refId": "A"
           }
         ],
@@ -1076,12 +1076,12 @@
       "list": []
     },
     "time": {
-      "from": "now-6h",
+      "from": "now-12h",
       "to": "now"
     },
     "timepicker": {},
     "timezone": "",
     "title": "Yupana Dev",
     "uid": "KYkcp45Wk",
-    "version": 4
+    "version": 5
   }
