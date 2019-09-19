@@ -24,7 +24,8 @@ import threading
 from aiokafka import AIOKafkaProducer
 from kafka.errors import ConnectionError as KafkaConnectionError
 from processor.abstract_processor import (AbstractProcessor, FAILED_TO_VALIDATE)
-from processor.report_consumer import (KafkaMsgHandlerError,
+from processor.report_consumer import (KAFKA_ERRORS,
+                                       KafkaMsgHandlerError,
                                        QPCReportException,
                                        format_message)
 
@@ -182,7 +183,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         return candidates
 
     # pylint:disable=too-many-locals
-    async def _upload_to_host_inventory_via_kafka(self, hosts):   # noqa: C901 (too-complex)
+    @KAFKA_ERRORS.count_exceptions()  # noqa: C901 (too-complex)
+    async def _upload_to_host_inventory_via_kafka(self, hosts):
         """
         Upload to the host inventory via kafka.
 
@@ -195,6 +197,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         try:
             await producer.start()
         except (KafkaConnectionError, TimeoutError):
+            KAFKA_ERRORS.inc()
             await producer.stop()
             raise KafkaMsgHandlerError(
                 format_message(
@@ -245,6 +248,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                         LOG.error('An exception occurred: %s', error)
                     send_futures = []
         except Exception as err:  # pylint: disable=broad-except
+            KAFKA_ERRORS.inc()
             await producer.stop()
             raise KafkaMsgHandlerError(
                 format_message(
