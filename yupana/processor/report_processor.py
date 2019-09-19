@@ -33,7 +33,9 @@ from kafka.errors import ConnectionError as KafkaConnectionError
 from processor.abstract_processor import (
     AbstractProcessor,
     FAILED_TO_DOWNLOAD, FAILED_TO_VALIDATE, RETRY)
-from processor.report_consumer import (KafkaMsgHandlerError,
+from processor.report_consumer import (DB_ERRORS,
+                                       KAFKA_ERRORS,
+                                       KafkaMsgHandlerError,
                                        QPCReportException,
                                        format_message)
 from prometheus_client import Counter, Gauge
@@ -164,6 +166,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 account_number=self.account_number))
             self.determine_retry(Report.FAILED_DOWNLOAD, Report.STARTED)
 
+    @DB_ERRORS.count_exceptions()
     def transition_to_validated(self):
         """Validate that the report contents & move to validated state."""
         self.prefix = 'ATTEMPTING VALIDATE'
@@ -237,6 +240,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 report_platform_id=self.report_platform_id))
             self.determine_retry(Report.FAILED_VALIDATION_REPORTING, Report.VALIDATED)
 
+    @DB_ERRORS.count_exceptions()
     def create_report_slice(self, options):
         """Create report slice.
 
@@ -375,6 +379,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id))
         except Exception as error:  # pylint: disable=broad-except
+            DB_ERRORS.inc()
             LOG.error(format_message(
                 self.prefix,
                 'Could not update report slice record due to the following error %s.' % str(error),
@@ -663,6 +668,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                                'Unexpected error reading tar.gz: %s' % str(err),
                                account_number=self.account_number))
 
+    @KAFKA_ERRORS.count_exceptions()
     async def _send_confirmation(self, file_hash):  # pragma: no cover
         """
         Send kafka validation message to Insights Upload service.
@@ -680,6 +686,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         try:
             await producer.start()
         except (KafkaConnectionError, TimeoutError):
+            KAFKA_ERRORS.inc()
             await producer.stop()
             raise KafkaMsgHandlerError(
                 format_message(
@@ -704,6 +711,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         finally:
             await producer.stop()
 
+    @DB_ERRORS.count_exceptions()
     @transaction.atomic
     def deduplicate_reports(self):
         """If a report with the same id already exists, archive the new report."""

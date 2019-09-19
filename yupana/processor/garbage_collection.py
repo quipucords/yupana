@@ -22,7 +22,7 @@ import threading
 from datetime import datetime, timedelta
 
 import pytz
-from processor.report_consumer import format_message
+from processor.report_consumer import DB_ERRORS, format_message
 
 from api.models import ReportArchive
 from config.settings.base import (ARCHIVE_RECORD_RETENTION_PERIOD,
@@ -61,6 +61,7 @@ class GarbageCollector():
                     % int(GARBAGE_COLLECTION_INTERVAL)))
             await asyncio.sleep(GARBAGE_COLLECTION_INTERVAL)
 
+    @DB_ERRORS.count_exceptions()
     def remove_outdated_archives(self):
         """Query for archived reports and delete them if they have come of age."""
         current_time = datetime.now(pytz.utc)
