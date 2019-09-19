@@ -36,7 +36,7 @@ UPLOAD_REPORT_CONSUMER_LOOP = asyncio.get_event_loop()
 REPORT_PENDING_QUEUE = asyncio.Queue()
 QPC_TOPIC = 'platform.upload.qpc'
 
-MSG_UPLOADS = Counter('uploaded_messages',
+MSG_UPLOADS = Counter('yupana_message_uploads',
                       'Number of messages uploaded to qpc topic',
                       ['account_number'])
 

@@ -59,7 +59,7 @@ HOSTS_PER_REPORT_SATELLITE = Gauge('hosts_per_sat_rep',
 HOSTS_PER_REPORT_QPC = Gauge('hosts_per_qpc_rep',
                              'Hosts count in a QPC report',
                              ['account_number'])
-HOSTS_COUNTER = Counter('hosts_count',
+HOSTS_COUNTER = Counter('yupana_hosts_count',
                         'Total number of hosts uploaded',
                         ['account_number', 'source'])
 

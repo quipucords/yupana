@@ -155,61 +155,61 @@
         "steppedLine": false,
         "targets": [
           {
-            "expr": "sum(hosts_count_total)",
+            "expr": "sum(yupana_hosts_count_total)",
             "hide": false,
             "legendFormat": "Total Hosts ",
             "refId": "A"
           },
           {
-            "expr": "hosts_count_total{source=\"qpc\"}",
+            "expr": "yupana_hosts_count_total{source=\"qpc\"}",
             "hide": false,
             "legendFormat": "Total QPC Hosts",
             "refId": "B"
           },
           {
-            "expr": "hosts_count_total{source=\"satellite\"}",
+            "expr": "yupana_hosts_count_total{source=\"satellite\"}",
             "hide": false,
             "legendFormat": "Total Satellite Hosts ",
             "refId": "C"
           },
           {
-            "expr": "sum(increase(hosts_count_total[1m]))",
+            "expr": "sum(increase(yupana_hosts_count_total[1m]))",
             "hide": false,
             "legendFormat": "Hosts per minute",
             "refId": "D"
           },
           {
-            "expr": "increase(hosts_count_total{source=\"qpc\"}[1m])",
+            "expr": "increase(yupana_hosts_count_total{source=\"qpc\"}[1m])",
             "legendFormat": "QPC hosts per minute",
             "refId": "E"
           },
           {
-            "expr": "increase(hosts_count_total{source=\"satellite\"}[1m])",
+            "expr": "increase(yupana_hosts_count_total{source=\"satellite\"}[1m])",
             "legendFormat": "Satellite hosts per minute",
             "refId": "F"
           },
           {
-            "expr": "sum(increase(hosts_count_total[1h]))",
+            "expr": "sum(increase(yupana_hosts_count_total[1h]))",
             "legendFormat": "Hosts per hour",
             "refId": "G"
           },
           {
-            "expr": "increase(hosts_count_total{source=\"qpc\"}[1h])",
+            "expr": "increase(yupana_hosts_count_total{source=\"qpc\"}[1h])",
             "legendFormat": "QPC hosts per hour",
             "refId": "H"
           },
           {
-            "expr": "increase(hosts_count_total{source=\"satellite\"}[1h])",
+            "expr": "increase(yupana_hosts_count_total{source=\"satellite\"}[1h])",
             "legendFormat": "Satellite hosts per hour",
             "refId": "I"
           },
           {
-            "expr": "sum(rate(hosts_count_total[1h]))",
+            "expr": "sum(rate(yupana_hosts_count_total[1h]))",
             "legendFormat": "Rate of hosts per hour",
             "refId": "J"
           },
           {
-            "expr": "sum(increase(hosts_count_total[24h]))",
+            "expr": "sum(increase(yupana_hosts_count_total[24h]))",
             "legendFormat": "Hosts uploaded over the last day",
             "refId": "K"
           }
@@ -883,33 +883,33 @@
         "steppedLine": false,
         "targets": [
           {
-            "expr": "uploaded_messages_total",
+            "expr": "yupana_message_uploads_total",
             "format": "time_series",
             "legendFormat": "Total report uploads",
             "refId": "A"
           },
           {
-            "expr": "rate(uploaded_messages_total[1m])",
+            "expr": "rate(yupana_message_uploads_total[1m])",
             "legendFormat": "Rate of report uploads per minute",
             "refId": "B"
           },
           {
-            "expr": "increase(uploaded_messages_total[1m])",
+            "expr": "increase(yupana_message_uploads_total[1m])",
             "legendFormat": "Total report uploads per min",
             "refId": "C"
           },
           {
-            "expr": "increase(uploaded_messages_total[1h])",
+            "expr": "increase(yupana_message_uploads_total[1h])",
             "legendFormat": "Total report uploads per hour",
             "refId": "D"
           },
           {
-            "expr": "rate(uploaded_messages_total[1h])",
+            "expr": "rate(yupana_message_uploads_total[1h])",
             "legendFormat": "Rate of report uploads per hour",
             "refId": "E"
           },
           {
-            "expr": "increase(uploaded_messages_total[24h])",
+            "expr": "increase(yupana_message_uploads_total[24h])",
             "legendFormat": "Report uploads over the last day",
             "refId": "F"
           }
@@ -1083,5 +1083,5 @@
     "timezone": "",
     "title": "Yupana Dev",
     "uid": "KYkcp45Wk",
-    "version": 5
+    "version": 8
   }
