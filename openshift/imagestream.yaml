@@ -21,7 +21,7 @@ objects:
 - apiVersion: v1
   kind: ImageStream
   metadata:
-    name: python-36-centos7
+    name: python-36
     namespace: ${NAMESPACE}
   spec:
     lookupPolicy:
@@ -30,7 +30,7 @@ objects:
     - annotations: null
       from:
         kind: DockerImage
-        name: centos/python-36-centos7
+        name: registry.access.redhat.com/ubi7/python-36
       name: latest
       referencePolicy:
         type: Source
