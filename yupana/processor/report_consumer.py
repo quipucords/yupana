@@ -40,7 +40,9 @@ MSG_UPLOADS = Counter('yupana_message_uploads',
                       'Number of messages uploaded to qpc topic',
                       ['account_number'])
 
+
 KAFKA_ERRORS = Counter('yupana_kafka_errors', 'Number of Kafka errors')
+DB_ERRORS = Counter('yupana_db_errors', 'Number of db errors')
 
 
 def format_message(prefix, message, account_number=None,
@@ -156,6 +158,7 @@ async def save_message_and_ack(consumer, consumer_record):
                     prefix, 'Upload service message saved. Ready for processing.'))
                 await consumer.commit()
             except Exception as error:  # pylint: disable=broad-except
+                DB_ERRORS.inc()
                 LOG.error(format_message(
                     prefix,
                     'The following error occurred while trying to save and '

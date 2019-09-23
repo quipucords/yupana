@@ -26,7 +26,8 @@ from enum import Enum
 
 import pytz
 from django.db import transaction
-from processor.report_consumer import (QPCReportException,
+from processor.report_consumer import (DB_ERRORS,
+                                       QPCReportException,
                                        format_message)
 from prometheus_client import Counter, Gauge, Summary
 
@@ -155,6 +156,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             else:
                 await asyncio.sleep(NEW_REPORT_QUERY_INTERVAL)
 
+    @DB_ERRORS.count_exceptions()
     def calculate_queued_objects(self, current_time, status_info):
         """Calculate the number of reports waiting to be processed.
 
@@ -190,6 +192,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         except (Report.DoesNotExist, ReportSlice.DoesNotExist):
             return None
 
+    @DB_ERRORS.count_exceptions()
     def get_oldest_object_to_retry(self):
         """Grab the oldest report or report slice object to retry.
 
@@ -227,6 +230,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         # if we haven't returned a retry object, return None
         return None
 
+    @DB_ERRORS.count_exceptions()
     def get_new_record(self):
         """Grab the newest report or report slice object."""
         # Get the queryset for all of the objects in the NEW state
@@ -403,6 +407,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             serializer.save()
 
         except Exception as error:
+            DB_ERRORS.inc()
             LOG.error(format_message(
                 self.prefix,
                 'Could not update %s record due to the following error %s.' % (
@@ -523,7 +528,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                                 account_number=self.account_number,
                                 report_platform_id=self.report_platform_id))
 
-    @transaction.atomic  # noqa: C901 (too-complex)
+    @DB_ERRORS.count_exceptions()  # noqa: C901 (too-complex)
+    @transaction.atomic
     def archive_report_and_slices(self):  # pylint: disable=too-many-statements
         """Archive the report slice objects & associated report."""
         self.prefix = 'ARCHIVING'

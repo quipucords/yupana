@@ -20,6 +20,93 @@
     "panels": [
       {
         "aliasColors": {
+          "DB errors": "dark-blue"
+        },
+        "bars": false,
+        "dashLength": 10,
+        "dashes": false,
+        "fill": 1,
+        "fillGradient": 0,
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "id": 26,
+        "legend": {
+          "avg": false,
+          "current": false,
+          "max": false,
+          "min": false,
+          "show": true,
+          "total": false,
+          "values": false
+        },
+        "lines": true,
+        "linewidth": 1,
+        "nullPointMode": "null",
+        "options": {
+          "dataLinks": []
+        },
+        "percentage": false,
+        "pointradius": 2,
+        "points": false,
+        "renderer": "flot",
+        "seriesOverrides": [],
+        "spaceLength": 10,
+        "stack": false,
+        "steppedLine": false,
+        "targets": [
+          {
+            "expr": "yupana_db_errors_total",
+            "legendFormat": "DB errors",
+            "refId": "A"
+          }
+        ],
+        "thresholds": [],
+        "timeFrom": null,
+        "timeRegions": [],
+        "timeShift": null,
+        "title": "Database Errors",
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "type": "graph",
+        "xaxis": {
+          "buckets": null,
+          "mode": "time",
+          "name": null,
+          "show": true,
+          "values": []
+        },
+        "yaxes": [
+          {
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          },
+          {
+            "format": "short",
+            "label": null,
+            "logBase": 1,
+            "max": null,
+            "min": null,
+            "show": true
+          }
+        ],
+        "yaxis": {
+          "align": false,
+          "alignLevel": null
+        }
+      },
+      {
+        "aliasColors": {
           "kafka_errors_total{instance=\"docker.for.mac.localhost:8001\",job=\"yupana\"}": "dark-blue"
         },
         "bars": true,
@@ -31,7 +118,7 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 0
+          "y": 8
         },
         "id": 24,
         "legend": {
@@ -127,7 +214,7 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 8
+          "y": 16
         },
         "id": 22,
         "legend": {
@@ -266,7 +353,7 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 16
+          "y": 24
         },
         "id": 18,
         "legend": {
@@ -350,7 +437,7 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 24
+          "y": 32
         },
         "id": 16,
         "legend": {
@@ -449,7 +536,7 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 32
+          "y": 40
         },
         "id": 14,
         "legend": {
@@ -559,7 +646,7 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 40
+          "y": 48
         },
         "id": 12,
         "legend": {
@@ -654,7 +741,7 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 48
+          "y": 56
         },
         "id": 8,
         "legend": {
@@ -752,7 +839,7 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 56
+          "y": 64
         },
         "id": 6,
         "interval": "",
@@ -855,7 +942,7 @@
           "h": 8,
           "w": 12,
           "x": 0,
-          "y": 64
+          "y": 72
         },
         "id": 4,
         "legend": {
@@ -967,7 +1054,7 @@
           "h": 9,
           "w": 12,
           "x": 0,
-          "y": 72
+          "y": 80
         },
         "id": 2,
         "legend": {
@@ -1083,5 +1170,5 @@
     "timezone": "",
     "title": "Yupana Dev",
     "uid": "KYkcp45Wk",
-    "version": 8
+    "version": 3
   }
