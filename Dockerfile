@@ -44,8 +44,6 @@ RUN INSTALL_PKGS="${NODEJS_SCL} \
     prepare-yum-repositories rhel-server-rhscl-7-rpms && \
     yum -y --setopt=tsflags=nodocs install $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
-    # Remove redhat-logos (httpd dependency) to keep image size smaller.
-    rpm -e --nodeps redhat-logos && \
     yum -y clean all --enablerepo='*'
 
 # sets io.openshift.s2i.scripts-url label that way, or update that label
