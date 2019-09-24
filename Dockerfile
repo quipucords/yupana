@@ -1,5 +1,5 @@
-# yupana-centos7
-FROM centos/python-36-centos7
+# yupana-ubi7
+FROM registry.access.redhat.com/ubi7/python-36:latest
 
 EXPOSE 8080
 
@@ -36,12 +36,14 @@ USER root
 RUN INSTALL_PKGS="${NODEJS_SCL} \
     ${NODEJS_SCL}-npm \
     ${NODEJS_SCL}-nodejs-nodemon \
+    rh-python36 rh-python36-python-devel rh-python36-python-setuptools rh-python36-python-pip nss_wrapper \
+    httpd24 httpd24-httpd-devel httpd24-mod_ssl httpd24-mod_auth_kerb httpd24-mod_ldap \
+    httpd24-mod_session atlas-devel gcc-gfortran libffi-devel libtool-ltdl enchant \
     " && \
-    yum-config-manager --enable centos-sclo-rh-testing && \
-    yum -y --setopt=tsflags=nodocs install --enablerepo=centosplus $INSTALL_PKGS && \
+    yum install -y yum-utils && \
+    prepare-yum-repositories rhel-server-rhscl-7-rpms && \
+    yum -y --setopt=tsflags=nodocs install $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
-    yum remove -y rh-nodejs6\* && \
-    ln -s /usr/lib/node_modules/nodemon/bin/nodemon.js /usr/bin/nodemon && \
     yum -y clean all --enablerepo='*'
 
 # sets io.openshift.s2i.scripts-url label that way, or update that label

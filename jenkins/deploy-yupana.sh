@@ -8,7 +8,7 @@ oc project ${OPENSHIFT_PROJECT}
 
 
 # Is this a new object deployment or an existing? Decide based on whether the object exists
-IMAGESTREAM=`oc get -o name 'is/python-36-centos7' 2>/dev/null | tail -1 | awk '{print $1}'`
+IMAGESTREAM=`oc get -o name 'is/python-36-ubi7' 2>/dev/null | tail -1 | awk '{print $1}'`
 CONFIGMAP=`oc get configmap -l app=${APP_NAME} 2>/dev/null | tail -1 | awk '{print $1}'`
 SECRET=`oc get secret -l app=${APP_NAME} 2>/dev/null | tail -1 | awk '{print $1}'`
 DB_CONFIG=`oc get dc ${APP_NAME}-db 2>/dev/null | tail -1 | awk '{print $1}'`
