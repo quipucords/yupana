@@ -115,7 +115,7 @@ objects:
                 key: build-version
         from:
           kind: ImageStreamTag
-          name: python-36:latest
+          name: python-36-ubi7:latest
           namespace: ${NAMESPACE}
       type: Source
     triggers:
