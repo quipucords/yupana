@@ -1,4 +1,4 @@
-# yupana-centos7
+# yupana-ubi7
 FROM registry.access.redhat.com/ubi7/python-36:latest
 
 EXPOSE 8080
