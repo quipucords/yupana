@@ -50,7 +50,7 @@ class ReportProcessorTests(TransactionTestCase):
         self.uuid2 = uuid.uuid4()
         self.uuid3 = uuid.uuid4()
         self.fake_record = test_handler.KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
-        self.msg = msg_handler.unpack_consumer_record(self.fake_record)
+        self.msg = msg_handler.ReportConsumer.unpack_consumer_record(self.fake_record)
         self.report_json = {
             'report_id': 1,
             'report_slice_id': str(self.uuid2),

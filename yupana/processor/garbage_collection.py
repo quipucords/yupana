@@ -22,14 +22,15 @@ import threading
 from datetime import datetime, timedelta
 
 import pytz
-from processor.report_consumer import DB_ERRORS, format_message
+from processor.report_consumer import (DB_ERRORS,
+                                       GARBAGE_COLLECTION_LOOP,
+                                       format_message)
 
 from api.models import ReportArchive
 from config.settings.base import (ARCHIVE_RECORD_RETENTION_PERIOD,
                                   GARBAGE_COLLECTION_INTERVAL)
 
 LOG = logging.getLogger(__name__)
-GARBAGE_COLLECTION_LOOP = asyncio.new_event_loop()
 # this is how often we want garbage collection to run
 # (set to seconds) - default value is 1 week
 GARBAGE_COLLECTION_INTERVAL = int(GARBAGE_COLLECTION_INTERVAL)
@@ -98,7 +99,10 @@ def asyncio_garbage_collection_thread(loop):  # pragma: no cover
     :returns None
     """
     collector = GarbageCollector()
-    loop.run_until_complete(collector.run())
+    try:
+        loop.run_until_complete(collector.run())
+    except Exception:  # pylint: disable=broad-except
+        pass
 
 
 def initialize_garbage_collection_loop():  # pragma: no cover

@@ -27,7 +27,9 @@ from processor.abstract_processor import (AbstractProcessor, FAILED_TO_VALIDATE)
 from processor.report_consumer import (KAFKA_ERRORS,
                                        KafkaMsgHandlerError,
                                        QPCReportException,
-                                       format_message)
+                                       SLICE_PROCESSING_LOOP,
+                                       format_message,
+                                       stop_all_event_loops)
 
 from api.models import ReportSlice
 from api.serializers import ReportSliceSerializer
@@ -39,7 +41,6 @@ from config.settings.base import (HOSTS_UPLOAD_FUTURES_COUNT,
                                   RETRY_TIME)
 
 LOG = logging.getLogger(__name__)
-SLICE_PROCESSING_LOOP = asyncio.new_event_loop()
 
 HOSTS_UPLOAD_FUTURES_COUNT = int(HOSTS_UPLOAD_FUTURES_COUNT)
 HOSTS_UPLOAD_TIMEOUT = int(HOSTS_UPLOAD_TIMEOUT)
@@ -198,7 +199,9 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             await producer.start()
         except (KafkaConnectionError, TimeoutError):
             KAFKA_ERRORS.inc()
+            self.should_run = False
             await producer.stop()
+            stop_all_event_loops()
             raise KafkaMsgHandlerError(
                 format_message(
                     self.prefix,
@@ -249,7 +252,9 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     send_futures = []
         except Exception as err:  # pylint: disable=broad-except
             KAFKA_ERRORS.inc()
+            self.should_run = False
             await producer.stop()
+            stop_all_event_loops()
             raise KafkaMsgHandlerError(
                 format_message(
                     self.prefix,
@@ -270,7 +275,10 @@ def asyncio_report_processor_thread(loop):  # pragma: no cover
     :returns None
     """
     processor = ReportSliceProcessor()
-    loop.run_until_complete(processor.run())
+    try:
+        loop.run_until_complete(processor.run())
+    except Exception:  # pylint: disable=broad-except
+        pass
 
 
 def initialize_report_slice_processor():  # pragma: no cover

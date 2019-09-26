@@ -28,7 +28,8 @@ import pytz
 from django.db import transaction
 from processor.report_consumer import (DB_ERRORS,
                                        QPCReportException,
-                                       format_message)
+                                       format_message,
+                                       stop_all_event_loops)
 from prometheus_client import Counter, Gauge, Summary
 
 from api.models import (Report,
@@ -408,11 +409,13 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
 
         except Exception as error:
             DB_ERRORS.inc()
+            self.should_run = False
             LOG.error(format_message(
                 self.prefix,
                 'Could not update %s record due to the following error %s.' % (
                     self.object_prefix.lower(), str(error)),
                 account_number=self.account_number, report_platform_id=self.report_platform_id))
+            stop_all_event_loops()
 
     def move_candidates_to_failed(self):
         """Before entering a failed state any candidates should be moved to the failed hosts."""

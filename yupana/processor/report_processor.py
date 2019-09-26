@@ -16,7 +16,6 @@
 #
 """Report Processor."""
 
-import asyncio
 import json
 import logging
 import tarfile
@@ -37,7 +36,9 @@ from processor.report_consumer import (DB_ERRORS,
                                        KAFKA_ERRORS,
                                        KafkaMsgHandlerError,
                                        QPCReportException,
-                                       format_message)
+                                       REPORT_PROCESSING_LOOP,
+                                       format_message,
+                                       stop_all_event_loops)
 from prometheus_client import Counter, Gauge
 
 from api.models import (Report, ReportSlice, Status)
@@ -48,7 +49,6 @@ from config.settings.base import (INSIGHTS_KAFKA_ADDRESS,
                                   RETRY_TIME)
 
 LOG = logging.getLogger(__name__)
-REPORT_PROCESSING_LOOP = asyncio.new_event_loop()
 VALIDATION_TOPIC = 'platform.upload.validation'
 SUCCESS_CONFIRM_STATUS = 'success'
 FAILURE_CONFIRM_STATUS = 'failure'
@@ -380,10 +380,12 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     report_platform_id=self.report_platform_id))
         except Exception as error:  # pylint: disable=broad-except
             DB_ERRORS.inc()
+            self.should_run = False
             LOG.error(format_message(
                 self.prefix,
                 'Could not update report slice record due to the following error %s.' % str(error),
                 account_number=self.account_number, report_platform_id=self.report_platform_id))
+            stop_all_event_loops()
 
     def _download_report(self):
         """
@@ -687,7 +689,9 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             await producer.start()
         except (KafkaConnectionError, TimeoutError):
             KAFKA_ERRORS.inc()
+            self.should_run = False
             await producer.stop()
+            stop_all_event_loops()
             raise KafkaMsgHandlerError(
                 format_message(
                     self.prefix,
@@ -739,7 +743,10 @@ def asyncio_report_processor_thread(loop):  # pragma: no cover
     :returns None
     """
     processor = ReportProcessor()
-    loop.run_until_complete(processor.run())
+    try:
+        loop.run_until_complete(processor.run())
+    except Exception:  # pylint: disable=broad-except
+        pass
 
 
 def initialize_report_processor():  # pragma: no cover
