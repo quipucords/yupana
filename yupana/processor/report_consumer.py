@@ -47,6 +47,7 @@ MSG_UPLOADS = Counter('yupana_message_uploads',
 
 KAFKA_ERRORS = Counter('yupana_kafka_errors', 'Number of Kafka errors')
 DB_ERRORS = Counter('yupana_db_errors', 'Number of db errors')
+CLASS_INSTANCES = []
 
 
 def format_message(prefix, message, account_number=None,
@@ -98,6 +99,11 @@ class KafkaMsgHandlerError(Exception):
 def stop_all_event_loops():
     """Stop all of the event loops."""
     prefix = 'STOPPING EVENT LOOPS'
+    for i in CLASS_INSTANCES:
+        if isinstance(i, ReportConsumer):
+            i.consumer.stop()
+        else:
+            i.producer.stop()
     try:
         LOG.error(format_message(
             prefix,
@@ -245,15 +251,22 @@ class ReportConsumer():
             await self.consumer.start()
         except KafkaConnectionError:
             KAFKA_ERRORS.inc()
-            await self.consumer.stop()
             stop_all_event_loops()
             raise KafkaMsgHandlerError('Unable to connect to kafka server.  Closing consumer.')
+        except Exception as err:  # pylint: disable=broad-except
+            LOG.error(format_message(
+                self.prefix, 'The following error occurred: %s' % err))
+            stop_all_event_loops()
 
         LOG.info(log_message)
         try:
             # Consume messages
             async for msg in self.consumer:
                 await async_queue.put(msg)
+        except Exception as err:  # pylint: disable=broad-except
+            LOG.error(format_message(
+                self.prefix, 'The following error occurred: %s' % err))
+            stop_all_event_loops()
         finally:
             # Will leave consumer group; perform autocommit if enabled.
             await self.consumer.stop()
@@ -262,6 +275,7 @@ class ReportConsumer():
 def create_upload_report_consumer_loop(loop):
     """Initialize the report consumer class and run."""
     report_consumer = ReportConsumer()
+    CLASS_INSTANCES.append(report_consumer)
     report_consumer.run(loop)
 
 
