@@ -99,11 +99,15 @@ class KafkaMsgHandlerError(Exception):
 def stop_all_event_loops():
     """Stop all of the event loops."""
     prefix = 'STOPPING EVENT LOOPS'
-    for i in CLASS_INSTANCES:
-        if isinstance(i, ReportConsumer):
-            i.consumer.stop()
-        else:
-            i.producer.stop()
+    try:
+        for i in CLASS_INSTANCES:
+            if isinstance(i, ReportConsumer):
+                i.consumer.cancel()
+            else:
+                i.producer.cancel()
+    except Exception as err:  # pylint:disable=broad-except
+        LOG.error(format_message(
+            prefix, 'The following error occurred: %s' % err))
     try:
         LOG.error(format_message(
             prefix,
@@ -254,6 +258,7 @@ class ReportConsumer():
             stop_all_event_loops()
             raise KafkaMsgHandlerError('Unable to connect to kafka server.  Closing consumer.')
         except Exception as err:  # pylint: disable=broad-except
+            KAFKA_ERRORS.inc()
             LOG.error(format_message(
                 self.prefix, 'The following error occurred: %s' % err))
             stop_all_event_loops()
@@ -264,6 +269,7 @@ class ReportConsumer():
             async for msg in self.consumer:
                 await async_queue.put(msg)
         except Exception as err:  # pylint: disable=broad-except
+            KAFKA_ERRORS.inc()
             LOG.error(format_message(
                 self.prefix, 'The following error occurred: %s' % err))
             stop_all_event_loops()
