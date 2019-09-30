@@ -145,7 +145,10 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         """
         while self.should_run:
             if not self.report_or_slice:
-                self.assign_object()
+                try:
+                    self.assign_object()
+                except Exception:  # pylint:disable=broad-except
+                    stop_all_event_loops()
             if self.report_or_slice:
                 try:
                     await self.delegate_state()

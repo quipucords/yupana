@@ -32,10 +32,10 @@ from kafka.errors import ConnectionError as KafkaConnectionError
 from processor.abstract_processor import (
     AbstractProcessor,
     FAILED_TO_DOWNLOAD, FAILED_TO_VALIDATE, RETRY)
-from processor.report_consumer import (CLASS_INSTANCES,
-                                       DB_ERRORS,
+from processor.report_consumer import (DB_ERRORS,
                                        KAFKA_ERRORS,
                                        KafkaMsgHandlerError,
+                                       PROCESSOR_INSTANCES,
                                        QPCReportException,
                                        REPORT_PROCESSING_LOOP,
                                        format_message,
@@ -686,6 +686,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         :returns None
         """
         self.prefix = 'REPORT VALIDATION STATE ON KAFKA'
+        await self.producer.stop()
         self.producer = AIOKafkaProducer(
             loop=REPORT_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
         )
@@ -753,7 +754,7 @@ def asyncio_report_processor_thread(loop):  # pragma: no cover
     :returns None
     """
     processor = ReportProcessor()
-    CLASS_INSTANCES.append(processor)
+    PROCESSOR_INSTANCES.append(processor)
     try:
         loop.run_until_complete(processor.run())
     except Exception:  # pylint: disable=broad-except

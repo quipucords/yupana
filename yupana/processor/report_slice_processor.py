@@ -24,9 +24,9 @@ import threading
 from aiokafka import AIOKafkaProducer
 from kafka.errors import ConnectionError as KafkaConnectionError
 from processor.abstract_processor import (AbstractProcessor, FAILED_TO_VALIDATE)
-from processor.report_consumer import (CLASS_INSTANCES,
-                                       KAFKA_ERRORS,
+from processor.report_consumer import (KAFKA_ERRORS,
                                        KafkaMsgHandlerError,
+                                       PROCESSOR_INSTANCES,
                                        QPCReportException,
                                        SLICE_PROCESSING_LOOP,
                                        format_message,
@@ -196,6 +196,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         :param: hosts <list> the hosts to upload.
         """
         self.prefix = 'UPLOAD TO INVENTORY VIA KAFKA'
+        await self.producer.stop()
         self.producer = AIOKafkaProducer(
             loop=SLICE_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
         )
@@ -279,7 +280,7 @@ def asyncio_report_processor_thread(loop):  # pragma: no cover
     :returns None
     """
     processor = ReportSliceProcessor()
-    CLASS_INSTANCES.append(processor)
+    PROCESSOR_INSTANCES.append(processor)
     try:
         loop.run_until_complete(processor.run())
     except Exception:  # pylint: disable=broad-except

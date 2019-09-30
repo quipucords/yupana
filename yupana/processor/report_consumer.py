@@ -47,7 +47,7 @@ MSG_UPLOADS = Counter('yupana_message_uploads',
 
 KAFKA_ERRORS = Counter('yupana_kafka_errors', 'Number of Kafka errors')
 DB_ERRORS = Counter('yupana_db_errors', 'Number of db errors')
-CLASS_INSTANCES = []
+PROCESSOR_INSTANCES = []  # this list holds processor instances that have kafka components
 
 
 def format_message(prefix, message, account_number=None,
@@ -100,11 +100,11 @@ def stop_all_event_loops():
     """Stop all of the event loops."""
     prefix = 'STOPPING EVENT LOOPS'
     try:
-        for i in CLASS_INSTANCES:
+        for i in PROCESSOR_INSTANCES:
             if isinstance(i, ReportConsumer):
-                i.consumer.cancel()
+                i.consumer.stop()
             else:
-                i.producer.cancel()
+                i.producer.stop()
     except Exception as err:  # pylint:disable=broad-except
         LOG.error(format_message(
             prefix, 'The following error occurred: %s' % err))
@@ -281,7 +281,7 @@ class ReportConsumer():
 def create_upload_report_consumer_loop(loop):
     """Initialize the report consumer class and run."""
     report_consumer = ReportConsumer()
-    CLASS_INSTANCES.append(report_consumer)
+    PROCESSOR_INSTANCES.append(report_consumer)
     report_consumer.run(loop)
 
 
