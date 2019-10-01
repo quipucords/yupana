@@ -9,7 +9,7 @@ django==2.2.6
 djangorestframework==3.10.3
 gunicorn==19.9.0
 idna==2.8; python_version != '3.3.*'
-kafka-python==1.4.6
+kafka-python==1.4.7
 prometheus-client==0.7.1
 psycopg2-binary==2.8.3
 pytz==2019.2
