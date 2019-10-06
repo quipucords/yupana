@@ -25,6 +25,10 @@ from datetime import datetime
 import pytz
 from aiokafka import AIOKafkaConsumer
 from kafka.errors import ConnectionError as KafkaConnectionError
+from processor.processor_utils import (PROCESSOR_INSTANCES,
+                                       UPLOAD_REPORT_CONSUMER_LOOP,
+                                       format_message,
+                                       stop_all_event_loops)
 from prometheus_client import Counter
 
 from api.models import Report
@@ -32,10 +36,6 @@ from api.serializers import ReportSerializer
 from config.settings.base import INSIGHTS_KAFKA_ADDRESS
 
 LOG = logging.getLogger(__name__)
-UPLOAD_REPORT_CONSUMER_LOOP = asyncio.get_event_loop()
-REPORT_PROCESSING_LOOP = asyncio.new_event_loop()
-SLICE_PROCESSING_LOOP = asyncio.new_event_loop()
-GARBAGE_COLLECTION_LOOP = asyncio.new_event_loop()
 
 REPORT_PENDING_QUEUE = asyncio.Queue()
 QPC_TOPIC = 'platform.upload.qpc'
@@ -47,30 +47,6 @@ MSG_UPLOADS = Counter('yupana_message_uploads',
 
 KAFKA_ERRORS = Counter('yupana_kafka_errors', 'Number of Kafka errors')
 DB_ERRORS = Counter('yupana_db_errors', 'Number of db errors')
-PROCESSOR_INSTANCES = []  # this list holds processor instances that have kafka components
-
-
-def format_message(prefix, message, account_number=None,
-                   report_platform_id=None):
-    """Format log messages in a consistent way.
-
-    :param prefix: (str) A meaningful prefix to be displayed in all caps.
-    :param message: (str) A short message describing the state
-    :param account_number: (str) The account sending the report.
-    :param report_platform_id: (str) The qpc report id.
-    :returns: (str) containing formatted message
-    """
-    if not report_platform_id and not account_number:
-        actual_message = 'Report %s - %s' % (prefix, message)
-    elif account_number and not report_platform_id:
-        actual_message = 'Report(account=%s) %s - %s' % (account_number, prefix, message)
-    else:
-        actual_message = 'Report(account=%s, report_platform_id=%s) %s - %s' % (
-            account_number,
-            report_platform_id, prefix,
-            message)
-
-    return actual_message
 
 
 class QPCReportException(Exception):
@@ -94,36 +70,6 @@ class KafkaMsgHandlerError(Exception):
     """Kafka msg handler error."""
 
     pass
-
-
-def stop_all_event_loops():
-    """Stop all of the event loops."""
-    prefix = 'STOPPING EVENT LOOPS'
-    try:
-        for i in PROCESSOR_INSTANCES:
-            if isinstance(i, ReportConsumer):
-                i.consumer.stop()
-            else:
-                i.producer.stop()
-    except Exception as err:  # pylint:disable=broad-except
-        LOG.error(format_message(
-            prefix, 'The following error occurred: %s' % err))
-    try:
-        LOG.error(format_message(
-            prefix,
-            'A fatal error occurred. Shutting down all processors: '))
-        LOG.info(format_message(prefix, 'Shutting down the report consumer.'))
-        UPLOAD_REPORT_CONSUMER_LOOP.stop()
-        LOG.info(format_message(prefix, 'Shutting down the report processor.'))
-        REPORT_PROCESSING_LOOP.stop()
-        LOG.info(format_message(prefix, 'Shutting down the report slice processor.'))
-        SLICE_PROCESSING_LOOP.stop()
-        LOG.info(format_message(prefix, 'Shutting down the garbage collector.'))
-        GARBAGE_COLLECTION_LOOP.stop()
-    except Exception as err:  # pylint: disable=broad-except
-        LOG.error(format_message(
-            prefix,
-            str(err)))
 
 
 class ReportConsumer():
@@ -210,7 +156,7 @@ class ReportConsumer():
                         self.prefix,
                         'The following error occurred while trying to save and '
                         'commit the message: %s' % error))
-                    stop_all_event_loops()
+                    stop_all_event_loops(ReportConsumer)
             except QPCKafkaMsgException as message_error:
                 LOG.error(format_message(
                     self.prefix, 'Error processing records.  Message: %s, Error: %s' %
@@ -255,13 +201,13 @@ class ReportConsumer():
             await self.consumer.start()
         except KafkaConnectionError:
             KAFKA_ERRORS.inc()
-            stop_all_event_loops()
+            stop_all_event_loops(ReportConsumer)
             raise KafkaMsgHandlerError('Unable to connect to kafka server.  Closing consumer.')
         except Exception as err:  # pylint: disable=broad-except
             KAFKA_ERRORS.inc()
             LOG.error(format_message(
                 self.prefix, 'The following error occurred: %s' % err))
-            stop_all_event_loops()
+            stop_all_event_loops(ReportConsumer)
 
         LOG.info(log_message)
         try:
@@ -272,7 +218,7 @@ class ReportConsumer():
             KAFKA_ERRORS.inc()
             LOG.error(format_message(
                 self.prefix, 'The following error occurred: %s' % err))
-            stop_all_event_loops()
+            stop_all_event_loops(ReportConsumer)
         finally:
             # Will leave consumer group; perform autocommit if enabled.
             await self.consumer.stop()

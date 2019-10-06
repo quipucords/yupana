@@ -24,13 +24,14 @@ import threading
 from aiokafka import AIOKafkaProducer
 from kafka.errors import ConnectionError as KafkaConnectionError
 from processor.abstract_processor import (AbstractProcessor, FAILED_TO_VALIDATE)
-from processor.report_consumer import (KAFKA_ERRORS,
-                                       KafkaMsgHandlerError,
-                                       PROCESSOR_INSTANCES,
-                                       QPCReportException,
+from processor.processor_utils import (PROCESSOR_INSTANCES,
                                        SLICE_PROCESSING_LOOP,
                                        format_message,
                                        stop_all_event_loops)
+from processor.report_consumer import (KAFKA_ERRORS,
+                                       KafkaMsgHandlerError,
+                                       QPCReportException,
+                                       ReportConsumer)
 
 from api.models import ReportSlice
 from api.serializers import ReportSliceSerializer
@@ -205,7 +206,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         except (KafkaConnectionError, TimeoutError):
             KAFKA_ERRORS.inc()
             self.should_run = False
-            stop_all_event_loops()
+            stop_all_event_loops(ReportConsumer)
             raise KafkaMsgHandlerError(
                 format_message(
                     self.prefix,
@@ -259,7 +260,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 self.prefix, 'The following error occurred: %s' % err))
             KAFKA_ERRORS.inc()
             self.should_run = False
-            stop_all_event_loops()
+            stop_all_event_loops(ReportConsumer)
             raise KafkaMsgHandlerError(
                 format_message(
                     self.prefix,

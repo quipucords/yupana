@@ -32,14 +32,15 @@ from kafka.errors import ConnectionError as KafkaConnectionError
 from processor.abstract_processor import (
     AbstractProcessor,
     FAILED_TO_DOWNLOAD, FAILED_TO_VALIDATE, RETRY)
-from processor.report_consumer import (DB_ERRORS,
-                                       KAFKA_ERRORS,
-                                       KafkaMsgHandlerError,
-                                       PROCESSOR_INSTANCES,
-                                       QPCReportException,
+from processor.processor_utils import (PROCESSOR_INSTANCES,
                                        REPORT_PROCESSING_LOOP,
                                        format_message,
                                        stop_all_event_loops)
+from processor.report_consumer import (DB_ERRORS,
+                                       KAFKA_ERRORS,
+                                       KafkaMsgHandlerError,
+                                       QPCReportException,
+                                       ReportConsumer)
 from prometheus_client import Counter, Gauge
 
 from api.models import (Report, ReportSlice, Status)
@@ -389,7 +390,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 self.prefix,
                 'Could not update report slice record due to the following error %s.' % str(error),
                 account_number=self.account_number, report_platform_id=self.report_platform_id))
-            stop_all_event_loops()
+            stop_all_event_loops(ReportConsumer)
 
     def _download_report(self):
         """
@@ -696,7 +697,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             KAFKA_ERRORS.inc()
             self.should_run = False
             await self.producer.stop()
-            stop_all_event_loops()
+            stop_all_event_loops(ReportConsumer)
             raise KafkaMsgHandlerError(
                 format_message(
                     self.prefix,
@@ -721,7 +722,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             KAFKA_ERRORS.inc()
             LOG.error(format_message(
                 self.prefix, 'The following error occurred: %s' % err))
-            stop_all_event_loops()
+            stop_all_event_loops(ReportConsumer)
 
         finally:
             await self.producer.stop()

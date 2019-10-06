@@ -22,9 +22,9 @@ import threading
 from datetime import datetime, timedelta
 
 import pytz
-from processor.report_consumer import (DB_ERRORS,
-                                       GARBAGE_COLLECTION_LOOP,
+from processor.processor_utils import (GARBAGE_COLLECTION_LOOP,
                                        format_message)
+from processor.report_consumer import DB_ERRORS
 
 from api.models import ReportArchive
 from config.settings.base import (ARCHIVE_RECORD_RETENTION_PERIOD,
