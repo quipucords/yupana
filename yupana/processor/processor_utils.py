@@ -50,12 +50,15 @@ def format_message(prefix, message, account_number=None,
     return actual_message
 
 
-def stop_all_event_loops(report_consumer):
+def stop_all_event_loops():
     """Stop all of the event loops."""
     prefix = 'STOPPING EVENT LOOPS'
     for i in PROCESSOR_INSTANCES:
         try:
-            if isinstance(i, report_consumer):
+            # the only processor with a consumer is the ReportConsumer
+            # so we check the class and stop the consumer if we have a
+            # ReportConsumer instance - otherwise we stop a producer
+            if i.__class__.__name__ == 'ReportConsumer':
                 i.consumer.stop()
             else:
                 i.producer.stop()

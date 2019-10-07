@@ -156,7 +156,7 @@ class ReportConsumer():
                         self.prefix,
                         'The following error occurred while trying to save and '
                         'commit the message: %s' % error))
-                    stop_all_event_loops(ReportConsumer)
+                    stop_all_event_loops()
             except QPCKafkaMsgException as message_error:
                 LOG.error(format_message(
                     self.prefix, 'Error processing records.  Message: %s, Error: %s' %
@@ -201,13 +201,13 @@ class ReportConsumer():
             await self.consumer.start()
         except KafkaConnectionError:
             KAFKA_ERRORS.inc()
-            stop_all_event_loops(ReportConsumer)
+            stop_all_event_loops()
             raise KafkaMsgHandlerError('Unable to connect to kafka server.  Closing consumer.')
         except Exception as err:  # pylint: disable=broad-except
             KAFKA_ERRORS.inc()
             LOG.error(format_message(
                 self.prefix, 'The following error occurred: %s' % err))
-            stop_all_event_loops(ReportConsumer)
+            stop_all_event_loops()
 
         LOG.info(log_message)
         try:
@@ -218,7 +218,7 @@ class ReportConsumer():
             KAFKA_ERRORS.inc()
             LOG.error(format_message(
                 self.prefix, 'The following error occurred: %s' % err))
-            stop_all_event_loops(ReportConsumer)
+            stop_all_event_loops()
         finally:
             # Will leave consumer group; perform autocommit if enabled.
             await self.consumer.stop()

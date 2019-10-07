@@ -30,8 +30,7 @@ from processor.processor_utils import (PROCESSOR_INSTANCES,
                                        stop_all_event_loops)
 from processor.report_consumer import (KAFKA_ERRORS,
                                        KafkaMsgHandlerError,
-                                       QPCReportException,
-                                       ReportConsumer)
+                                       QPCReportException)
 
 from api.models import ReportSlice
 from api.serializers import ReportSliceSerializer
@@ -206,7 +205,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         except (KafkaConnectionError, TimeoutError):
             KAFKA_ERRORS.inc()
             self.should_run = False
-            stop_all_event_loops(ReportConsumer)
+            stop_all_event_loops()
             raise KafkaMsgHandlerError(
                 format_message(
                     self.prefix,
@@ -260,7 +259,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 self.prefix, 'The following error occurred: %s' % err))
             KAFKA_ERRORS.inc()
             self.should_run = False
-            stop_all_event_loops(ReportConsumer)
+            stop_all_event_loops()
             raise KafkaMsgHandlerError(
                 format_message(
                     self.prefix,

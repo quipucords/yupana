@@ -39,8 +39,7 @@ from processor.processor_utils import (PROCESSOR_INSTANCES,
 from processor.report_consumer import (DB_ERRORS,
                                        KAFKA_ERRORS,
                                        KafkaMsgHandlerError,
-                                       QPCReportException,
-                                       ReportConsumer)
+                                       QPCReportException)
 from prometheus_client import Counter, Gauge
 
 from api.models import (Report, ReportSlice, Status)
@@ -390,7 +389,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 self.prefix,
                 'Could not update report slice record due to the following error %s.' % str(error),
                 account_number=self.account_number, report_platform_id=self.report_platform_id))
-            stop_all_event_loops(ReportConsumer)
+            stop_all_event_loops()
 
     def _download_report(self):
         """
@@ -697,7 +696,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             KAFKA_ERRORS.inc()
             self.should_run = False
             await self.producer.stop()
-            stop_all_event_loops(ReportConsumer)
+            stop_all_event_loops()
             raise KafkaMsgHandlerError(
                 format_message(
                     self.prefix,
@@ -722,7 +721,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             KAFKA_ERRORS.inc()
             LOG.error(format_message(
                 self.prefix, 'The following error occurred: %s' % err))
-            stop_all_event_loops(ReportConsumer)
+            stop_all_event_loops()
 
         finally:
             await self.producer.stop()
