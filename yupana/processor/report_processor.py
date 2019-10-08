@@ -16,7 +16,6 @@
 #
 """Report Processor."""
 
-import asyncio
 import json
 import logging
 import tarfile
@@ -33,11 +32,14 @@ from kafka.errors import ConnectionError as KafkaConnectionError
 from processor.abstract_processor import (
     AbstractProcessor,
     FAILED_TO_DOWNLOAD, FAILED_TO_VALIDATE, RETRY)
+from processor.processor_utils import (PROCESSOR_INSTANCES,
+                                       REPORT_PROCESSING_LOOP,
+                                       format_message,
+                                       stop_all_event_loops)
 from processor.report_consumer import (DB_ERRORS,
                                        KAFKA_ERRORS,
                                        KafkaMsgHandlerError,
-                                       QPCReportException,
-                                       format_message)
+                                       QPCReportException)
 from prometheus_client import Counter, Gauge
 
 from api.models import (Report, ReportSlice, Status)
@@ -48,7 +50,6 @@ from config.settings.base import (INSIGHTS_KAFKA_ADDRESS,
                                   RETRY_TIME)
 
 LOG = logging.getLogger(__name__)
-REPORT_PROCESSING_LOOP = asyncio.new_event_loop()
 VALIDATION_TOPIC = 'platform.upload.validation'
 SUCCESS_CONFIRM_STATUS = 'success'
 FAILURE_CONFIRM_STATUS = 'failure'
@@ -109,6 +110,9 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             Report.FAILED_VALIDATION: FAILED_TO_VALIDATE
         }
         self.async_states = [Report.VALIDATED]
+        self.producer = AIOKafkaProducer(
+            loop=REPORT_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
+        )
         super().__init__(pre_delegate=self.pre_delegate,
                          state_functions=state_functions,
                          state_metrics=state_metrics,
@@ -380,10 +384,12 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     report_platform_id=self.report_platform_id))
         except Exception as error:  # pylint: disable=broad-except
             DB_ERRORS.inc()
+            self.should_run = False
             LOG.error(format_message(
                 self.prefix,
                 'Could not update report slice record due to the following error %s.' % str(error),
                 account_number=self.account_number, report_platform_id=self.report_platform_id))
+            stop_all_event_loops()
 
     def _download_report(self):
         """
@@ -680,14 +686,17 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         :returns None
         """
         self.prefix = 'REPORT VALIDATION STATE ON KAFKA'
-        producer = AIOKafkaProducer(
+        await self.producer.stop()
+        self.producer = AIOKafkaProducer(
             loop=REPORT_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
         )
         try:
-            await producer.start()
-        except (KafkaConnectionError, TimeoutError):
+            await self.producer.start()
+        except (KafkaConnectionError, TimeoutError, Exception):
             KAFKA_ERRORS.inc()
-            await producer.stop()
+            self.should_run = False
+            await self.producer.stop()
+            stop_all_event_loops()
             raise KafkaMsgHandlerError(
                 format_message(
                     self.prefix,
@@ -701,15 +710,21 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 'validation': self.status
             }
             msg = bytes(json.dumps(validation), 'utf-8')
-            await producer.send_and_wait(VALIDATION_TOPIC, msg)
+            await self.producer.send_and_wait(VALIDATION_TOPIC, msg)
             LOG.info(
                 format_message(
                     self.prefix,
                     'Send %s validation status to file upload on kafka' % self.status,
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id))
+        except Exception as err:  # pylint: disable=broad-except
+            KAFKA_ERRORS.inc()
+            LOG.error(format_message(
+                self.prefix, 'The following error occurred: %s' % err))
+            stop_all_event_loops()
+
         finally:
-            await producer.stop()
+            await self.producer.stop()
 
     @DB_ERRORS.count_exceptions()
     @transaction.atomic
@@ -739,7 +754,11 @@ def asyncio_report_processor_thread(loop):  # pragma: no cover
     :returns None
     """
     processor = ReportProcessor()
-    loop.run_until_complete(processor.run())
+    PROCESSOR_INSTANCES.append(processor)
+    try:
+        loop.run_until_complete(processor.run())
+    except Exception:  # pylint: disable=broad-except
+        pass
 
 
 def initialize_report_processor():  # pragma: no cover
