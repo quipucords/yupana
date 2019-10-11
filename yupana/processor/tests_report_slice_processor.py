@@ -55,7 +55,8 @@ class ReportSliceProcessorTests(TestCase):
         self.uuid6 = uuid.uuid4()
         self.uuid7 = uuid.uuid4()
         self.fake_record = test_handler.KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
-        self.msg = msg_handler.unpack_consumer_record(self.fake_record)
+        self.report_consumer = msg_handler.ReportConsumer()
+        self.msg = self.report_consumer.unpack_consumer_record(self.fake_record)
         self.report_json = {
             'report_id': 1,
             'report_type': 'insights',
