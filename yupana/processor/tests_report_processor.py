@@ -50,7 +50,8 @@ class ReportProcessorTests(TransactionTestCase):
         self.uuid2 = uuid.uuid4()
         self.uuid3 = uuid.uuid4()
         self.fake_record = test_handler.KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
-        self.msg = msg_handler.unpack_consumer_record(self.fake_record)
+        self.report_consumer = msg_handler.ReportConsumer()
+        self.msg = self.report_consumer.unpack_consumer_record(self.fake_record)
         self.report_json = {
             'report_id': 1,
             'report_slice_id': str(self.uuid2),
@@ -680,6 +681,7 @@ class ReportProcessorTests(TransactionTestCase):
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'hosts': {self.uuid: {'key': 'value'}}}
+        self.processor.report_or_slice = self.report_record
 
         with self.assertRaises(msg_handler.QPCReportException):
             self.processor._validate_report_details()
@@ -694,6 +696,7 @@ class ReportProcessorTests(TransactionTestCase):
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'hosts': {self.uuid: {'name': 'value'}}}
+        self.processor.report_or_slice = self.report_record
 
         with self.assertRaises(msg_handler.QPCReportException):
             self.processor._validate_report_details()
@@ -708,6 +711,7 @@ class ReportProcessorTests(TransactionTestCase):
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'hosts': {self.uuid: {'key': 'value'}}}
+        self.processor.report_or_slice = self.report_record
 
         with self.assertRaises(msg_handler.QPCReportException):
             self.processor._validate_report_details()
@@ -721,6 +725,7 @@ class ReportProcessorTests(TransactionTestCase):
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'hosts': {self.uuid: {'key': 'value'}}}
+        self.processor.report_or_slice = self.report_record
 
         with self.assertRaises(msg_handler.QPCReportException):
             self.processor._validate_report_details()
@@ -734,6 +739,7 @@ class ReportProcessorTests(TransactionTestCase):
             'report_version': '1.0.0.1b025b8',
             'status': 'completed',
             'hosts': {self.uuid: {'key': 'value'}}}
+        self.processor.report_or_slice = self.report_record
 
         with self.assertRaises(msg_handler.QPCReportException):
             self.processor._validate_report_details()
@@ -748,6 +754,7 @@ class ReportProcessorTests(TransactionTestCase):
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'hosts': {}}
+        self.processor.report_or_slice = self.report_record
 
         with self.assertRaises(msg_handler.QPCReportException):
             self.processor._validate_report_details()
@@ -761,6 +768,7 @@ class ReportProcessorTests(TransactionTestCase):
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'hosts': {self.uuid: {'key': 'value'}}}
+        self.processor.report_or_slice = self.report_record
 
         with self.assertRaises(msg_handler.QPCReportException):
             self.processor._validate_report_details()
@@ -775,6 +783,7 @@ class ReportProcessorTests(TransactionTestCase):
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'hosts': ['foo']}
+        self.processor.report_or_slice = self.report_record
 
         with self.assertRaises(msg_handler.QPCReportException):
             self.processor._validate_report_details()
@@ -789,6 +798,7 @@ class ReportProcessorTests(TransactionTestCase):
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'hosts': {1: {'foo': 'bar'}}}
+        self.processor.report_or_slice = self.report_record
 
         with self.assertRaises(msg_handler.QPCReportException):
             self.processor._validate_report_details()
@@ -803,6 +813,7 @@ class ReportProcessorTests(TransactionTestCase):
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'hosts': {self.uuid: ['foo']}}
+        self.processor.report_or_slice = self.report_record
 
         with self.assertRaises(msg_handler.QPCReportException):
             self.processor._validate_report_details()
@@ -831,7 +842,9 @@ class ReportProcessorTests(TransactionTestCase):
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'hosts': hosts}
-        actual_valid, actual_invalid = self.processor._validate_report_hosts(self.uuid)
+        source_metadata = {'server_version': '0.0.0'}
+        actual_valid, actual_invalid = self.processor._validate_report_hosts(
+            self.uuid, source_metadata)
         for valid_host in actual_valid:
             for host_id, host in valid_host.items():
                 self.assertIn('facts', host)
@@ -858,7 +871,9 @@ class ReportProcessorTests(TransactionTestCase):
         # test that invalid hosts are not removed
         invalid_host = {'no': 'canonical facts', 'metadata': []}
         hosts.append(invalid_host)
-        valid_hosts, _ = self.processor._validate_report_hosts(self.uuid)
+        source_metadata = {'version': '0.0.0.1'}
+        valid_hosts, _ = self.processor._validate_report_hosts(
+            self.uuid, source_metadata)
         kept_invalid = False
         for valid_host in valid_hosts:
             for host_id, host in valid_host.items():
@@ -1193,7 +1208,7 @@ class ReportProcessorTests(TransactionTestCase):
             'status': 'completed',
             'report_platform_id': '5f2cc1fd-ec66-4c67-be1b-171a595ce319',
             'hosts': {self.uuid: {'key': 'value'}}}
-
+        self.processor.report_or_slice = self.report_record
         with self.assertRaises(msg_handler.QPCReportException):
             _, _ = self.processor._validate_report_details()
 
@@ -1338,7 +1353,12 @@ class ReportProcessorTests(TransactionTestCase):
     def test_state_to_metric(self):
         """Test the state_to_metric function."""
         self.processor.state = Report.FAILED_DOWNLOAD
-        failed_download_before = REGISTRY.get_sample_value('failed_download_total')
+        self.processor.account_number = '1234'
+        failed_download_before = \
+            REGISTRY.get_sample_value(
+                'failed_download_total', {'account_number': '1234'}) or 0
         self.processor.record_failed_state_metrics()
-        failed_download_after = REGISTRY.get_sample_value('failed_download_total')
-        self.assertEqual(1, failed_download_after - failed_download_before)
+        failed_download_after = REGISTRY.get_sample_value(
+            'failed_download_total', {'account_number': '1234'})
+        self.assertEqual(
+            1, int(failed_download_after) - failed_download_before)

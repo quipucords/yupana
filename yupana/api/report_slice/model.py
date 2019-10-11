@@ -26,6 +26,7 @@ class AbstractReportSlice(models.Model):
     git_commit = models.CharField(max_length=50, null=True)
     ready_to_archive = models.BooleanField(null=False, default=False)
     source = models.CharField(max_length=15, null=False)
+    source_metadata = models.TextField(null=True)
 
     PENDING = 'pending'
     NEW = 'new'
@@ -80,6 +81,7 @@ class AbstractReportSlice(models.Model):
             'git_commit: {}, '\
             'ready_to_archive: {}, '\
             'source: {}, '\
+            'source_metadata: {}, '\
             'state: {}, '\
             'state_info: {}, '\
             'retry_count: {}, '\
@@ -98,6 +100,7 @@ class AbstractReportSlice(models.Model):
                 self.git_commit,
                 self.ready_to_archive,
                 self.source,
+                self.source_metadata,
                 self.state,
                 self.state_info,
                 self.retry_count,

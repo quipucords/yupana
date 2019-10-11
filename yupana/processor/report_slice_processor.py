@@ -24,9 +24,13 @@ import threading
 from aiokafka import AIOKafkaProducer
 from kafka.errors import ConnectionError as KafkaConnectionError
 from processor.abstract_processor import (AbstractProcessor, FAILED_TO_VALIDATE)
-from processor.report_consumer import (KafkaMsgHandlerError,
-                                       QPCReportException,
-                                       format_message)
+from processor.processor_utils import (PROCESSOR_INSTANCES,
+                                       SLICE_PROCESSING_LOOP,
+                                       format_message,
+                                       stop_all_event_loops)
+from processor.report_consumer import (KAFKA_ERRORS,
+                                       KafkaMsgHandlerError,
+                                       QPCReportException)
 
 from api.models import ReportSlice
 from api.serializers import ReportSliceSerializer
@@ -38,7 +42,6 @@ from config.settings.base import (HOSTS_UPLOAD_FUTURES_COUNT,
                                   RETRY_TIME)
 
 LOG = logging.getLogger(__name__)
-SLICE_PROCESSING_LOOP = asyncio.new_event_loop()
 
 HOSTS_UPLOAD_FUTURES_COUNT = int(HOSTS_UPLOAD_FUTURES_COUNT)
 HOSTS_UPLOAD_TIMEOUT = int(HOSTS_UPLOAD_TIMEOUT)
@@ -74,8 +77,11 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             ReportSlice.FAILED_VALIDATION: self.archive_report_and_slices,
             ReportSlice.FAILED_HOSTS_UPLOAD: self.archive_report_and_slices}
         state_metrics = {
-            ReportSlice.FAILED_VALIDATION: FAILED_TO_VALIDATE.inc
+            ReportSlice.FAILED_VALIDATION: FAILED_TO_VALIDATE
         }
+        self.producer = AIOKafkaProducer(
+            loop=SLICE_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
+        )
         super().__init__(pre_delegate=self.pre_delegate,
                          state_functions=state_functions,
                          state_metrics=state_metrics,
@@ -182,20 +188,24 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         return candidates
 
     # pylint:disable=too-many-locals
-    async def _upload_to_host_inventory_via_kafka(self, hosts):   # noqa: C901 (too-complex)
+    @KAFKA_ERRORS.count_exceptions()  # noqa: C901 (too-complex)
+    async def _upload_to_host_inventory_via_kafka(self, hosts):
         """
         Upload to the host inventory via kafka.
 
         :param: hosts <list> the hosts to upload.
         """
         self.prefix = 'UPLOAD TO INVENTORY VIA KAFKA'
-        producer = AIOKafkaProducer(
+        await self.producer.stop()
+        self.producer = AIOKafkaProducer(
             loop=SLICE_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
         )
         try:
-            await producer.start()
+            await self.producer.start()
         except (KafkaConnectionError, TimeoutError):
-            await producer.stop()
+            KAFKA_ERRORS.inc()
+            self.should_run = False
+            stop_all_event_loops()
             raise KafkaMsgHandlerError(
                 format_message(
                     self.prefix,
@@ -220,7 +230,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     'platform_metadata': {'request_id': system_unique_id}
                 }
                 msg = bytes(json.dumps(upload_msg), 'utf-8')
-                future = await producer.send(UPLOAD_TOPIC, msg)
+                future = await self.producer.send(UPLOAD_TOPIC, msg)
                 send_futures.append(future)
                 associated_msg.append(upload_msg)
                 if count % HOSTS_UPLOAD_FUTURES_COUNT == 0 or count == total_hosts:
@@ -245,7 +255,11 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                         LOG.error('An exception occurred: %s', error)
                     send_futures = []
         except Exception as err:  # pylint: disable=broad-except
-            await producer.stop()
+            LOG.error(format_message(
+                self.prefix, 'The following error occurred: %s' % err))
+            KAFKA_ERRORS.inc()
+            self.should_run = False
+            stop_all_event_loops()
             raise KafkaMsgHandlerError(
                 format_message(
                     self.prefix,
@@ -253,7 +267,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id))
         finally:
-            await producer.stop()
+            await self.producer.stop()
 
 
 def asyncio_report_processor_thread(loop):  # pragma: no cover
@@ -266,7 +280,11 @@ def asyncio_report_processor_thread(loop):  # pragma: no cover
     :returns None
     """
     processor = ReportSliceProcessor()
-    loop.run_until_complete(processor.run())
+    PROCESSOR_INSTANCES.append(processor)
+    try:
+        loop.run_until_complete(processor.run())
+    except Exception:  # pylint: disable=broad-except
+        pass
 
 
 def initialize_report_slice_processor():  # pragma: no cover

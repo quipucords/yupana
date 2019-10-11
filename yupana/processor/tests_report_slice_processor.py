@@ -31,6 +31,7 @@ from processor import (abstract_processor,
                        report_consumer as msg_handler,
                        report_slice_processor,
                        tests_report_consumer as test_handler)
+from prometheus_client import REGISTRY
 
 from api.models import (Report,
                         ReportArchive,
@@ -54,7 +55,8 @@ class ReportSliceProcessorTests(TestCase):
         self.uuid6 = uuid.uuid4()
         self.uuid7 = uuid.uuid4()
         self.fake_record = test_handler.KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
-        self.msg = msg_handler.unpack_consumer_record(self.fake_record)
+        self.report_consumer = msg_handler.ReportConsumer()
+        self.msg = self.report_consumer.unpack_consumer_record(self.fake_record)
         self.report_json = {
             'report_id': 1,
             'report_type': 'insights',
@@ -111,6 +113,16 @@ class ReportSliceProcessorTests(TestCase):
                                 self.processor.failed_hosts]
         for attribute in processor_attributes:
             self.assertEqual(attribute, None)
+
+    def test_assign_report_slice_new(self):
+        """Test the assign report slice function with only a new report slice."""
+        self.report_slice.state = ReportSlice.NEW
+        self.report_slice.save()
+        self.processor.report_or_slice = None
+        self.processor.assign_object()
+        self.assertEqual(self.processor.report_or_slice, self.report_slice)
+        queued_slices = REGISTRY.get_sample_value('queued_report_slices')
+        self.assertEqual(queued_slices, 1)
 
     async def async_test_delegate_state(self):
         """Set up the test for delegate state."""

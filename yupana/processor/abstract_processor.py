@@ -26,8 +26,10 @@ from enum import Enum
 
 import pytz
 from django.db import transaction
-from processor.report_consumer import (QPCReportException,
-                                       format_message)
+from processor.processor_utils import (format_message,
+                                       stop_all_event_loops)
+from processor.report_consumer import (DB_ERRORS,
+                                       QPCReportException)
 from prometheus_client import Counter, Gauge, Summary
 
 from api.models import (Report,
@@ -51,25 +53,42 @@ RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
 
 # setup for prometheus metrics
-QUEUED_OBJECTS = Gauge('queued_objects', 'Reports & Report slices waiting to be processed')
-ARCHIVED_FAIL = Counter('archived_fail', 'Reports that have been archived as failures')
-ARCHIVED_SUCCESS = Counter('archived_success', 'Reports that have been archived as successes')
-FAILED_TO_DOWNLOAD = Counter('failed_download', 'Reports that failed to downlaod')
-FAILED_TO_VALIDATE = Counter('failed_validation', 'Reports that could not be validated')
-INVALID_REPORTS = Counter('invalid_reports', 'Reports containing invalid syntax')
-TIME_RETRIES = Counter('time_retries', 'The total number of retries based on time for all reports')
+QUEUED_REPORTS = Gauge('queued_reports', 'Reports waiting to be processed')
+QUEUED_REPORT_SLICES = Gauge('queued_report_slices', 'Report Slices waiting to be processed')
+ARCHIVED_FAIL_REPORTS = Counter('archived_fail_reports',
+                                'Reports that have been archived as failures',
+                                ['account_number'])
+ARCHIVED_SUCCESS_REPORTS = Counter('archived_success_reports',
+                                   'Reports that have been archived as successes',
+                                   ['account_number'])
+ARCHIVED_FAIL_SLICES = Counter('archived_fail_slices',
+                               'Slices that have been archived as failures',
+                               ['account_number'])
+ARCHIVED_SUCCESS_SLICES = Counter('archived_success_slices',
+                                  'Slices that have been archived as successes',
+                                  ['account_number'])
+FAILED_TO_DOWNLOAD = Counter('failed_download',
+                             'Reports that failed to download',
+                             ['account_number'])
+FAILED_TO_VALIDATE = Counter('failed_validation',
+                             'Reports that could not be validated',
+                             ['account_number'])
+INVALID_REPORTS = Counter('invalid_reports',
+                          'Reports containing invalid syntax',
+                          ['account_number'])
+TIME_RETRIES = Counter('time_retries',
+                       'The total number of retries based on time for all reports',
+                       ['account_number'])
 COMMIT_RETRIES = Counter('commit_retries',
-                         'The total number of retries based on commit for all reports')
-HOST_UPLOAD_REQUEST_LATENCY = Summary(
-    'inventory_upload_latency',
-    'The time in seconds that it takes to post to the host inventory')
-UPLOAD_GROUP_SIZE = Gauge('upload_group_size',
-                          'The amount of hosts being uploaded in a single bulk request.')
+                         'The total number of retries based on commit for all reports',
+                         ['account_number'])
+REPORT_PROCESSING_LATENCY = Summary(
+    'report_processing_latency',
+    'The time in seconds that it takes to process a report'
+)
 VALIDATION_LATENCY = Summary('validation_latency', 'The time it takes to validate a report')
-INVALID_HOSTS = Gauge('invalid_hosts_per_report', 'The total number of invalid hosts per report')
-VALID_HOSTS = Gauge('valid_hosts_per_report', 'The total number of valid hosts per report')
-HOSTS_UPLOADED_SUCCESS = Gauge('hosts_uploaded', 'The total number of hosts successfully uploaded')
-HOSTS_UPLOADED_FAILED = Gauge('hosts_failed', 'The total number of hosts that fail to upload')
+INVALID_HOSTS = Gauge('invalid_hosts', 'The number of invalid hosts',
+                      ['account_number', 'source'])
 
 
 # pylint: disable=broad-except, too-many-lines, too-many-public-methods
@@ -126,7 +145,10 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         """
         while self.should_run:
             if not self.report_or_slice:
-                self.assign_object()
+                try:
+                    self.assign_object()
+                except Exception:  # pylint:disable=broad-except
+                    stop_all_event_loops()
             if self.report_or_slice:
                 try:
                     await self.delegate_state()
@@ -138,6 +160,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             else:
                 await asyncio.sleep(NEW_REPORT_QUERY_INTERVAL)
 
+    @DB_ERRORS.count_exceptions()
     def calculate_queued_objects(self, current_time, status_info):
         """Calculate the number of reports waiting to be processed.
 
@@ -173,6 +196,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         except (Report.DoesNotExist, ReportSlice.DoesNotExist):
             return None
 
+    @DB_ERRORS.count_exceptions()
     def get_oldest_object_to_retry(self):
         """Grab the oldest report or report slice object to retry.
 
@@ -181,7 +205,10 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         status_info = Status()
         current_time = datetime.now(pytz.utc)
         objects_count = self.calculate_queued_objects(current_time, status_info)
-        QUEUED_OBJECTS.set(objects_count)
+        if self.object_class == Report:
+            QUEUED_REPORTS.set(objects_count)
+        else:
+            QUEUED_REPORT_SLICES.set(objects_count)
         LOG.info(format_message(
             self.prefix,
             'Number of %s waiting to be processed: %s' %
@@ -207,6 +234,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         # if we haven't returned a retry object, return None
         return None
 
+    @DB_ERRORS.count_exceptions()
     def get_new_record(self):
         """Grab the newest report or report slice object."""
         # Get the queryset for all of the objects in the NEW state
@@ -383,11 +411,14 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             serializer.save()
 
         except Exception as error:
+            DB_ERRORS.inc()
+            self.should_run = False
             LOG.error(format_message(
                 self.prefix,
                 'Could not update %s record due to the following error %s.' % (
                     self.object_prefix.lower(), str(error)),
                 account_number=self.account_number, report_platform_id=self.report_platform_id))
+            stop_all_event_loops()
 
     def move_candidates_to_failed(self):
         """Before entering a failed state any candidates should be moved to the failed hosts."""
@@ -424,13 +455,13 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         else:
             self.next_state = current_state
             if retry_type == self.object_class.GIT_COMMIT:
-                COMMIT_RETRIES.inc()
+                COMMIT_RETRIES.labels(account_number=self.account_number).inc()
                 log_message = \
                     'Saving the %s to retry when a new commit '\
                     'is pushed. Retries: %s' % (self.object_prefix.lower(),
                                                 str(self.report_or_slice.retry_count + 1))
             else:
-                TIME_RETRIES.inc()
+                TIME_RETRIES.labels(account_number=self.account_number).inc()
                 log_message = \
                     'Saving the %s to retry at in %s minutes. '\
                     'Retries: %s' % (self.object_prefix.lower(),
@@ -449,7 +480,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
     def record_failed_state_metrics(self):
         """Record the metrics based on the report or slice state."""
         if self.state in self.state_to_metric.keys():
-            self.state_to_metric.get(self.state)()
+            metric = self.state_to_metric.get(self.state)
+            metric.labels(account_number=self.account_number).inc()
 
     def log_time_stats(self, archived_rep):
         """Log the start/completion and processing times of the report."""
@@ -487,6 +519,10 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         time_processing = '{}h {}m {}s'.format(
             total_processing_hours, total_processing_minutes, total_processing_seconds)
 
+        total_processing_time_in_seconds = \
+            int((processing_end_time - processing_start_time).total_seconds() % 60)
+        REPORT_PROCESSING_LATENCY.observe(total_processing_time_in_seconds)
+
         report_time_facts = '\nArrival date & time: {} '\
                             '\nTime spent in queue: {}'\
                             '\nTime spent processing report: {}'\
@@ -498,7 +534,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                                 account_number=self.account_number,
                                 report_platform_id=self.report_platform_id))
 
-    @transaction.atomic  # noqa: C901 (too-complex)
+    @DB_ERRORS.count_exceptions()  # noqa: C901 (too-complex)
+    @transaction.atomic
     def archive_report_and_slices(self):  # pylint: disable=too-many-statements
         """Archive the report slice objects & associated report."""
         self.prefix = 'ARCHIVING'
@@ -539,7 +576,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             if report.upload_ack_status:
                 if report.upload_ack_status == FAILURE_CONFIRM_STATUS:
                     failed = True
-                    INVALID_REPORTS.inc()
+                    INVALID_REPORTS.labels(account_number=self.account_number).inc()
                 archived_rep_data['upload_ack_status'] = report.upload_ack_status
             if report.report_platform_id:
                 archived_rep_data['report_platform_id'] = report.report_platform_id
@@ -553,9 +590,9 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             failed_states = [Report.FAILED_DOWNLOAD, Report.FAILED_VALIDATION,
                              Report.FAILED_VALIDATION_REPORTING]
             if report.state in failed_states or failed:
-                ARCHIVED_FAIL.inc()
+                ARCHIVED_FAIL_REPORTS.labels(account_number=self.account_number).inc()
             else:
-                ARCHIVED_SUCCESS.inc()
+                ARCHIVED_SUCCESS_REPORTS.labels(account_number=self.account_number).inc()
 
             # loop through the associated reports & archive them
             for report_slice in all_report_slices:
@@ -587,9 +624,9 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 failed_states = [ReportSlice.FAILED_VALIDATION,
                                  ReportSlice.FAILED_HOSTS_UPLOAD]
                 if report_slice.state in failed_states:
-                    ARCHIVED_FAIL.inc()
+                    ARCHIVED_FAIL_SLICES.labels(account_number=self.account_number).inc()
                 else:
-                    ARCHIVED_SUCCESS.inc()
+                    ARCHIVED_SUCCESS_SLICES.labels(account_number=self.account_number).inc()
                 LOG.info(format_message(
                     self.prefix,
                     'Archiving report slice %s.' % report_slice.report_slice_id,
@@ -617,12 +654,14 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                                     report_platform_id=self.report_platform_id))
             self.reset_variables()
 
+    @VALIDATION_LATENCY.time()
     def _validate_report_details(self):  # pylint: disable=too-many-locals
         """
         Verify that the report contents are a valid Insights report.
 
         :returns: tuple contain list of valid and invalid hosts
         """
+        source_metadata = self.report_or_slice.source_metadata
         self.prefix = 'VALIDATE REPORT STRUCTURE'
         required_keys = ['report_slice_id',
                          'hosts']
@@ -643,27 +682,34 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     report_platform_id=self.report_platform_id))
 
         # validate that hosts is an array
-        invalid_hosts_message = 'Hosts must be a list of dictionaries.'
+        invalid_hosts_message = \
+            'Hosts must be a list of dictionaries. '\
+            'Source metadata: %s' % source_metadata
         hosts = self.report_json.get('hosts')
         if not hosts or not isinstance(hosts, list):
-            raise QPCReportException(
-                format_message(
-                    self.prefix,
-                    invalid_hosts_message,
-                    account_number=self.account_number,
-                    report_platform_id=self.report_platform_id))
-
+            LOG.error(format_message(self.prefix,
+                                     invalid_hosts_message,
+                                     account_number=self.account_number,
+                                     report_platform_id=self.report_platform_id))
+            raise QPCReportException()
+        invalid_hosts_count = 0
         for host in hosts:
             if not isinstance(host, dict):
-                raise QPCReportException(
-                    format_message(
-                        self.prefix,
-                        invalid_hosts_message,
-                        account_number=self.account_number,
-                        report_platform_id=self.report_platform_id))
+                invalid_hosts_count += 1
+        INVALID_HOSTS.labels(account_number=self.account_number,
+                             source=self.report_or_slice.source).set(invalid_hosts_count)
+        if invalid_hosts_count > 0:
+            hosts_count_message = \
+                '%s invalid host(s) found. ' % invalid_hosts_count
+            invalid_hosts_message = hosts_count_message + invalid_hosts_message
+            LOG.error(format_message(self.prefix,
+                                     invalid_hosts_message,
+                                     account_number=self.account_number,
+                                     report_platform_id=self.report_platform_id))
+            raise QPCReportException()
         report_slice_id = self.report_json.get('report_slice_id')
         candidate_hosts, hosts_without_facts = \
-            self._validate_report_hosts(report_slice_id)
+            self._validate_report_hosts(report_slice_id, source_metadata)
         total_fingerprints = len(candidate_hosts)
         total_valid = total_fingerprints - len(hosts_without_facts)
         LOG.info(format_message(
@@ -674,15 +720,14 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             report_platform_id=self.report_platform_id
         ))
         if not candidate_hosts:
-            raise QPCReportException(
-                format_message(
-                    self.prefix,
-                    'report does not contain any valid hosts.',
-                    account_number=self.account_number,
-                    report_platform_id=self.report_platform_id))
+            LOG.error(format_message(self.prefix,
+                                     'report does not contain any valid hosts.',
+                                     account_number=self.account_number,
+                                     report_platform_id=self.report_platform_id))
+            raise QPCReportException()
         return candidate_hosts
 
-    def _validate_report_hosts(self, report_slice_id):
+    def _validate_report_hosts(self, report_slice_id, source_metadata):
         """Verify that report hosts contain canonical facts.
 
         :returns: tuple containing valid & invalid hosts
@@ -709,15 +754,20 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     found_facts = True
                     break
             if not found_facts:
+                INVALID_HOSTS.labels(
+                    account_number=self.account_number, source=self.report_or_slice.source).inc()
                 hosts_without_facts.append({host_uuid: host})
             candidate_hosts.append({host_uuid: host})
-
         if hosts_without_facts:
+            invalid_hosts_message = \
+                '%d host(s) found that contain(s) 0 canonical facts: %s.'\
+                'Source metadata: %s' % (len(hosts_without_facts),
+                                         hosts_without_facts,
+                                         source_metadata)
             LOG.warning(
                 format_message(
                     prefix,
-                    '%d host(s) found that contain(s) 0 canonical facts: %s' % (
-                        len(hosts_without_facts), hosts_without_facts),
+                    invalid_hosts_message,
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id))
 

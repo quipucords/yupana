@@ -19,3 +19,18 @@ services:
         POSTGRES_DB: insights
       ports:
         - "5432:5432"
+  grafana:
+      ports:
+          - '3000:3000'
+      container_name: grafana
+      environment:
+          - GF_SERVER_ROOT_URL=http://grafana.server.name
+          - GF_SECURITY_ADMIN_PASSWORD=secret
+      image: grafana/grafana
+  prometheus:
+      container_name: prometheus
+      ports:
+          - '9090:9090'
+      volumes:
+          - './scripts/config/prometheus.yml:/etc/prometheus/prometheus.yml'
+      image: prom/prometheus

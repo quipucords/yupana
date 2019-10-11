@@ -16,7 +16,6 @@
 #
 """Report Processor."""
 
-import asyncio
 import json
 import logging
 import tarfile
@@ -33,9 +32,15 @@ from kafka.errors import ConnectionError as KafkaConnectionError
 from processor.abstract_processor import (
     AbstractProcessor,
     FAILED_TO_DOWNLOAD, FAILED_TO_VALIDATE, RETRY)
-from processor.report_consumer import (KafkaMsgHandlerError,
-                                       QPCReportException,
-                                       format_message)
+from processor.processor_utils import (PROCESSOR_INSTANCES,
+                                       REPORT_PROCESSING_LOOP,
+                                       format_message,
+                                       stop_all_event_loops)
+from processor.report_consumer import (DB_ERRORS,
+                                       KAFKA_ERRORS,
+                                       KafkaMsgHandlerError,
+                                       QPCReportException)
+from prometheus_client import Counter, Gauge
 
 from api.models import (Report, ReportSlice, Status)
 from api.serializers import ReportSerializer, ReportSliceSerializer
@@ -45,13 +50,21 @@ from config.settings.base import (INSIGHTS_KAFKA_ADDRESS,
                                   RETRY_TIME)
 
 LOG = logging.getLogger(__name__)
-REPORT_PROCESSING_LOOP = asyncio.new_event_loop()
 VALIDATION_TOPIC = 'platform.upload.validation'
 SUCCESS_CONFIRM_STATUS = 'success'
 FAILURE_CONFIRM_STATUS = 'failure'
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
 MAX_HOSTS_PER_REP = int(MAX_HOSTS_PER_REP)
+HOSTS_PER_REPORT_SATELLITE = Gauge('hosts_per_sat_rep',
+                                   'Hosts count in a satellite report',
+                                   ['account_number'])
+HOSTS_PER_REPORT_QPC = Gauge('hosts_per_qpc_rep',
+                             'Hosts count in a QPC report',
+                             ['account_number'])
+HOSTS_COUNTER = Counter('yupana_hosts_count',
+                        'Total number of hosts uploaded',
+                        ['account_number', 'source'])
 
 
 class FailDownloadException(Exception):
@@ -93,10 +106,13 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             Report.FAILED_VALIDATION: self.archive_report_and_slices,
             Report.FAILED_VALIDATION_REPORTING: self.archive_report_and_slices}
         state_metrics = {
-            Report.FAILED_DOWNLOAD: FAILED_TO_DOWNLOAD.inc,
-            Report.FAILED_VALIDATION: FAILED_TO_VALIDATE.inc
+            Report.FAILED_DOWNLOAD: FAILED_TO_DOWNLOAD,
+            Report.FAILED_VALIDATION: FAILED_TO_VALIDATE
         }
         self.async_states = [Report.VALIDATED]
+        self.producer = AIOKafkaProducer(
+            loop=REPORT_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
+        )
         super().__init__(pre_delegate=self.pre_delegate,
                          state_functions=state_functions,
                          state_metrics=state_metrics,
@@ -154,6 +170,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 account_number=self.account_number))
             self.determine_retry(Report.FAILED_DOWNLOAD, Report.STARTED)
 
+    @DB_ERRORS.count_exceptions()
     def transition_to_validated(self):
         """Validate that the report contents & move to validated state."""
         self.prefix = 'ATTEMPTING VALIDATE'
@@ -227,6 +244,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 report_platform_id=self.report_platform_id))
             self.determine_retry(Report.FAILED_VALIDATION_REPORTING, Report.VALIDATED)
 
+    @DB_ERRORS.count_exceptions()
     def create_report_slice(self, options):
         """Create report slice.
 
@@ -239,6 +257,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         report_slice_id = options.get('report_slice_id')
         hosts_count = options.get('hosts_count')
         source = options.get('source')
+        source_metadata = options.get('source_metadata')
         LOG.info(
             format_message(
                 self.prefix, 'Creating report slice %s' % report_slice_id,
@@ -271,6 +290,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             'report': self.report_or_slice.id,
             'hosts_count': hosts_count,
             'source': source,
+            'source_metadata': json.dumps(source_metadata),
             'creation_time': datetime.now(pytz.utc)
         }
         slice_serializer = ReportSliceSerializer(data=report_slice)
@@ -363,10 +383,13 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id))
         except Exception as error:  # pylint: disable=broad-except
+            DB_ERRORS.inc()
+            self.should_run = False
             LOG.error(format_message(
                 self.prefix,
                 'Could not update report slice record due to the following error %s.' % str(error),
                 account_number=self.account_number, report_platform_id=self.report_platform_id))
+            stop_all_event_loops()
 
     def _download_report(self):
         """
@@ -469,7 +492,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
 
         self.report_platform_id = metadata_json.get('report_id')
         host_inventory_api_version = metadata_json.get('host_inventory_api_version')
-        source = metadata_json.get('source')
+        source = metadata_json.get('source', '')
         # we should save the above information into the report object
         options = {
             'report_platform_id': self.report_platform_id,
@@ -492,12 +515,24 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         valid_slice_ids = {}
         report_slices = metadata_json.get('report_slices', {})
         # we need to verify that the report slices have the appropriate number of hosts
+        total_hosts_in_report = 0
         for report_slice_id, report_info in report_slices.items():
             num_hosts = int(report_info.get('number_hosts', MAX_HOSTS_PER_REP + 1))
             if num_hosts <= MAX_HOSTS_PER_REP:
+                total_hosts_in_report += num_hosts
                 valid_slice_ids[report_slice_id] = num_hosts
             else:
                 invalid_slice_ids[report_slice_id] = num_hosts
+        # record how many hosts there were for grafana charts
+        HOSTS_COUNTER.labels(
+            account_number=self.account_number,
+            source=source).inc(total_hosts_in_report)
+        if source.lower() == 'qpc':
+            HOSTS_PER_REPORT_QPC.labels(
+                account_number=self.account_number).set(total_hosts_in_report)
+        elif source.lower() == 'satellite':
+            HOSTS_PER_REPORT_SATELLITE.labels(
+                account_number=self.account_number).set(total_hosts_in_report)
         # if any reports were over the max number of hosts, we need to log
         if invalid_slice_ids:
             for report_slice_id, num_hosts in invalid_slice_ids.items():
@@ -596,7 +631,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                                     'report_json': report_slice_json,
                                     'report_slice_id': report_slice_id,
                                     'hosts_count': num_hosts,
-                                    'source': options.get('source')
+                                    'source': options.get('source'),
+                                    'source_metadata': options.get('source_metadata', {})
                                 }
                                 created = self.create_report_slice(
                                     slice_options)
@@ -638,6 +674,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                                'Unexpected error reading tar.gz: %s' % str(err),
                                account_number=self.account_number))
 
+    @KAFKA_ERRORS.count_exceptions()
     async def _send_confirmation(self, file_hash):  # pragma: no cover
         """
         Send kafka validation message to Insights Upload service.
@@ -649,13 +686,17 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         :returns None
         """
         self.prefix = 'REPORT VALIDATION STATE ON KAFKA'
-        producer = AIOKafkaProducer(
+        await self.producer.stop()
+        self.producer = AIOKafkaProducer(
             loop=REPORT_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
         )
         try:
-            await producer.start()
-        except (KafkaConnectionError, TimeoutError):
-            await producer.stop()
+            await self.producer.start()
+        except (KafkaConnectionError, TimeoutError, Exception):
+            KAFKA_ERRORS.inc()
+            self.should_run = False
+            await self.producer.stop()
+            stop_all_event_loops()
             raise KafkaMsgHandlerError(
                 format_message(
                     self.prefix,
@@ -669,16 +710,23 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 'validation': self.status
             }
             msg = bytes(json.dumps(validation), 'utf-8')
-            await producer.send_and_wait(VALIDATION_TOPIC, msg)
+            await self.producer.send_and_wait(VALIDATION_TOPIC, msg)
             LOG.info(
                 format_message(
                     self.prefix,
                     'Send %s validation status to file upload on kafka' % self.status,
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id))
-        finally:
-            await producer.stop()
+        except Exception as err:  # pylint: disable=broad-except
+            KAFKA_ERRORS.inc()
+            LOG.error(format_message(
+                self.prefix, 'The following error occurred: %s' % err))
+            stop_all_event_loops()
 
+        finally:
+            await self.producer.stop()
+
+    @DB_ERRORS.count_exceptions()
     @transaction.atomic
     def deduplicate_reports(self):
         """If a report with the same id already exists, archive the new report."""
@@ -706,7 +754,11 @@ def asyncio_report_processor_thread(loop):  # pragma: no cover
     :returns None
     """
     processor = ReportProcessor()
-    loop.run_until_complete(processor.run())
+    PROCESSOR_INSTANCES.append(processor)
+    try:
+        loop.run_until_complete(processor.run())
+    except Exception:  # pylint: disable=broad-except
+        pass
 
 
 def initialize_report_processor():  # pragma: no cover

@@ -23,7 +23,6 @@ import tarfile
 from unittest.mock import patch
 
 import processor.report_consumer as msg_handler
-from aiokafka import AIOKafkaConsumer
 from asynctest import CoroutineMock
 from django.test import TestCase
 
@@ -73,6 +72,7 @@ class KafkaMsgHandlerTest(TestCase):
     def setUp(self):
         """Create test setup."""
         self.payload_url = 'http://insights-upload.com/q/file_to_validate'
+        self.report_consumer = msg_handler.ReportConsumer()
 
     def tearDown(self):
         """Remove test setup."""
@@ -86,7 +86,7 @@ class KafkaMsgHandlerTest(TestCase):
     def test_unpack_consumer_record(self):
         """Test format message without account or report id."""
         fake_record = KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
-        msg = msg_handler.unpack_consumer_record(fake_record)
+        msg = self.report_consumer.unpack_consumer_record(fake_record)
         self.assertEqual(msg, {'url': 'http://internet.com', 'rh_account': '1234',
                                'request_id': '234332'})
 
@@ -96,31 +96,25 @@ class KafkaMsgHandlerTest(TestCase):
         fake_record.value = 'not json'.encode('utf-8')
 
         with self.assertRaises(msg_handler.QPCKafkaMsgException):
-            msg_handler.unpack_consumer_record(fake_record)
+            self.report_consumer.unpack_consumer_record(fake_record)
 
     async def save_and_ack(self):
         """Test the save and ack message method."""
-        test_consumer = AIOKafkaConsumer(
-            msg_handler.QPC_TOPIC,
-            loop=msg_handler.UPLOAD_REPORT_CONSUMER_LOOP,
-            bootstrap_servers=msg_handler.INSIGHTS_KAFKA_ADDRESS,
-            group_id='qpc-group', enable_auto_commit=False
-        )
-        test_consumer.commit = CoroutineMock()
+        self.report_consumer.consumer.commit = CoroutineMock()
         qpc_msg = KafkaMsg(msg_handler.QPC_TOPIC, self.payload_url)
         # test happy case
-        with patch('processor.report_consumer.unpack_consumer_record',
+        with patch('processor.report_consumer.ReportConsumer.unpack_consumer_record',
                    return_value={'account': '8910', 'request_id': '1234'}):
-            await msg_handler.save_message_and_ack(test_consumer, qpc_msg)
+            await self.report_consumer.save_message_and_ack(qpc_msg)
             report = Report.objects.get(account='8910')
             self.assertEqual(json.loads(report.upload_srv_kafka_msg),
                              {'account': '8910', 'request_id': '1234'})
             self.assertEqual(report.state, Report.NEW)
 
         # test no rh_account or request_id
-        with patch('processor.report_consumer.unpack_consumer_record',
+        with patch('processor.report_consumer.ReportConsumer.unpack_consumer_record',
                    return_value={'foo': 'bar'}):
-            await msg_handler.save_message_and_ack(test_consumer, qpc_msg)
+            await self.report_consumer.save_message_and_ack(qpc_msg)
             with self.assertRaises(Report.DoesNotExist):
                 Report.objects.get(upload_srv_kafka_msg=json.dumps({'foo': 'bar'}))
 
@@ -129,10 +123,10 @@ class KafkaMsgHandlerTest(TestCase):
             """Raise a general error."""
             raise Exception('Test')
 
-        test_consumer.commit = CoroutineMock(side_effect=raise_error)
-        with patch('processor.report_consumer.unpack_consumer_record',
+        self.report_consumer.consumer.commit = CoroutineMock(side_effect=raise_error)
+        with patch('processor.report_consumer.ReportConsumer.unpack_consumer_record',
                    return_value={'rh_account': '1112', 'request_id': '1234'}):
-            await msg_handler.save_message_and_ack(test_consumer, qpc_msg)
+            await self.report_consumer.save_message_and_ack(qpc_msg)
             report = Report.objects.get(account='1112')
             self.assertEqual(json.loads(report.upload_srv_kafka_msg),
                              {'rh_account': '1112', 'request_id': '1234'})
