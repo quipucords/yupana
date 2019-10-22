@@ -18,7 +18,7 @@ if (env.CHANGE_ID) {
         // the iqe plugins to install for the test
         iqePlugins: ["iqe-yupana-plugin"],
         // the pytest marker to use when calling `iqe tests all`
-        pytestMarker: "yupana-smoke",
+        pytestMarker: "yupana_smoke",
         // optional id for an IQE configuration file stored as a secret in Jenkins
         //configFileCredentialsId: "myId",
     )
