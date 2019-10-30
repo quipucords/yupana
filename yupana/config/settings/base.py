@@ -148,7 +148,8 @@ if CW_AWS_ACCESS_KEY_ID:
     }
     LOGGING['handlers']['watchtower'] = WATCHTOWER_HANDLER
 else:
-    print('Unable to configure watchtower logging.  Please verify watchtower logging configuration!')
+    print('Unable to configure watchtower logging.'
+          'Please verify watchtower logging configuration!')
 
 # Default apps go here
 DJANGO_APPS = [
