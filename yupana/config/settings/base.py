@@ -32,6 +32,7 @@ import os
 import environ
 
 from boto3.session import Session
+from botocore.exceptions import ClientError
 from .env import ENVIRONMENT
 
 ROOT_DIR = environ.Path(__file__) - 4
@@ -130,23 +131,26 @@ LOGGING = {
 if CW_AWS_ACCESS_KEY_ID:
     print('Configuring watchtower logging.')
     NAMESPACE = 'unknown'
-    BOTO3_SESSION = Session(aws_access_key_id=CW_AWS_ACCESS_KEY_ID,
-                            aws_secret_access_key=CW_AWS_SECRET_ACCESS_KEY,
-                            region_name=CW_AWS_REGION)
     try:
-        with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r") as f:
-            NAMESPACE = f.read()
-    except Exception:  # pylint: disable=W0703
-        pass
-    WATCHTOWER_HANDLER = {
-        'level': LOGGING_LEVEL,
-        'class': 'watchtower.CloudWatchLogHandler',
-        'boto3_session': BOTO3_SESSION,
-        'log_group': CW_LOG_GROUP,
-        'stream_name': NAMESPACE,
-        'formatter': LOGGING_FORMATTER,
-    }
-    LOGGING['handlers']['watchtower'] = WATCHTOWER_HANDLER
+        BOTO3_SESSION = Session(aws_access_key_id=CW_AWS_ACCESS_KEY_ID,
+                                aws_secret_access_key=CW_AWS_SECRET_ACCESS_KEY,
+                                region_name=CW_AWS_REGION)
+        try:
+            with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r") as f:
+                NAMESPACE = f.read()
+        except Exception:  # pylint: disable=W0703
+            pass
+        WATCHTOWER_HANDLER = {
+            'level': LOGGING_LEVEL,
+            'class': 'watchtower.CloudWatchLogHandler',
+            'boto3_session': BOTO3_SESSION,
+            'log_group': CW_LOG_GROUP,
+            'stream_name': NAMESPACE,
+            'formatter': LOGGING_FORMATTER,
+        }
+        LOGGING['handlers']['watchtower'] = WATCHTOWER_HANDLER
+    except ClientError as cerr:
+        print('CloudWatch logging setup failed: %s' % cerr)
 else:
     print('Unable to configure watchtower logging.'
           'Please verify watchtower logging configuration!')
