@@ -88,8 +88,7 @@ class extend_report():
         for uid in uuids:
             if host.get(uid, None):
                 host[uid] = str(uuid.uuid4())
-        fqdn = host.get('fqdn', None)
-        if fqdn:
+        if host.get('fqdn', None):
             self.fqdn_count += 1
             new_fqdn = 'host_number_%s' % self.fqdn_count
             host['fqdn'] = new_fqdn
@@ -99,7 +98,7 @@ class extend_report():
         number_hosts = self.target_hosts
         if number_hosts % self.slice_max:
             number_of_slices = number_hosts // self.slice_max + 1
-            hosts_per_slice = number_hosts // number_of_slices + 1
+            hosts_per_slice = number_hosts // number_of_slices
         else:
             number_of_slices = number_hosts // self.slice_max
             hosts_per_slice = number_hosts // number_of_slices
@@ -131,7 +130,7 @@ if __name__ == "__main__":
         hosts_arg = list(filter(lambda x: 'hosts' in x, sys.argv))[0]
         host_num = int(hosts_arg.split('=')[1])
     except Exception as e:
-        print('Inproper value passed in for hosts.')
+        print('Improper value passed in for hosts.')
         sys.exit(1)
     cla_obj = extend_report(target_hosts=host_num)
     cla_obj.create_slices()
