@@ -112,6 +112,9 @@ LOGGING = {
             'format': '%(asctime)s | %(levelname)s | '
                       '%(filename)s:%(funcName)s:%(lineno)d | %(message)s'
         },
+        'simple': {
+            'format': '[%(asctime)s] %(levelname)s: %(message)s'
+        },
     },
     'handlers': {
         'console': {
