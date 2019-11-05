@@ -44,7 +44,8 @@ class Status:
             git_commit = subprocess.run(['git',
                                          'describe',
                                          '--always'],
-                                        stdout=subprocess.PIPE)
+                                        stdout=subprocess.PIPE,
+                                        check=True)
             if git_commit.stdout:
                 git_commit = git_commit.stdout.decode('utf-8').strip()
         return git_commit
