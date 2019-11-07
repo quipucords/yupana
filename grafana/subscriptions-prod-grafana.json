@@ -1,0 +1,1293 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": 150,
+  "links": [],
+  "panels": [
+    {
+      "aliasColors": {
+        "DB errors": "dark-blue"
+      },
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Insights-Prometheus",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 26,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(yupana_db_errors_total{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Yupana DB errors",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Database Errors",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {
+        "kafka_errors_total{instance=\"docker.for.mac.localhost:8001\",job=\"yupana\"}": "dark-blue"
+      },
+      "bars": true,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Insights-Prometheus",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 24,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(yupana_kafka_errors_total{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "kafka errors",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Kafka Errors",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {
+        "Hosts per hour": "#aea2e0",
+        "Hosts per minute": "#890f02",
+        "Hosts uploaded over the last day": "#e5ac0e",
+        "QPC hosts per hour": "#bf1b00",
+        "QPC hosts per minute": "#eab839",
+        "Rate of hosts per hour": "#614d93",
+        "Satellite hosts per hour": "light-yellow",
+        "Satellite hosts per minute": "light-red",
+        "Total Hosts ": "#0a50a1",
+        "Total QPC Hosts": "#508642",
+        "Total Satellite Hosts ": "dark-red"
+      },
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Insights-Prometheus",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 22,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(yupana_hosts_count_total{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "hide": false,
+          "intervalFactor": 1,
+          "legendFormat": "Total Hosts ",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(yupana_hosts_count_total{source=\"qpc\", kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "hide": false,
+          "intervalFactor": 1,
+          "legendFormat": "Total QPC Hosts",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(yupana_hosts_count_total{source=\"satellite\", kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "hide": false,
+          "intervalFactor": 1,
+          "legendFormat": "Total Satellite Hosts ",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(increase(yupana_hosts_count_total{kubernetes_namespace=\"subscriptions-prod\"}[1m]))",
+          "format": "time_series",
+          "hide": false,
+          "intervalFactor": 1,
+          "legendFormat": "Hosts per minute",
+          "refId": "D"
+        },
+        {
+          "expr": "sum(increase(yupana_hosts_count_total{source=\"qpc\", kubernetes_namespace=\"subscriptions-prod\"}[1m]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "QPC hosts per minute",
+          "refId": "E"
+        },
+        {
+          "expr": "sum(increase(yupana_hosts_count_total{source=\"satellite\", kubernetes_namespace=\"subscriptions-prod\"}[1m]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Satellite hosts per minute",
+          "refId": "F"
+        },
+        {
+          "expr": "sum(increase(yupana_hosts_count_total{kubernetes_namespace=\"subscriptions-prod\"}[1h]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Hosts per hour",
+          "refId": "G"
+        },
+        {
+          "expr": "sum(increase(yupana_hosts_count_total{source=\"qpc\", kubernetes_namespace=\"subscriptions-prod\"}[1h]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "QPC hosts per hour",
+          "refId": "H"
+        },
+        {
+          "expr": "sum(increase(yupana_hosts_count_total{source=\"satellite\", kubernetes_namespace=\"subscriptions-prod\"}[1h]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Satellite hosts per hour",
+          "refId": "I"
+        },
+        {
+          "expr": "sum(rate(yupana_hosts_count_total{kubernetes_namespace=\"subscriptions-prod\"}[1h]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Rate of hosts per hour",
+          "refId": "J"
+        },
+        {
+          "expr": "sum(increase(yupana_hosts_count_total{kubernetes_namespace=\"subscriptions-prod\"}[24h]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Hosts uploaded over the last day",
+          "refId": "K"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Hosts Counter",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Insights-Prometheus",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "id": 18,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(rate(django_http_responses_total_by_status_total{kubernetes_namespace=\"subscriptions-prod\"}[1m])) by (status)",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Requests per minute by Status Code",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Insights-Prometheus",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "id": 16,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(time_retries_total{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Time Retries",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(commit_retries_total{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Commit Retries",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(time_retries_total{kubernetes_namespace=\"subscriptions-prod\"}) + sum(commit_retries_total{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Total Retries",
+          "refId": "C"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Retries ",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {
+        "Archived Failed Reports": "dark-blue",
+        "Archived Successful Report Slices": "#bf1b00",
+        "Total Archived Reports": "dark-green"
+      },
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Insights-Prometheus",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "id": 14,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(archived_fail_reports_total{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Archived Failed Reports",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(archived_success_reports_total{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Archived Successful Reports",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(archived_fail_reports_total{kubernetes_namespace=\"subscriptions-prod\"}) + sum(archived_success_reports_total{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Total Archived Reports",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(archived_success_slices_total{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Archived Successful Report Slices",
+          "refId": "D"
+        },
+        {
+          "expr": "sum(archived_fail_slices_total{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Archived Failed Report Slices",
+          "refId": "E"
+        },
+        {
+          "expr": "sum(archived_success_slices_total{kubernetes_namespace=\"subscriptions-prod\"}) + sum(archived_fail_slices_total{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Total Archived Report Slices",
+          "refId": "F"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Archived Reports & Slices",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Insights-Prometheus",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 48
+      },
+      "id": 12,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(failed_validation_total{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Reports that failed validation",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(failed_download_total{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Reports that failed to download",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(invalid_reports_total{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Invalid reports ",
+          "refId": "C"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Failed Reports",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Insights-Prometheus",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 56
+      },
+      "id": 8,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(report_processing_latency_sum{kubernetes_namespace=\"subscriptions-prod\"})/sum(report_processing_latency_count{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Report Processing Latency Average",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(validation_latency_sum{kubernetes_namespace=\"subscriptions-prod\"})/sum(validation_latency_count{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Validation Latency Average",
+          "refId": "B"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Report Processing Latency",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {
+        "Hosts per QPC report": "#0a50a1",
+        "Hosts per SAT report": "dark-green",
+        "Total hosts": "dark-yellow"
+      },
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Insights-Prometheus",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 64
+      },
+      "id": 6,
+      "interval": "",
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(hosts_per_qpc_rep{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Hosts per QPC report",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(hosts_per_sat_rep{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Hosts per SAT report",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(hosts_per_qpc_rep{kubernetes_namespace=\"subscriptions-prod\"}) + sum(hosts_per_sat_rep{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Total hosts",
+          "refId": "C"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Hosts per report (Gauge)",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {
+        "Rate of report uploads per hour": "#ba43a9",
+        "Rate of report uploads per minute": "#0a50a1",
+        "Report uploads over the last day": "#70dbed",
+        "Total report upl": "dark-green",
+        "Total report uploads per hour": "#bf1b00",
+        "Total report uploads per min": "#e5ac0e"
+      },
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Insights-Prometheus",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 72
+      },
+      "id": 4,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(yupana_message_uploads_total{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Total report uploads",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(yupana_message_uploads_total{kubernetes_namespace=\"subscriptions-prod\"}[1m]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Rate of report uploads per minute",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(increase(yupana_message_uploads_total{kubernetes_namespace=\"subscriptions-prod\"}[1m]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Total report uploads per min",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(increase(yupana_message_uploads_total{kubernetes_namespace=\"subscriptions-prod\"}[1h]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Total report uploads per hour",
+          "refId": "D"
+        },
+        {
+          "expr": "sum(rate(yupana_message_uploads_total{kubernetes_namespace=\"subscriptions-prod\"}[1h]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Rate of report uploads per hour",
+          "refId": "E"
+        },
+        {
+          "expr": "sum(increase(yupana_message_uploads_total{kubernetes_namespace=\"subscriptions-prod\"}[24h]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Report uploads over the last day",
+          "refId": "F"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Report Uploads",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Insights-Prometheus",
+      "description": "Visualization of all of the queued reports & report slices",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 80
+      },
+      "id": 2,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "sum(queued_report_slices{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "instant": false,
+          "intervalFactor": 1,
+          "legendFormat": "Queued report slices",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(queued_reports{kubernetes_namespace=\"subscriptions-prod\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Queued reports",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(increase(queued_report_slices{kubernetes_namespace=\"subscriptions-prod\"}[1m]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Queued report slices per minute",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(increase(queued_reports{kubernetes_namespace=\"subscriptions-prod\"}[1m]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Queued reports per minute",
+          "refId": "D"
+        },
+        {
+          "expr": "sum(rate(queued_report_slices{kubernetes_namespace=\"subscriptions-prod\"}[1m]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Rate of queued report slices per minute",
+          "refId": "E"
+        },
+        {
+          "expr": "sum(rate(queued_reports{kubernetes_namespace=\"subscriptions-prod\"}[1m]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "Rate of queued reports per minute",
+          "refId": "F"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Queued Reports & Slices",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 16,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-12h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ],
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "30d"
+    ]
+  },
+  "timezone": "",
+  "title": "Subscriptions",
+  "uid": "KYkcp45Wkz",
+  "version": 2
+}

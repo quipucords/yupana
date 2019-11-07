@@ -123,7 +123,7 @@ In order to visualize the metrics that we are collecting, log in to Grafana at [
 
 2. Once you are logged in, click on `Create your first data source`, and select `Prometheus`. Leave all of the defaults, but enter `http://docker.for.mac.localhost:9090` into the `URL` field. Scroll down and click `Save & Test`.
 
-3. Now you can import our development dashboard. Click on the `+` in the lefthand toolbar and select `Import`. Next, select `Upload .json file` in the upper right-hand corner. Now, import [yupana-grafana.json](https://github.com/quipucords/yupana/blob/master/scripts/config/yupana-grafana.json). Finally, click `Import` to begin using the yupana dashboard to visualize the data.
+3. Now you can import our development dashboard. Click on the `+` in the lefthand toolbar and select `Import`. Next, select `Upload .json file` in the upper right-hand corner. Now, import [dev-grafana.json](https://github.com/quipucords/yupana/blob/master/grafana/dev-grafana.json). Finally, click `Import` to begin using the yupana dashboard to visualize the data.
 
 
 ### Bringing down yupana and all services
