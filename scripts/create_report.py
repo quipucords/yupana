@@ -99,6 +99,8 @@ class extend_report():
         if number_hosts % self.slice_max:
             number_of_slices = number_hosts // self.slice_max + 1
             hosts_per_slice = number_hosts // number_of_slices
+            if number_hosts > self.slice_max:
+                 hosts_per_slice += 1
         else:
             number_of_slices = number_hosts // self.slice_max
             hosts_per_slice = number_hosts // number_of_slices
