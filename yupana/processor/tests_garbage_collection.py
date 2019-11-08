@@ -20,6 +20,7 @@ import asyncio
 import json
 import uuid
 from datetime import datetime, timedelta
+from unittest import mock
 from unittest.mock import patch
 
 import pytz
@@ -35,7 +36,8 @@ from api.models import (Report,
 class GarbageCollectorTests(TestCase):
     """Test Cases for the garbage collector."""
 
-    def setUp(self):
+    @mock.patch('psycopg2.connect')
+    def setUp(self, mock_connect):  # pylint: disable=arguments-differ, unused-argument
         """Create test setup."""
         self.uuid = uuid.uuid4()
         self.uuid2 = uuid.uuid4()

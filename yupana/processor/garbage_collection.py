@@ -21,6 +21,7 @@ import logging
 import threading
 from datetime import datetime, timedelta
 
+import psycopg2
 import pytz
 from processor.processor_utils import (GARBAGE_COLLECTION_LOOP,
                                        format_message)
@@ -28,7 +29,13 @@ from processor.report_consumer import DB_ERRORS
 
 from api.models import ReportArchive
 from config.settings.base import (ARCHIVE_RECORD_RETENTION_PERIOD,
-                                  GARBAGE_COLLECTION_INTERVAL)
+                                  DB_SERVICE_HOST,
+                                  DB_SERVICE_NAME,
+                                  DB_SERVICE_PASSWORD,
+                                  DB_SERVICE_PORT,
+                                  DB_SERVICE_USER,
+                                  GARBAGE_COLLECTION_INTERVAL,
+                                  )
 
 LOG = logging.getLogger(__name__)
 # this is how often we want garbage collection to run
@@ -38,6 +45,39 @@ GARBAGE_COLLECTION_INTERVAL = int(GARBAGE_COLLECTION_INTERVAL)
 ARCHIVE_RECORD_RETENTION_PERIOD = int(ARCHIVE_RECORD_RETENTION_PERIOD)
 
 
+class DatabaseConn():
+    """Class for connecting to and vacuuming the database."""
+
+    def __init__(self):
+        """Initialize a database connection."""
+        self. conn = psycopg2.connect(
+            'dbname=%s host=%s port=%s user=%s password=%s' %
+            (DB_SERVICE_NAME, DB_SERVICE_HOST, DB_SERVICE_PORT,
+             DB_SERVICE_USER, DB_SERVICE_PASSWORD))
+        self.cursor = self.conn.cursor()
+        self.prefix = 'GARBAGE COLLECTING'
+
+    def do_query(self, query):
+        """Carry out a database query."""
+        self.cursor.execute(query)
+        self.conn.commit()
+
+    def vacuum_db(self):
+        """Vacuum the database to release disc space."""
+        LOG.info(format_message(
+            self.prefix,
+            'Vacuuming the database.'))
+        # get old isolation level
+        old_isolation_level = self.conn.isolation_level
+        # set isolation level to 0
+        self.conn.set_isolation_level(0)
+        query = 'VACUUM FULL'
+        # carryout a query of the above
+        self.do_query(query)
+        # set the isolation level back to what it was
+        self.conn.set_isolation_level(old_isolation_level)
+
+
 class GarbageCollector():
     """Class for deleting archived reports & associated slices."""
 
@@ -45,6 +85,7 @@ class GarbageCollector():
         """Initialize a garbage collector."""
         self.should_run = True
         self.prefix = 'GARBAGE COLLECTING'
+        self.db_connection = DatabaseConn()
 
     async def run(self):
         """Run the garbage collector in a loop.
@@ -54,6 +95,7 @@ class GarbageCollector():
         """
         while self.should_run:
             self.remove_outdated_archives()
+            self.db_connection.vacuum_db()
             LOG.info(
                 format_message(
                     self.prefix,

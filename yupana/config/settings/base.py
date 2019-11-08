@@ -231,20 +231,27 @@ if SERVICE_NAME:
 else:
     ENGINE = ENGINES['sqlite']
 
-NAME = ENVIRONMENT.get_value('DATABASE_NAME', default=None)
+DB_SERVICE_NAME = ENVIRONMENT.get_value('DATABASE_NAME', default=None)
 
-if not NAME and ENGINE == ENGINES['sqlite']:
-    NAME = os.path.join(APPS_DIR, 'db.sqlite3')
+if not DB_SERVICE_NAME and ENGINE == ENGINES['sqlite']:
+    DB_SERVICE_NAME = os.path.join(APPS_DIR, 'db.sqlite3')
+
+DB_SERVICE_HOST = ENVIRONMENT.get_value('{}_SERVICE_HOST'.format(SERVICE_NAME),
+                                        default=None)
+
+DB_SERVICE_PORT = ENVIRONMENT.get_value('{}_SERVICE_PORT'.format(SERVICE_NAME),
+                                        default=None)
+DB_SERVICE_USER = ENVIRONMENT.get_value('DATABASE_USER', default=None)
+DB_SERVICE_PASSWORD = ENVIRONMENT.get_value('DATABASE_PASSWORD', default=None)
+
 
 DATABASES = {
     'ENGINE': ENGINE,
-    'NAME': NAME,
-    'USER': ENVIRONMENT.get_value('DATABASE_USER', default=None),
-    'PASSWORD': ENVIRONMENT.get_value('DATABASE_PASSWORD', default=None),
-    'HOST': ENVIRONMENT.get_value('{}_SERVICE_HOST'.format(SERVICE_NAME),
-                                  default=None),
-    'PORT': ENVIRONMENT.get_value('{}_SERVICE_PORT'.format(SERVICE_NAME),
-                                  default=None),
+    'NAME': DB_SERVICE_NAME,
+    'USER': DB_SERVICE_USER,
+    'PASSWORD': DB_SERVICE_PASSWORD,
+    'HOST': DB_SERVICE_HOST,
+    'PORT': DB_SERVICE_PORT,
 }
 
 # add ssl cert if specified
