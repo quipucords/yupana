@@ -46,9 +46,6 @@ SECRET_KEY = ENVIRONMENT.get_value('DJANGO_SECRET_KEY',
                                    default='base')
 DEBUG = ENVIRONMENT.bool('DJANGO_DEBUG', default=False)
 ALLOWED_HOSTS = ENVIRONMENT.get_value('DJANGO_ALLOWED_HOSTS', default=['*'])
-INSIGHTS_HOST_INVENTORY_URL = ENVIRONMENT.get_value(
-    'INSIGHTS_HOST_INVENTORY_URL',
-    default='http://127.0.0.1:8000/r/insights/platform/inventory/api/v1/hosts')
 
 # this is the time in minutes that we want to wait to retry a report
 # default is 8 hours
@@ -57,15 +54,8 @@ RETRY_TIME = ENVIRONMENT.get_value('RETRY_TIME', default=480)
 # this is the number of retries that we want to allow before failing a report
 RETRIES_ALLOWED = ENVIRONMENT.get_value('RETRIES_ALLOWED', default=5)
 
-# this is the max number of hosts that we want to upload at a time for bulk
-# requests (default is 100)
-HOSTS_PER_REQ = ENVIRONMENT.get_value('HOSTS_PER_REQ', default=250)
-
 # this is the max number of hosts per report slice
 MAX_HOSTS_PER_REP = ENVIRONMENT.get_value('MAX_HOSTS_PER_REP', default=10000)
-
-# this is the max number of threads that we want to allow per pod
-MAX_THREADS = ENVIRONMENT.get_value('MAX_THREADS', default=10)
 
 # this is how long we want to sleep in between looking for reports or slices
 # to be processed
@@ -323,6 +313,3 @@ INSIGHTS_KAFKA_PORT = os.getenv('INSIGHTS_KAFKA_PORT', '29092')
 
 # Insights Kafka server address
 INSIGHTS_KAFKA_ADDRESS = f'{INSIGHTS_KAFKA_HOST}:{INSIGHTS_KAFKA_PORT}'
-
-# Mode to use when uploading (REST vs. Kafka)
-HOST_INVENTORY_UPLOAD_MODE = os.getenv('HOST_INVENTORY_UPLOAD_MODE', 'http')
