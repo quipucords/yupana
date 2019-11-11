@@ -51,7 +51,6 @@ help:
 	@echo "--- Commands using an OpenShift Cluster ---"
 	@echo "oc-clean                 stop openshift cluster & remove local config data"
 	@echo "oc-up                    initialize an openshift cluster"
-	@echo "oc-up-dev                run yupana app in openshift cluster"
 	@echo "oc-down                  stop app & openshift cluster"
 	@echo "oc-create-secret         create secret in an initialized openshift cluster"
 	@echo "oc-login-admin           login to openshift as admin"
