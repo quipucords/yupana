@@ -25,7 +25,7 @@ This is a Python project developed using Python 3.6. Make sure you have at least
 To get started developing against Yupana first clone a local copy of the git repository.
 ```
 git clone https://github.com/quipucords/yupana
-git clone https://github.com/RedHatInsights/insights-upload.git
+git clone https://github.com/RedHatInsights/insights-ingress-go
 git clone https://github.com/RedHatInsights/insights-host-inventory.git
 ```
 
@@ -76,15 +76,14 @@ docker ps --format '{{.Names}}'
 ```
 You should see the following services up and running.
 ```
-docker_upload-service_1
-docker_consumer_1
-docker_kafka_1
-docker_minio_1
-docker_zookeeper_1
-yupana_db_1
-yupana_db-host-inventory_1
-prometheus
 grafana
+yupana_db-host-inventory_1
+yupana_db_1
+prometheus
+insightsingressgo_ingress_1
+insightsingressgo_kafka_1
+insightsingressgo_zookeeper_1
+insightsingressgo_minio_1
 ```
 
 ### Sending data to local yupana

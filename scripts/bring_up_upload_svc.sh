@@ -1,9 +1,9 @@
 #!/bin/bash
 set -x
 
-cp -f config/.upload_env ../../insights-upload/docker/.env
-
-cd ../../insights-upload/docker/
+upload_dir_path='../../insights-ingress-go'
+cp -f config/.upload_env $upload_dir_path/.env
+cd $upload_dir_path
 . .env
 pipenv install --dev
 pipenv run docker-compose up --build
