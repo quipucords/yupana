@@ -31,6 +31,8 @@ import os
 
 import environ
 
+from boto3.session import Session
+from botocore.exceptions import ClientError
 from .env import ENVIRONMENT
 
 ROOT_DIR = environ.Path(__file__) - 4
@@ -88,6 +90,20 @@ GARBAGE_COLLECTION_INTERVAL = ENVIRONMENT.get_value(
 # Logging
 # https://docs.djangoproject.com/en/dev/topics/logging/
 # https://docs.python.org/3.6/library/logging.html
+
+# cloudwatch logging variables
+CW_AWS_ACCESS_KEY_ID = ENVIRONMENT.get_value('CW_AWS_ACCESS_KEY_ID', default=None)
+CW_AWS_SECRET_ACCESS_KEY = ENVIRONMENT.get_value('CW_AWS_SECRET_ACCESS_KEY', default=None)
+CW_AWS_REGION = ENVIRONMENT.get_value('CW_AWS_REGION', default='us-east-1')
+CW_LOG_GROUP = ENVIRONMENT.get_value('CW_LOG_GROUP', default='platform-dev')
+
+LOGGING_LEVEL = os.getenv('DJANGO_LOG_LEVEL', 'INFO')
+LOGGING_HANDLERS = os.getenv('DJANGO_LOG_HANDLERS', 'console').split(',')
+LOGGING_FORMATTER = os.getenv('DJANGO_LOG_FORMATTER', 'simple')
+
+if CW_AWS_ACCESS_KEY_ID:
+    LOGGING_HANDLERS += ['watchtower']
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -95,6 +111,9 @@ LOGGING = {
         'verbose': {
             'format': '%(asctime)s | %(levelname)s | '
                       '%(filename)s:%(funcName)s:%(lineno)d | %(message)s'
+        },
+        'simple': {
+            'format': '[%(asctime)s] %(levelname)s: %(message)s'
         },
     },
     'handlers': {
@@ -106,12 +125,38 @@ LOGGING = {
     },
     'loggers': {
         '': {
-            'handlers': ['console', ],
-            'level': ENVIRONMENT.get_value('DJANGO_LOG_LEVEL', default='INFO'),
+            'handlers': LOGGING_HANDLERS,
+            'level': LOGGING_LEVEL,
         },
     },
 }
 
+if CW_AWS_ACCESS_KEY_ID:
+    print('Configuring watchtower logging.')
+    NAMESPACE = 'unknown'
+    try:
+        BOTO3_SESSION = Session(aws_access_key_id=CW_AWS_ACCESS_KEY_ID,
+                                aws_secret_access_key=CW_AWS_SECRET_ACCESS_KEY,
+                                region_name=CW_AWS_REGION)
+        try:
+            with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r") as f:
+                NAMESPACE = f.read()
+        except Exception:  # pylint: disable=W0703
+            pass
+        WATCHTOWER_HANDLER = {
+            'level': LOGGING_LEVEL,
+            'class': 'watchtower.CloudWatchLogHandler',
+            'boto3_session': BOTO3_SESSION,
+            'log_group': CW_LOG_GROUP,
+            'stream_name': NAMESPACE,
+            'formatter': LOGGING_FORMATTER,
+        }
+        LOGGING['handlers']['watchtower'] = WATCHTOWER_HANDLER
+    except ClientError as cerr:
+        print('CloudWatch logging setup failed: %s' % cerr)
+else:
+    print('Unable to configure watchtower logging.'
+          'Please verify watchtower logging configuration!')
 
 # Default apps go here
 DJANGO_APPS = [

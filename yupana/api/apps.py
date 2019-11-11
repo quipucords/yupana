@@ -28,6 +28,7 @@ from config.settings.env import ENVIRONMENT
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 
+# pylint: disable=import-outside-toplevel
 class ApiConfig(AppConfig):
     """API application configuration."""
 

@@ -323,6 +323,22 @@ objects:
                   name: yupana-env
                   key: new-report-query-interval
                   optional: true
+            - name: CW_AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: cw-aws-access-key-id
+                  name: cloudwatch
+                  optional: true
+            - name: CW_AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: cw-aws-secret-access-key
+                  name: cloudwatch
+                  optional: true
+            - name: CW_AWS_REGION
+              value: us-east-1
+            - name: CW_LOG_GROUP
+              value: ${CW_LOG_GROUP}
           livenessProbe:
             failureThreshold: 3
             httpGet:
@@ -596,3 +612,6 @@ parameters:
   displayName: Database Client Certificate
   name: DATABASE_SERVICE_CERT
   required: false
+- name: CW_LOG_GROUP
+  description: AWS CloudWatch log group
+  value: platform-dev

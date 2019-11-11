@@ -38,6 +38,7 @@ help:
 	@echo "server-migrate           run migrations against database"
 	@echo "serve                    run the Django server locally"
 	@echo "validate-swagger         to run swagger-cli validation"
+	@echo "lint                     to run linters on code"
 	@echo "unittest                 run the unit tests"
 	@echo "test-coverage            run the test coverage"
 	@echo "requirements             create requirements.txt for readthedocs"
@@ -71,6 +72,7 @@ help:
 	@echo "sample-data                                 ready sample data for upload to Insights"
 	@echo "custom-data file=<path/to/file>             ready given data for upload to Insights"
 	@echo "upload-data file=<path/to/file>             upload data to Insights"
+	@echo "create-report hosts=<number>                generates a report with x amount of hosts"
 	@echo ""
 	@echo "--- Commands for local development ---"
 	@echo "local-dev-up                                bring up yupana with all required services"
@@ -172,6 +174,16 @@ upload-data:
 		-H "x-rh-insights-request-id: 52df9f748eabcfea" \
 		$(FILE_UPLOAD_URL) \
 		-u $(RH_USERNAME):$(RH_PASSWORD)
+
+create-report:
+	mkdir -p temp/reports
+	$(PYTHON) scripts/create_report.py hosts=$(hosts)
+	@NEW_FILENAME="report_$(hosts)h_$(shell date +%s).tar.gz"; \
+	cd temp; COPYFILE_DISABLE=1 tar -zcvf $$NEW_FILENAME reports; \
+	echo ""; \
+	echo "The updated report was written to" temp/$$NEW_FILENAME; \
+	echo ""; \
+	rm -rf reports; \
 
 local-dev-up:
 	./scripts/bring_up_all.sh
