@@ -318,6 +318,9 @@ http://127.0.0.1:8001/apidoc/index.html
 We use a stable branch to release our code to production. You can complete the release process using the following steps:
 
 1. Submit a pull request (PR) with the changes that you want to merge from `master` into the `stable` branch. In the PR description, create a draft of the release notes. Once a smoke test has passed and the release notes and changes have been approved, merge the PR.
+
 2. Create a release based off of the `stable` branch. Copy the release notes from your PR description and also record the commit number at the top of the release notes.
+
 3. Submit a pull request to the `e2e-deploy` repository updating the `BUILD_VERSION` for the CI, QA, and PROD environment. The `BUILD_VERSION` for CI and QA should always be the `BUILD_VERSION` for PROD plus `0.0.1`.
-4. Once, the PR to update the versions has been reviewed and merged, manually kick off a Jenkins deploy job for the subscriptions service set to the production environment. 
+
+4. Once, the PR to update the versions has been reviewed and merged, manually kick off a Jenkins deploy job for the subscriptions service set to the production environment.
