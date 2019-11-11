@@ -312,3 +312,7 @@ make server-static
 
 Now start the server as described above and point your browser to
 http://127.0.0.1:8001/apidoc/index.html
+
+## Yupana Deployments
+
+We deploy Yupana to the Insights Dev & Production Clusters (subscriptions-ci, subscriptions-qa, subscriptions-stage, subscriptions-prod) via the deployment pipeline defined by the [e2e-deploy repo](https://github.com/RedHatInsights/e2e-deploy).
