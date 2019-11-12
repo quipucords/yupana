@@ -18,6 +18,8 @@ Add `172.30.0.0/16` to the Docker insecure registries which can be accomplished 
 
 Add `172.30.1.1` to the list of proxies to bypass. This can be found at Docker -> Preferences -> Proxies
 
+It is also recommended to adjust your Docker computing resource for memory to a minimum of 4GB. This can be found at Docker -> Preferences -> Advanced
+
 ## Running Locally in OpenShift
 
 Yupana is deployed using the pipeline defined in the [e2e-deploy repo](https://github.com/RedHatInsights/e2e-deploy).
