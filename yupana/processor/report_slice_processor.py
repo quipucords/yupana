@@ -36,7 +36,6 @@ from api.models import ReportSlice
 from api.serializers import ReportSliceSerializer
 from config.settings.base import (HOSTS_UPLOAD_FUTURES_COUNT,
                                   HOSTS_UPLOAD_TIMEOUT,
-                                  HOST_INVENTORY_UPLOAD_MODE,
                                   INSIGHTS_KAFKA_ADDRESS,
                                   RETRIES_ALLOWED,
                                   RETRY_TIME)
@@ -142,8 +141,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         self.prefix = 'ATTEMPTING HOST UPLOAD'
         LOG.info(format_message(
             self.prefix,
-            'Uploading hosts to inventory. State is "%s". HOST_INVENTORY_UPLOAD_MODE is "%s".' %
-            (self.report_or_slice.state, HOST_INVENTORY_UPLOAD_MODE),
+            'Uploading hosts to inventory. State is "%s".' %
+            (self.report_or_slice.state),
             account_number=self.account_number, report_platform_id=self.report_platform_id))
         try:
             if self.candidate_hosts:
