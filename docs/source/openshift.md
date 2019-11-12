@@ -29,10 +29,10 @@ The `Makefile` target to create the secrets includes scripting to dynamically pa
 
 An example of a secret parameter file is provided for you in the `yupana.git/openshift/parameters/examples` directory. For development, you can copy the example environment file into the `parameters` directory and remove the `.example` extension.
 
-Once you have copied over the env file for the secrets template, you can begin deploying using the provided make commands. To start a barebones OpenShift cluster that will persist configuration between restarts, you can run the following:
+Once you have copied over the env file for the secrets template, you can begin deploying using the provided make commands. To clean out any previous projects and start a barebones OpenShift cluster that will persist configuration between restarts, you can run the following:
 
 ```
-
+    make oc-clean
     make oc-up
 
 ```
@@ -44,13 +44,35 @@ Once you have copied over the env file for the secrets template, you can begin d
     make oc-create-secret
 
 ```
-Now switch to the `e2e-deploy` repo and enter a virtual environment.
+Now switch to the `e2e-deploy` repo and enter a virtual environment and install ocdeployer as follows:
 
-1. Edit the [buildfactory/subscriptions/yupana.yml](https://github.com/RedHatInsights/e2e-deploy/blob/master/buildfactory/subscriptions/yupana.yml#L241) and change the `SOURCE_REPOSITORY_REF` to have a value that is set to the name of the branch of Yupana that you are testing.
+```
+pip install ocdeployer
+```
 
-2. Edit the [templates/subscriptions/yupana.yml](https://github.com/RedHatInsights/e2e-deploy/blob/master/templates/subscriptions/yupana.yml#L440) to set the `IMAGE_NAMESPACE` to yupana instead of buildfactory.
+Next, edit the [buildfactory/subscriptions/yupana.yml](https://github.com/RedHatInsights/e2e-deploy/blob/master/buildfactory/subscriptions/yupana.yml) and change the `SOURCE_REPOSITORY_REF` in the parameters to have a value that is set to the name of the branch of Yupana that you are testing. For example, if you are testing the branch `issues/264`, the paremeter for the `SOURCE_REPOSITORY_REF` should look like the following:
 
-3. Now to deploy the deployment configs and to deploy PostgreSQL, run the following:
+```
+- description: Set this to a branch name, tag or other ref of your repository if you
+    are not using the default branch.
+  displayName: Git Reference
+  name: SOURCE_REPOSITORY_REF
+  value: issues/264
+```
+
+Finally, edit the [templates/subscriptions/yupana.yml](https://github.com/RedHatInsights/e2e-deploy/blob/master/templates/subscriptions/yupana.yml) to set the `IMAGE_NAMESPACE` paremeter to have the value `yupana` instead of `buildfactory`. It should look like the following:
+
+```
+- description: Namespace that the image resides in
+  displayName: Image Namespace
+  name: IMAGE_NAMESPACE
+  required: true
+  value: yupana
+```
+
+Once you have edited the templates as described above, run the following two commands to create & deploy the yupana components:
+
+1. To deploy the deployment configs and to deploy PostgreSQL, run the following:
 
 ```
 
@@ -58,7 +80,7 @@ Now switch to the `e2e-deploy` repo and enter a virtual environment.
 
 ```
 
-4. Now to create the imagestream and run the build configs, run the following:
+2. In a new window, run the following to create the imagestream and run the build configs:
 
 ```
 
