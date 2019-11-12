@@ -316,3 +316,15 @@ http://127.0.0.1:8001/apidoc/index.html
 ## Yupana Deployments
 
 We deploy Yupana to the Insights Dev & Production Clusters (subscriptions-ci, subscriptions-qa, subscriptions-stage, subscriptions-prod) via the deployment pipeline defined by the [e2e-deploy repo](https://github.com/RedHatInsights/e2e-deploy).
+
+## Releasing to Production
+
+We use a stable branch to release our code to production. You can complete the release process using the following steps:
+
+1. Submit a pull request (PR) with the changes that you want to merge from `master` into the `stable` branch. In the PR description, create a draft of the release notes. Once the release notes and changes have been approved, and a smoke test has passed, merge the PR. Be sure not to squash commits in order to preserve the history (this may require changing the settings of the repo to allow merge commits).
+
+2. Create a release based off of the `stable` branch. Copy the release notes from your PR description and also record the commit number at the top of the release notes.
+
+3. Submit a pull request to the `e2e-deploy` repository updating the `BUILD_VERSION` for the CI, QA, and PROD environment. The `BUILD_VERSION` for CI and QA should always be the `BUILD_VERSION` for PROD plus `0.0.1`. For example, if PROD is `0.2.0`, CI and QA should be `0.2.1`.
+
+4. Once the PR to update the versions has been reviewed and merged, manually kick off a Jenkins deploy job for the subscriptions service set to the production environment.
