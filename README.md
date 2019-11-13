@@ -25,7 +25,7 @@ This is a Python project developed using Python 3.6. Make sure you have at least
 To get started developing against Yupana first clone a local copy of the git repository.
 ```
 git clone https://github.com/quipucords/yupana
-git clone https://github.com/RedHatInsights/insights-upload.git
+git clone https://github.com/RedHatInsights/insights-ingress-go
 git clone https://github.com/RedHatInsights/insights-host-inventory.git
 ```
 
@@ -64,7 +64,7 @@ docker ps -a
 
 Make sure that there are no docker containers that will conflict with the services that are about to be brought up. It is safest if you have none at all, but containers that will not conflict can be left.
 
-To run the file upload service, yupana, and host inventory service locally, use the following command:
+To run the ingress service, yupana, and host inventory service locally, use the following command:
 ```
 make local-dev-up
 ```
@@ -76,15 +76,14 @@ docker ps --format '{{.Names}}'
 ```
 You should see the following services up and running.
 ```
-docker_upload-service_1
-docker_consumer_1
-docker_kafka_1
-docker_minio_1
-docker_zookeeper_1
-yupana_db_1
-yupana_db-host-inventory_1
-prometheus
 grafana
+yupana_db-host-inventory_1
+yupana_db_1
+prometheus
+insightsingressgo_ingress_1
+insightsingressgo_kafka_1
+insightsingressgo_zookeeper_1
+insightsingressgo_minio_1
 ```
 
 ### Sending data to local yupana
@@ -162,7 +161,7 @@ tox -e lint
 Below is a description of how to create data formatted for the yupana service.
 
 ## Yupana tar.gz File Format Overview
-Yupana retrieves data from the Insights platform file upload service.  Yupana requires a specially formatted tar.gz file.  Files that do not conform to the required format will be marked as invalid and no processing will occur.  The tar.gz file must contain a metadata JSON file and one or more report slice JSON files. The file that contains metadata information is named `metadata.json`, while the files containing host data are named with their uniquely generated UUID4 `report_slice_id` followed by the .json extension. You can download [sample.tar.gz](https://github.com/quipucords/yupana/raw/master/sample.tar.gz) to view an example.
+Yupana retrieves data from the Insights platform ingress service.  Yupana requires a specially formatted tar.gz file.  Files that do not conform to the required format will be marked as invalid and no processing will occur.  The tar.gz file must contain a metadata JSON file and one or more report slice JSON files. The file that contains metadata information is named `metadata.json`, while the files containing host data are named with their uniquely generated UUID4 `report_slice_id` followed by the .json extension. You can download [sample.tar.gz](https://github.com/quipucords/yupana/raw/master/sample.tar.gz) to view an example.
 
 ## Yupana Meta-data JSON Format
 Metadata should include information about the sender of the data, Host Inventory API version, and the report slices included in the tar.gz file. Below is a sample metadata section for a report with 2 slices:
@@ -229,7 +228,7 @@ Report slices are a slice of the host inventory data for a given report. A slice
 }
 ```
 
-An API specification of the report slices can be found in [report_slices.yml](https://github.com/quipucords/yupana/blob/master/docs/report_slices.yml). Yupana expects each host to be formatted according to the Insights host based inventory API [spec](https://github.com/RedHatInsights/insights-host-inventory/blob/master/swagger/api.spec.yaml#L383). The host based inventory API specification includes a mandatory `account` field. Yupana will extract the `account` number from the kafka message it receives from the Insights platform file upload service and populate the `account` field of each host.
+An API specification of the report slices can be found in [report_slices.yml](https://github.com/quipucords/yupana/blob/master/docs/report_slices.yml). Yupana expects each host to be formatted according to the Insights host based inventory API [spec](https://github.com/RedHatInsights/insights-host-inventory/blob/master/swagger/api.spec.yaml#L383). The host based inventory API specification includes a mandatory `account` field. Yupana will extract the `account` number from the kafka message it receives from the Insights platform ingress service and populate the `account` field of each host.
 
 # <a name="sending_data"></a> Sending Data to Insights Upload service for Yupana (without QPC)
 Data being uploaded to Insights must be in `tar.gz` format containing the `.json` files with the given JSON structure above. It is important to note that Yupana processes & tracks reports based on their UUIDS, which means that data with a specific UUID cannot be uploaded more than once, or else the second upload will be archived and not processed. Therefore, before every upload we need to generate a new UUID and replace the current one with it if we want to upload the same data more than once. Use the following instructions to prepare and upload a sample or custom report.
@@ -255,7 +254,7 @@ After preparing the data with new UUIDs through either of the above steps, you c
 ```
 RH_ACCOUNT_NUMBER=<your-account-number>
 RH_ORG_ID=<your-org-id>
-FILE_UPLOAD_URL=<file-upload-url>
+INGRESS_URL=<ingress-url>
 RH_USERNAME=<your-username>
 RH_PASSWORD=<your-password>
 ```

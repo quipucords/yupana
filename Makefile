@@ -69,7 +69,7 @@ help:
 	@echo "--- Commands for local development ---"
 	@echo "local-dev-up                                bring up yupana with all required services"
 	@echo "local-dev-down                              bring down yupana with all required services"
-	@echo "local-upload-data file=<path/to/file>       upload data to local file upload service for yupana processing"
+	@echo "local-upload-data file=<path/to/file>       upload data to local ingress service for yupana processing"
 	@echo ""
 
 clean:
@@ -164,7 +164,7 @@ upload-data:
 	curl -vvvv -H "x-rh-identity: $(shell echo '{"identity": {"account_number": $(RH_ACCOUNT_NUMBER), "internal": {"org_id": $(RH_ORG_ID)}}}' | base64)" \
 		-F "file=@$(file);type=application/vnd.redhat.qpc.tar+tgz" \
 		-H "x-rh-insights-request-id: 52df9f748eabcfea" \
-		$(FILE_UPLOAD_URL) \
+		$(INGRESS_URL) \
 		-u $(RH_USERNAME):$(RH_PASSWORD)
 
 create-report:
@@ -183,14 +183,14 @@ local-dev-up:
 
 local-dev-down:
 	osascript -e 'quit app "iTerm"' | true
-	cd ../insights-upload/docker/;docker-compose down
+	cd ../insights-ingress-go;docker-compose down
 	docker-compose down
 	sudo lsof -t -i tcp:8081 | xargs kill -9
 
 local-upload-data:
-	curl -vvvv -H "x-rh-identity: eyJpZGVudGl0eSI6IHsiYWNjb3VudF9udW1iZXIiOiAiMTIzNDUiLCAiaW50ZXJuYWwiOiB7Im9yZ19pZCI6ICI1NDMyMSJ9fX0=" \
-		-F "file=@$(file);type=application/vnd.redhat.qpc.tar+tgz" \
-		-H "x-rh-insights-request-id: 52df9f748eabcfea" \
+	curl -vvvv -F "upload=@$(file);type=application/vnd.redhat.qpc.$(basename $(basename $(notdir $(file))))+tgz" \
+		-H "x-rh-identity: eyJpZGVudGl0eSI6IHsiYWNjb3VudF9udW1iZXIiOiAiMTIzNDUiLCAiaW50ZXJuYWwiOiB7Im9yZ19pZCI6ICI1NDMyMSJ9fX0=" \
+		-H "x-rh-request_id: testtesttest" \
 		localhost:8080/api/ingress/v1/upload
 
 # Local commands for working with OpenShift
