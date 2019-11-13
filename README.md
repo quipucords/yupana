@@ -266,7 +266,7 @@ make upload-data file=<path/to/your-data.tar.gz>
 
 You need to replace `<path/to/your-data.tar.gz>` with either the absolute or relative path to the `tar.gz` file that you want to upload to Insights.
 
-After running this command if you see `HTTP 202` like the following lines in your output logs, it means your ingress to Insights was successful:
+After running this command if you see `HTTP 202` like the following lines in your output logs, it means your file upload to Insights was successful:
 ```
 * Connection state changed (MAX_CONCURRENT_STREAMS updated)!
 < HTTP/2 202
