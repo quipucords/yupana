@@ -82,47 +82,26 @@ class ApiConfig(AppConfig):
         with KAFKA_ERRORS.count_exceptions():
             pause_kafka_for_file_upload = ENVIRONMENT.get_value(
                 'PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE', default=False)
-            host_inventory_upload_mode = ENVIRONMENT.get_value(
-                'HOST_INVENTORY_UPLOAD_MODE', default='http')
             if not pause_kafka_for_file_upload:
-                if host_inventory_upload_mode == 'http':
-                    from processor.legacy_report_consumer import initialize_kafka_handler
-                    logger.info('Initializing the legacy kafka report consumer.')
-                    initialize_kafka_handler()
-                else:
-                    from processor.report_consumer import initialize_upload_report_consumer
-                    logger.info('Initializing the kafka report consumer.')
-                    initialize_upload_report_consumer()
+                from processor.report_consumer import initialize_upload_report_consumer
+                logger.info('Initializing the kafka report consumer.')
+                initialize_upload_report_consumer()
             else:
                 logger.info('Kafka report consumer paused for file upload service.')
 
     @staticmethod
     def start_report_processor():
         """Start the report processor."""
-        host_inventory_upload_mode = ENVIRONMENT.get_value(
-            'HOST_INVENTORY_UPLOAD_MODE', default='http')
-        if host_inventory_upload_mode == 'http':
-            from processor.legacy_report_processor import initialize_report_processor
-            logger.info('Initializing the legacy report processor.')
-            initialize_report_processor()
-        else:
-            from processor.report_processor import initialize_report_processor
-            logger.info('Initializing the report processor.')
-            initialize_report_processor()
+        from processor.report_processor import initialize_report_processor
+        logger.info('Initializing the report processor.')
+        initialize_report_processor()
 
     @staticmethod
     def start_report_slice_processor():
         """Start the report slice processor."""
-        host_inventory_upload_mode = ENVIRONMENT.get_value(
-            'HOST_INVENTORY_UPLOAD_MODE', default='http')
-        if host_inventory_upload_mode == 'http':
-            from processor.legacy_report_slice_processor import initialize_report_slice_processor
-            logger.info('Initializing the legacy report slice processor.')
-            initialize_report_slice_processor()
-        else:
-            from processor.report_slice_processor import initialize_report_slice_processor
-            logger.info('Initializing the report slice processor.')
-            initialize_report_slice_processor()
+        from processor.report_slice_processor import initialize_report_slice_processor
+        logger.info('Initializing the report slice processor.')
+        initialize_report_slice_processor()
 
     @staticmethod
     def start_garbage_collection():
