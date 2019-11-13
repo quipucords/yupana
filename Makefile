@@ -69,7 +69,7 @@ help:
 	@echo "--- Commands for local development ---"
 	@echo "local-dev-up                                bring up yupana with all required services"
 	@echo "local-dev-down                              bring down yupana with all required services"
-	@echo "local-upload-data file=<path/to/file>       upload data to local file upload service for yupana processing"
+	@echo "local-upload-data file=<path/to/file>       upload data to local ingress service for yupana processing"
 	@echo ""
 
 clean:
@@ -164,7 +164,7 @@ upload-data:
 	curl -vvvv -H "x-rh-identity: $(shell echo '{"identity": {"account_number": $(RH_ACCOUNT_NUMBER), "internal": {"org_id": $(RH_ORG_ID)}}}' | base64)" \
 		-F "file=@$(file);type=application/vnd.redhat.qpc.tar+tgz" \
 		-H "x-rh-insights-request-id: 52df9f748eabcfea" \
-		$(FILE_UPLOAD_URL) \
+		$(INGRESS_URL) \
 		-u $(RH_USERNAME):$(RH_PASSWORD)
 
 create-report:
