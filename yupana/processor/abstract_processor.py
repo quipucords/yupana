@@ -37,9 +37,11 @@ from api.models import (Report,
                         Status)
 from api.serializers import (ReportArchiveSerializer,
                              ReportSliceArchiveSerializer)
-from config.settings.base import (NEW_REPORT_QUERY_INTERVAL,
+from config.settings.base import (DISCOVERY_HOST_TTL,
+                                  NEW_REPORT_QUERY_INTERVAL,
                                   RETRIES_ALLOWED,
-                                  RETRY_TIME)
+                                  RETRY_TIME,
+                                  SATELLITE_HOST_TTL)
 
 LOG = logging.getLogger(__name__)
 FAILURE_CONFIRM_STATUS = 'failure'
@@ -747,6 +749,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                                          'report_slice_id': str(report_slice_id),
                                          'account': self.account_number,
                                          'source': self.report_or_slice.source}})
+            host['stale_timestamp'] = self.get_stale_date()
+            host['reporter'] = 'yupana'
             host['facts'] = host_facts
             found_facts = False
             for fact in CANONICAL_FACTS:
@@ -772,3 +776,12 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     report_platform_id=self.report_platform_id))
 
         return candidate_hosts, hosts_without_facts
+
+    def get_stale_date(self):
+        """Compute the stale date based on the host source."""
+        ttl = int(DISCOVERY_HOST_TTL)
+        if self.report_or_slice.source == 'satellite':
+            ttl = int(SATELLITE_HOST_TTL)
+        current_time = datetime.utcnow()
+        stale_time = current_time + timedelta(days=ttl)
+        return stale_time.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'

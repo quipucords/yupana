@@ -313,3 +313,8 @@ INSIGHTS_KAFKA_PORT = os.getenv('INSIGHTS_KAFKA_PORT', '29092')
 
 # Insights Kafka server address
 INSIGHTS_KAFKA_ADDRESS = f'{INSIGHTS_KAFKA_HOST}:{INSIGHTS_KAFKA_PORT}'
+
+# Culling variables to compute the stale date
+# the time to live in number of days (the time from insertion into HBI until the stale date)
+DISCOVERY_HOST_TTL = os.getenv('DISCOVERY_HOST_TTL', '30')
+SATELLITE_HOST_TTL = os.getenv('SATELLITE_HOST_TTL', '30')
