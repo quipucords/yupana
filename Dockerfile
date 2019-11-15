@@ -3,13 +3,7 @@ FROM registry.access.redhat.com/ubi7/python-36:latest
 
 EXPOSE 8080
 
-ENV NODEJS_VERSION=8 \
-    NODEJS_SCL=rh-nodejs8 \
-    NPM_RUN=start \
-    NODEJS_SCL=rh-nodejs8 \
-    NPM_CONFIG_PREFIX=$HOME/.npm-global \
-    PATH=$HOME/.local/bin/:$HOME/node_modules/.bin/:$HOME/.npm-global/bin/:$PATH \
-    LC_ALL=en_US.UTF-8 \
+ENV LC_ALL=en_US.UTF-8 \
     LANG=en_US.UTF-8 \
     PIP_NO_CACHE_DIR=off \
     ENABLE_PIPENV=true \
@@ -32,11 +26,7 @@ LABEL summary="$SUMMARY" \
 
 USER root
 
-# replace nodejs 6 with nodejs 8
-RUN INSTALL_PKGS="${NODEJS_SCL} \
-    ${NODEJS_SCL}-npm \
-    ${NODEJS_SCL}-nodejs-nodemon \
-    rh-python36 rh-python36-python-devel rh-python36-python-setuptools rh-python36-python-pip nss_wrapper \
+RUN INSTALL_PKGS="rh-python36 rh-python36-python-devel rh-python36-python-setuptools rh-python36-python-pip nss_wrapper \
     httpd24 httpd24-httpd-devel httpd24-mod_ssl httpd24-mod_auth_kerb httpd24-mod_ldap \
     httpd24-mod_session atlas-devel gcc-gfortran libffi-devel libtool-ltdl enchant \
     " && \
@@ -61,7 +51,7 @@ COPY . ${APP_ROOT}/src
 # - In order to drop the root user, we have to make some directories world
 #   writable as OpenShift default security model is to run the container
 #   under random UID.
-RUN source scl_source enable rh-python36 rh-nodejs8 && \
+RUN source scl_source enable rh-python36 && \
     virtualenv ${APP_ROOT} && \
     chown -R 1001:0 ${APP_ROOT} && \
     fix-permissions ${APP_ROOT} -P && \

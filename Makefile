@@ -1,10 +1,9 @@
 PYTHON=$(shell which python)
-IMAGE_NAME=yupana-centos7
+IMAGE_NAME=yupana-ubi7
 .PHONY: build
 
 TOPDIR=$(shell pwd)
 PYDIR=yupana
-APIDOC=apidoc
 STATIC=staticfiles
 
 # OC Params
@@ -42,7 +41,6 @@ help:
 	@echo "unittest                 run the unit tests"
 	@echo "test-coverage            run the test coverage"
 	@echo "requirements             create requirements.txt for readthedocs"
-	@echo "gen-apidoc               create api documentation"
 	@echo "server-static            collect static files to host"
 	@echo "start-db                 start postgres db"
 	@echo "clean-db                 remove postgres db"
@@ -76,10 +74,6 @@ clean:
 	git clean -fdx -e .idea/ -e *env/ $(PYDIR)/db.sqlite3
 	rm -rf yupana/static
 	rm -rf temp/
-
-gen-apidoc:
-	rm -fr $(PYDIR)/$(STATIC)/
-	apidoc -i $(PYDIR) -o $(APIDOC)
 
 html:
 	@cd docs; $(MAKE) html
