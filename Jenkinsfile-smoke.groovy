@@ -2,7 +2,7 @@
 * Requires: https://github.com/RedHatInsights/insights-pipeline-lib
 */
 
-@Library("github.com/RedHatInsights/insights-pipeline-lib") _
+@Library("github.com/RedHatInsights/insights-pipeline-lib@v2") _
 
 
 // this 'if' statement makes sure this is a PR, so we don't run smoke tests again
