@@ -295,23 +295,6 @@ gunicorn config.wsgi -c ./yupana/config/gunicorn.py --chdir=./yupana/
 Please refer to [Working with Openshift](https://yupana.readthedocs.io/en/latest/openshift.html).
 
 
-## API Documentation Generation
-
-To generate and host the API documentation locally you need to [Install APIDoc](http://apidocjs.com/#install).
-
-Generate the project API documentation by running the following command:
-```
-make gen-apidoc
-```
-
-In order to host the docs locally you need to collect the static files:
-```
-make server-static
-```
-
-Now start the server as described above and point your browser to
-http://127.0.0.1:8001/apidoc/index.html
-
 ## Yupana Deployments
 
 We deploy Yupana to the Insights Dev & Production Clusters (subscriptions-ci, subscriptions-qa, subscriptions-stage, subscriptions-prod) via the deployment pipeline defined by the [e2e-deploy repo](https://github.com/RedHatInsights/e2e-deploy).
