@@ -110,6 +110,7 @@ test-coverage:
 requirements:
 	pipenv lock
 	pipenv lock -r > docs/rtd_requirements.txt
+	python scripts/create_manifest.py
 
 validate-swagger:
 	npm install swagger-cli

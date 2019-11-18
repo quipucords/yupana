@@ -20,6 +20,6 @@ yupana/python:3.6=requests:2.22.0
 yupana/python:3.6=s3transfer:0.2.1
 yupana/python:3.6=six:1.13.0
 yupana/python:3.6=sqlparse:0.3.0
-yupana/python:3.6=urllib3:1.25.6
+yupana/python:3.6=urllib3:1.25.7
 yupana/python:3.6=watchtower:0.6.0
 yupana/python:3.6=whitenoise:4.1.4
