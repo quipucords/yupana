@@ -45,6 +45,8 @@ help:
 	@echo "start-db                 start postgres db"
 	@echo "clean-db                 remove postgres db"
 	@echo "reinit-db                remove db and start a new one"
+	@echo "manifest					create/update manifest for product security"
+	@echo "check-manifest			check that the manifest is up to date"
 	@echo ""
 	@echo "--- Commands using an OpenShift Cluster ---"
 	@echo "oc-clean                 stop openshift cluster & remove local config data"
@@ -186,6 +188,12 @@ local-upload-data:
 		-H "x-rh-identity: eyJpZGVudGl0eSI6IHsiYWNjb3VudF9udW1iZXIiOiAiMTIzNDUiLCAiaW50ZXJuYWwiOiB7Im9yZ19pZCI6ICI1NDMyMSJ9fX0=" \
 		-H "x-rh-request_id: testtesttest" \
 		localhost:8080/api/ingress/v1/upload
+
+manifest:
+	python scripts/create_manifest.py
+
+check-manifest:
+	./scripts/check_manifest.sh
 
 # Local commands for working with OpenShift
 oc-up:
