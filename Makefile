@@ -40,7 +40,7 @@ help:
 	@echo "lint                     to run linters on code"
 	@echo "unittest                 run the unit tests"
 	@echo "test-coverage            run the test coverage"
-	@echo "requirements             create requirements.txt for readthedocs"
+	@echo "requirements             create requirements.txt for readthedocs & manifest for product security"
 	@echo "server-static            collect static files to host"
 	@echo "start-db                 start postgres db"
 	@echo "clean-db                 remove postgres db"
@@ -194,7 +194,7 @@ manifest:
 	python scripts/create_manifest.py
 
 check-manifest:
-	./scripts/check_manifest.sh
+	./.travis/check_manifest.sh
 
 # Local commands for working with OpenShift
 oc-up:
