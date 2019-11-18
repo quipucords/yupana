@@ -156,6 +156,16 @@ To lint the code base:
 tox -e lint
 ```
 
+To check whether or not the product manifest needs to be updated, run the following:
+```
+make check-manifest
+```
+
+If the manifest is out of date, you can run the following to update it:
+```
+make manifest
+```
+
 
 # <a name="formatting_data"></a> Formatting Data for Yupana (without QPC)
 Below is a description of how to create data formatted for the yupana service.
