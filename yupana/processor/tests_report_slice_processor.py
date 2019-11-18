@@ -19,7 +19,7 @@
 import asyncio
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 import pytz
@@ -37,6 +37,7 @@ from api.models import (Report,
                         ReportArchive,
                         ReportSlice,
                         ReportSliceArchive)
+from config.settings.base import SATELLITE_HOST_TTL
 
 
 # pylint: disable=too-many-public-methods
@@ -326,7 +327,6 @@ class ReportSliceProcessorTests(TestCase):
         self.assertEqual(json.loads(self.report_slice.candidate_hosts), [])
         self.assertEqual(self.report_slice.state, ReportSlice.HOSTS_UPLOADED)
 
-    @patch('processor.report_slice_processor.HOST_INVENTORY_UPLOAD_MODE', 'kafka')
     def test_transition_to_hosts_uploaded_kafka_mode(self):
         """Test the async hosts uploaded successful."""
         event_loop = asyncio.new_event_loop()
@@ -585,3 +585,17 @@ class ReportSliceProcessorTests(TestCase):
         self.assertEqual(str(existing.report_platform_id), str(self.uuid))
         # assert the processor was reset
         self.check_variables_are_reset()
+
+    def test_get_stale_time(self):
+        """Test the get stale date method."""
+        self.processor.report_or_slice = self.report_record
+        self.processor.report_or_slice.source = 'satellite'
+        self.processor.report_or_slice.save()
+        current_time = datetime.utcnow()
+        stale_time = current_time + timedelta(days=int(SATELLITE_HOST_TTL))
+        expected = stale_time.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+        actual = self.processor.get_stale_date()
+        # the format looks like this: 2019-11-14T19:58:13.037Z
+        # by cutting off the last 13 i am comparing 2019-11-14T
+        # which is the year/month/day
+        self.assertEqual(expected[:-13], actual[:-13])

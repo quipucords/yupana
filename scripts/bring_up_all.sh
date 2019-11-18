@@ -42,7 +42,7 @@ EOF
 
 iterm $@ $SCRIPT_HOME "./bring_up_upload_svc.sh"  &
 
-$SCRIPT_HOME/countdown.sh 'Waiting for file upload services to startup' 60 'Services are ready!'
+$SCRIPT_HOME/countdown.sh 'Waiting for ingress services to startup' 60 'Services are ready!'
 iterm $@ $SCRIPT_HOME "./bring_up_upload_consumer.sh" &
 iterm $@ $SCRIPT_HOME "./bring_up_test_hi_consumer.sh" &
 iterm $@ $SCRIPT_HOME "./bring_up_yupana.sh" &

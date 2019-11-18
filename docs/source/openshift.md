@@ -18,45 +18,75 @@ Add `172.30.0.0/16` to the Docker insecure registries which can be accomplished 
 
 Add `172.30.1.1` to the list of proxies to bypass. This can be found at Docker -> Preferences -> Proxies
 
+It is also recommended to adjust your Docker computing resource for memory to a minimum of 4GB. This can be found at Docker -> Preferences -> Advanced
+
 ## Running Locally in OpenShift
 
-OpenShift templates are provided for all service resources. Each template includes parameters to enable customization to the target environment.
+Yupana is deployed using the pipeline defined in the [e2e-deploy repo](https://github.com/RedHatInsights/e2e-deploy).
+You should clone the e2e-deploy repo in order to run the project in openshift locally in order to mimic the way that deployments to production work. One of the main assumptions when deploying via e2e is that the secrets are already defined in an existing Openshift project.
 
-The `Makefile` targets include scripting to dynamically pass parameter values into the OpenShift templates. A developer may define parameter values by placing a parameter file into the `yupana.git/openshift/parameters` directory.
+Therefore, the only template that is stored locally is the `secret.yaml` for our project.
 
-Examples of parameter files are provided in the `yupana.git/openshift/parameters/examples` directory. For development, you can copy each of the example environment files into the `parameters` directory and remove the `.example` extension.
+The `Makefile` target to create the secrets includes scripting to dynamically pass parameter values into the OpenShift templates. A developer may define parameter values by placing a parameter file for the secrets into the `yupana.git/openshift/parameters` directory.
 
-The `Makefile` scripting applies parameter values only to matching templates based on matching the filenames of each file. For example, parameters defined in `secret.env` are applied *only* to the `secret.yaml` template. As a result, common parameters like `NAMESPACE` must be defined consistently within *each* parameter file.
+An example of a secret parameter file is provided for you in the `yupana.git/openshift/parameters/examples` directory. For development, you can copy the example environment file into the `parameters` directory and remove the `.example` extension.
 
-Once you have set up the environment files for the templates, you can begin deploying using the provided make commands. To start a barebones OpenShift cluster that will persist configuration between restarts, you can run the following:
+Once you have copied over the env file for the secrets template, you can begin deploying using the provided make commands. To clean out any previous projects and start a barebones OpenShift cluster that will persist configuration between restarts, you can run the following:
 
 ```
-
+    make oc-clean
     make oc-up
-    
-```
-
- Once the cluster is running, you can deploy Yupana and PostgreSQL by running the following:
 
 ```
 
-    make oc-create-yupana-and-db
+ Once the cluster is running, you can create the secrets by running the following:
 
 ```
 
-If you'd like to start the cluster, deploy Yupana, and deploy PostgreSQL, run the following:
+    make oc-create-secret
+
+```
+Now switch to the `e2e-deploy` repo and enter a virtual environment and install ocdeployer as follows:
+
+```
+pip install ocdeployer
+```
+
+Next, edit the [buildfactory/subscriptions/yupana.yml](https://github.com/RedHatInsights/e2e-deploy/blob/master/buildfactory/subscriptions/yupana.yml) and change the `SOURCE_REPOSITORY_REF` in the parameters to have a value that is set to the name of the branch of Yupana that you are testing. For example, if you are testing the branch `issues/264`, the paremeter for the `SOURCE_REPOSITORY_REF` should look like the following:
+
+```
+- description: Set this to a branch name, tag or other ref of your repository if you
+    are not using the default branch.
+  displayName: Git Reference
+  name: SOURCE_REPOSITORY_REF
+  value: issues/264
+```
+
+Finally, edit the [templates/subscriptions/yupana.yml](https://github.com/RedHatInsights/e2e-deploy/blob/master/templates/subscriptions/yupana.yml) to set the `IMAGE_NAMESPACE` paremeter to have the value `yupana` instead of `buildfactory`. It should look like the following:
+
+```
+- description: Namespace that the image resides in
+  displayName: Image Namespace
+  name: IMAGE_NAMESPACE
+  required: true
+  value: yupana
+```
+
+Once you have edited the templates as described above, run the following two commands to create & deploy the yupana components:
+
+1. To deploy the deployment configs and to deploy PostgreSQL, run the following:
 
 ```
 
-    make oc-up-dev
+    ocdeployer deploy -s subscriptions -e env/ci.yml --secrets-src-project yupana yupana
 
 ```
 
-If you'd like to refresh the deployed app with your local changes, run the following:
+2. In a new window, run the following to create the imagestream and run the build configs:
 
 ```
 
-    make oc-refresh
+    ocdeployer deploy -s subscriptions --template-dir buildfactory --secrets-src-project yupana yupana
 
 ```
 
@@ -78,24 +108,7 @@ If you'd like to remove all your saved settings for your cluster, you can run th
 
 ```
 
-There are also other make targets available to step through the project deployment. See `make help` for more information about available targets. You can run the entire application and its dependent services through Openshift, or just the dependent services can be spun up, while using the local Django dev server.
-
-```
-
-    # Run everything through Openshift
-    make oc-up-dev
-
-    # Run just a database in Openshift, while running the server locally
-    make oc-up-db
-
-    # Run Django migrations to initialize the database
-    make oc-server-migrate
-
-    # Run the Django server locally with access to the OpenShift database
-    make serve-with-oc
-
-    # Run a build with updated template changes
-    make oc-refresh
+There are also other make targets available to step through the project deployment. See `make help` for more information about available targets.
 
 ```
 

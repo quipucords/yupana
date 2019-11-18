@@ -1,10 +1,9 @@
 PYTHON=$(shell which python)
-IMAGE_NAME=yupana-centos7
+IMAGE_NAME=yupana-ubi7
 .PHONY: build
 
 TOPDIR=$(shell pwd)
 PYDIR=yupana
-APIDOC=apidoc
 STATIC=staticfiles
 
 # OC Params
@@ -41,26 +40,19 @@ help:
 	@echo "lint                     to run linters on code"
 	@echo "unittest                 run the unit tests"
 	@echo "test-coverage            run the test coverage"
-	@echo "requirements             create requirements.txt for readthedocs"
-	@echo "gen-apidoc               create api documentation"
+	@echo "requirements             create requirements.txt for readthedocs & manifest for product security"
 	@echo "server-static            collect static files to host"
 	@echo "start-db                 start postgres db"
 	@echo "clean-db                 remove postgres db"
 	@echo "reinit-db                remove db and start a new one"
+	@echo "manifest                 create/update manifest for product security"
+	@echo "check-manifest           check that the manifest is up to date"
 	@echo ""
 	@echo "--- Commands using an OpenShift Cluster ---"
 	@echo "oc-clean                 stop openshift cluster & remove local config data"
 	@echo "oc-up                    initialize an openshift cluster"
-	@echo "oc-up-dev                run yupana app in openshift cluster"
 	@echo "oc-down                  stop app & openshift cluster"
-	@echo "oc-create-yupana         create just the Yupana app in an initialized openshift cluster"
-	@echo "oc-create-yupana-and-db  create the Yupana app and Postgres DB in an initialized openshift cluster"
-	@echo "oc-create-yupana-app     create the Yupana app all dependencies except db in an initialized openshift cluster"
 	@echo "oc-create-secret         create secret in an initialized openshift cluster"
-	@echo "oc-create-configmap      create the configmaps in an initialized openshift cluster"
-	@echo "oc-create-imagestream    create the imagestream in an initialized openshift cluster"
-	@echo "oc-create-standalone-db  create the Postgres DB in an initialized openshift cluster"
-	@echo "oc-create-database       create the Postgres DB and all app dependencies in an initialized openshift cluster"
 	@echo "oc-login-admin           login to openshift as admin"
 	@echo "oc-login-developer       login to openshift as developer"
 	@echo "oc-server-migrate        run migrations"
@@ -77,17 +69,13 @@ help:
 	@echo "--- Commands for local development ---"
 	@echo "local-dev-up                                bring up yupana with all required services"
 	@echo "local-dev-down                              bring down yupana with all required services"
-	@echo "local-upload-data file=<path/to/file>       upload data to local file upload service for yupana processing"
+	@echo "local-upload-data file=<path/to/file>       upload data to local ingress service for yupana processing"
 	@echo ""
 
 clean:
 	git clean -fdx -e .idea/ -e *env/ $(PYDIR)/db.sqlite3
 	rm -rf yupana/static
 	rm -rf temp/
-
-gen-apidoc:
-	rm -fr $(PYDIR)/$(STATIC)/
-	apidoc -i $(PYDIR) -o $(APIDOC)
 
 html:
 	@cd docs; $(MAKE) html
@@ -122,6 +110,7 @@ test-coverage:
 requirements:
 	pipenv lock
 	pipenv lock -r > docs/rtd_requirements.txt
+	python scripts/create_manifest.py
 
 validate-swagger:
 	npm install swagger-cli
@@ -172,7 +161,7 @@ upload-data:
 	curl -vvvv -H "x-rh-identity: $(shell echo '{"identity": {"account_number": $(RH_ACCOUNT_NUMBER), "internal": {"org_id": $(RH_ORG_ID)}}}' | base64)" \
 		-F "file=@$(file);type=application/vnd.redhat.qpc.tar+tgz" \
 		-H "x-rh-insights-request-id: 52df9f748eabcfea" \
-		$(FILE_UPLOAD_URL) \
+		$(INGRESS_URL) \
 		-u $(RH_USERNAME):$(RH_PASSWORD)
 
 create-report:
@@ -191,15 +180,21 @@ local-dev-up:
 
 local-dev-down:
 	osascript -e 'quit app "iTerm"' | true
-	cd ../insights-upload/docker/;docker-compose down
+	cd ../insights-ingress-go;docker-compose down
 	docker-compose down
 	sudo lsof -t -i tcp:8081 | xargs kill -9
 
 local-upload-data:
-	curl -vvvv -H "x-rh-identity: eyJpZGVudGl0eSI6IHsiYWNjb3VudF9udW1iZXIiOiAiMTIzNDUiLCAiaW50ZXJuYWwiOiB7Im9yZ19pZCI6ICI1NDMyMSJ9fX0=" \
-		-F "file=@$(file);type=application/vnd.redhat.qpc.tar+tgz" \
-		-H "x-rh-insights-request-id: 52df9f748eabcfea" \
+	curl -vvvv -F "upload=@$(file);type=application/vnd.redhat.qpc.$(basename $(basename $(notdir $(file))))+tgz" \
+		-H "x-rh-identity: eyJpZGVudGl0eSI6IHsiYWNjb3VudF9udW1iZXIiOiAiMTIzNDUiLCAiaW50ZXJuYWwiOiB7Im9yZ19pZCI6ICI1NDMyMSJ9fX0=" \
+		-H "x-rh-request_id: testtesttest" \
 		localhost:8080/api/ingress/v1/upload
+
+manifest:
+	python scripts/create_manifest.py
+
+check-manifest:
+	./.travis/check_manifest.sh
 
 # Local commands for working with OpenShift
 oc-up:
@@ -241,16 +236,6 @@ oc-delete-project:
 
 oc-delete-yupana: oc-delete-yupana-data oc-delete-project
 
-oc-up-dev: oc-up oc-project oc-create-yupana-and-db
-
-oc-up-db: oc-up oc-project oc-create-database
-
-oc-create-yupana-and-db: oc-project oc-create-imagestream oc-create-configmap oc-create-secret oc-create-standalone-db oc-create-yupana
-	oc start-build yupana
-
-oc-refresh: oc-create-imagestream oc-create-configmap oc-create-secret oc-create-standalone-db oc-create-yupana
-	oc start-build yupana
-
 oc-server-migrate: oc-forward-ports
 	sleep 3
 	DJANGO_READ_DOT_ENV_FILE=True $(PYTHON) $(PYDIR)/manage.py migrate
@@ -270,16 +255,6 @@ serve-with-oc: oc-forward-ports
 	DJANGO_READ_DOT_ENV_FILE=True $(PYTHON) $(PYDIR)/manage.py runserver
 	make oc-stop-forwarding-ports
 
-oc-create-yupana-app: OC_OBJECT = 'bc/$(NAME) dc/$(NAME)'
-oc-create-yupana-app: OC_PARAMETER_FILE = $(NAME).env
-oc-create-yupana-app: OC_TEMPLATE_FILE = $(NAME).yaml
-oc-create-yupana-app: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
-oc-create-yupana-app:
-	$(OC_PARAMS) $(MAKE) oc-create-imagestream
-	$(OC_PARAMS) $(MAKE) oc-create-configmap
-	$(OC_PARAMS) $(MAKE) oc-create-secret
-	$(OC_PARAMS) $(MAKE) __oc-create-object
-	$(OC_PARAMS) $(MAKE) __oc-apply-object
 
 oc-create-secret: OC_OBJECT = 'secret -l app=$(NAME)'
 oc-create-secret: OC_PARAMETER_FILE = secret.env
@@ -289,48 +264,6 @@ oc-create-secret:
 	$(OC_PARAMS) $(MAKE) __oc-apply-object
 	$(OC_PARAMS) $(MAKE) __oc-create-object
 
-oc-create-configmap: OC_OBJECT = 'configmap -l app=$(NAME)'
-oc-create-configmap: OC_PARAMETER_FILE = configmap.env
-oc-create-configmap: OC_TEMPLATE_FILE = configmap.yaml
-oc-create-configmap: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
-oc-create-configmap:
-	$(OC_PARAMS) $(MAKE) __oc-apply-object
-	$(OC_PARAMS) $(MAKE) __oc-create-object
-
-oc-create-imagestream: OC_OBJECT := 'is/centos is/python-36-ubi7 is/postgresql'
-oc-create-imagestream: OC_PARAMETER_FILE = imagestream.env
-oc-create-imagestream: OC_TEMPLATE_FILE = imagestream.yaml
-oc-create-imagestream: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
-oc-create-imagestream:
-	$(OC_PARAMS) $(MAKE) __oc-apply-object
-	$(OC_PARAMS) $(MAKE) __oc-create-object
-
-oc-create-yupana: OC_OBJECT = 'bc/$(NAME) dc/$(NAME)'
-oc-create-yupana: OC_PARAMETER_FILE = $(NAME).env
-oc-create-yupana: OC_TEMPLATE_FILE = $(NAME).yaml
-oc-create-yupana: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
-oc-create-yupana:
-	$(OC_PARAMS) $(MAKE) __oc-apply-object
-	$(OC_PARAMS) $(MAKE) __oc-create-object
-
-oc-create-standalone-db: OC_OBJECT = 'bc/$(NAME)-db dc/$(NAME)-db'
-oc-create-standalone-db: OC_PARAMETER_FILE = $(NAME)-db.env
-oc-create-standalone-db: OC_TEMPLATE_FILE = $(NAME)-db.yaml
-oc-create-standalone-db: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
-oc-create-standalone-db:
-	$(OC_PARAMS) $(MAKE) __oc-apply-object
-	$(OC_PARAMS) $(MAKE) __oc-create-object
-
-oc-create-database: OC_OBJECT = 'bc/$(NAME)-db dc/$(NAME)-db'
-oc-create-database: OC_PARAMETER_FILE = $(NAME)-db.env
-oc-create-database: OC_TEMPLATE_FILE = $(NAME)-db.yaml
-oc-create-database: OC_PARAMS = OC_OBJECT=$(OC_OBJECT) OC_PARAMETER_FILE=$(OC_PARAMETER_FILE) OC_TEMPLATE_FILE=$(OC_TEMPLATE_FILE) NAMESPACE=$(NAMESPACE)
-oc-create-database:
-	$(OC_PARAMS) $(MAKE) oc-create-imagestream
-	$(OC_PARAMS) $(MAKE) oc-create-configmap
-	$(OC_PARAMS) $(MAKE) oc-create-secret
-	$(OC_PARAMS) $(MAKE) __oc-apply-object
-	$(OC_PARAMS) $(MAKE) __oc-create-object
 ##################################
 ### Internal openshift targets ###
 ##################################

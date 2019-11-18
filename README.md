@@ -25,7 +25,7 @@ This is a Python project developed using Python 3.6. Make sure you have at least
 To get started developing against Yupana first clone a local copy of the git repository.
 ```
 git clone https://github.com/quipucords/yupana
-git clone https://github.com/RedHatInsights/insights-upload.git
+git clone https://github.com/RedHatInsights/insights-ingress-go
 git clone https://github.com/RedHatInsights/insights-host-inventory.git
 ```
 
@@ -64,7 +64,7 @@ docker ps -a
 
 Make sure that there are no docker containers that will conflict with the services that are about to be brought up. It is safest if you have none at all, but containers that will not conflict can be left.
 
-To run the file upload service, yupana, and host inventory service locally, use the following command:
+To run the ingress service, yupana, and host inventory service locally, use the following command:
 ```
 make local-dev-up
 ```
@@ -76,15 +76,14 @@ docker ps --format '{{.Names}}'
 ```
 You should see the following services up and running.
 ```
-docker_upload-service_1
-docker_consumer_1
-docker_kafka_1
-docker_minio_1
-docker_zookeeper_1
-yupana_db_1
-yupana_db-host-inventory_1
-prometheus
 grafana
+yupana_db-host-inventory_1
+yupana_db_1
+prometheus
+insightsingressgo_ingress_1
+insightsingressgo_kafka_1
+insightsingressgo_zookeeper_1
+insightsingressgo_minio_1
 ```
 
 ### Sending data to local yupana
@@ -157,12 +156,22 @@ To lint the code base:
 tox -e lint
 ```
 
+To check whether or not the product manifest needs to be updated, run the following:
+```
+make check-manifest
+```
+
+If the manifest is out of date, you can run the following to update it:
+```
+make manifest
+```
+
 
 # <a name="formatting_data"></a> Formatting Data for Yupana (without QPC)
 Below is a description of how to create data formatted for the yupana service.
 
 ## Yupana tar.gz File Format Overview
-Yupana retrieves data from the Insights platform file upload service.  Yupana requires a specially formatted tar.gz file.  Files that do not conform to the required format will be marked as invalid and no processing will occur.  The tar.gz file must contain a metadata JSON file and one or more report slice JSON files. The file that contains metadata information is named `metadata.json`, while the files containing host data are named with their uniquely generated UUID4 `report_slice_id` followed by the .json extension. You can download [sample.tar.gz](https://github.com/quipucords/yupana/raw/master/sample.tar.gz) to view an example.
+Yupana retrieves data from the Insights platform ingress service.  Yupana requires a specially formatted tar.gz file.  Files that do not conform to the required format will be marked as invalid and no processing will occur.  The tar.gz file must contain a metadata JSON file and one or more report slice JSON files. The file that contains metadata information is named `metadata.json`, while the files containing host data are named with their uniquely generated UUID4 `report_slice_id` followed by the .json extension. You can download [sample.tar.gz](https://github.com/quipucords/yupana/raw/master/sample.tar.gz) to view an example.
 
 ## Yupana Meta-data JSON Format
 Metadata should include information about the sender of the data, Host Inventory API version, and the report slices included in the tar.gz file. Below is a sample metadata section for a report with 2 slices:
@@ -229,7 +238,7 @@ Report slices are a slice of the host inventory data for a given report. A slice
 }
 ```
 
-An API specification of the report slices can be found in [report_slices.yml](https://github.com/quipucords/yupana/blob/master/docs/report_slices.yml). Yupana expects each host to be formatted according to the Insights host based inventory API [spec](https://github.com/RedHatInsights/insights-host-inventory/blob/master/swagger/api.spec.yaml#L383). The host based inventory API specification includes a mandatory `account` field. Yupana will extract the `account` number from the kafka message it receives from the Insights platform file upload service and populate the `account` field of each host.
+An API specification of the report slices can be found in [report_slices.yml](https://github.com/quipucords/yupana/blob/master/docs/report_slices.yml). Yupana expects each host to be formatted according to the Insights host based inventory API [spec](https://github.com/RedHatInsights/insights-host-inventory/blob/master/swagger/api.spec.yaml#L383). The host based inventory API specification includes a mandatory `account` field. Yupana will extract the `account` number from the kafka message it receives from the Insights platform ingress service and populate the `account` field of each host.
 
 # <a name="sending_data"></a> Sending Data to Insights Upload service for Yupana (without QPC)
 Data being uploaded to Insights must be in `tar.gz` format containing the `.json` files with the given JSON structure above. It is important to note that Yupana processes & tracks reports based on their UUIDS, which means that data with a specific UUID cannot be uploaded more than once, or else the second upload will be archived and not processed. Therefore, before every upload we need to generate a new UUID and replace the current one with it if we want to upload the same data more than once. Use the following instructions to prepare and upload a sample or custom report.
@@ -255,7 +264,7 @@ After preparing the data with new UUIDs through either of the above steps, you c
 ```
 RH_ACCOUNT_NUMBER=<your-account-number>
 RH_ORG_ID=<your-org-id>
-FILE_UPLOAD_URL=<file-upload-url>
+INGRESS_URL=<ingress-url>
 RH_USERNAME=<your-username>
 RH_PASSWORD=<your-password>
 ```
@@ -296,19 +305,18 @@ gunicorn config.wsgi -c ./yupana/config/gunicorn.py --chdir=./yupana/
 Please refer to [Working with Openshift](https://yupana.readthedocs.io/en/latest/openshift.html).
 
 
-## API Documentation Generation
+## Yupana Deployments
 
-To generate and host the API documentation locally you need to [Install APIDoc](http://apidocjs.com/#install).
+We deploy Yupana to the Insights Dev & Production Clusters (subscriptions-ci, subscriptions-qa, subscriptions-stage, subscriptions-prod) via the deployment pipeline defined by the [e2e-deploy repo](https://github.com/RedHatInsights/e2e-deploy).
 
-Generate the project API documentation by running the following command:
-```
-make gen-apidoc
-```
+## Releasing to Production
 
-In order to host the docs locally you need to collect the static files:
-```
-make server-static
-```
+We use a stable branch to release our code to production. You can complete the release process using the following steps:
 
-Now start the server as described above and point your browser to
-http://127.0.0.1:8001/apidoc/index.html
+1. Submit a pull request (PR) with the changes that you want to merge from `master` into the `stable` branch. In the PR description, create a draft of the release notes. Once the release notes and changes have been approved, and a smoke test has passed, merge the PR. Be sure not to squash commits in order to preserve the history (this may require changing the settings of the repo to allow merge commits).
+
+2. Create a release based off of the `stable` branch. Copy the release notes from your PR description and also record the commit number at the top of the release notes.
+
+3. Submit a pull request to the `e2e-deploy` repository updating the `BUILD_VERSION` for the CI, QA, and PROD environment. The `BUILD_VERSION` for CI and QA should always be the `BUILD_VERSION` for PROD plus `0.0.1`. For example, if PROD is `0.2.0`, CI and QA should be `0.2.1`.
+
+4. Once the PR to update the versions has been reviewed and merged, manually kick off a Jenkins deploy job for the subscriptions service set to the production environment.

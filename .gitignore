@@ -110,10 +110,6 @@ openshift/parameters/*.env
 # Django
 yupana/static/
 
-# apidoc
-apidoc/*
-!apidoc/.apidocignore
-
 # static files
 yupana/staticfiles/
 

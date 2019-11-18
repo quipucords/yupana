@@ -43,12 +43,6 @@ function install_pipenv() {
   ln -s $VENV_DIR/bin/pipenv $HOME/.local/bin/pipenv
 }
 
-function install_apidoc() {
-  echo "---> Installing apidoc tool ..."
-  npm install apidoc -g
-}
-
-
 set -e
 
 shopt -s dotglob
@@ -90,12 +84,6 @@ if [[ ! -z "${BUILD_VERSION}" ]]; then
   if [[ -f "$release_file" ]]; then
     sed -i "s/BUILD_VERSION_PLACEHOLDER/${BUILD_VERSION}/" $release_file
   fi
-fi
-
-if [[ -f apidoc.json ]]; then
-  install_apidoc
-  echo "---> Generating apidoc ..."
-  make gen-apidoc
 fi
 
 if should_collectstatic; then
