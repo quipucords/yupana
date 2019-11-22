@@ -243,7 +243,7 @@ An API specification of the report slices can be found in [report_slices.yml](ht
 # <a name="sending_data"></a> Sending Data to Insights Upload service for Yupana (without QPC)
 Data being uploaded to Insights must be in `tar.gz` format containing the `.json` files with the given JSON structure above. It is important to note that Yupana processes & tracks reports based on their UUIDS, which means that data with a specific UUID cannot be uploaded more than once, or else the second upload will be archived and not processed. Therefore, before every upload we need to generate a new UUID and replace the current one with it if we want to upload the same data more than once. Use the following instructions to prepare and upload a sample or custom report.
 
-## Preparing Yupana Sample Data for Upload
+## Create small yupana sample data for upload
 Yupana has a sample `tar.gz` file to showcase how to upload data to Insights. To prepare the sample data for upload, simply run:
 ```
 make sample-data
@@ -251,7 +251,15 @@ make sample-data
 
 This command will use the `sample.tar.gz` file in the Yupana repository, change the UUIDs within the metadata & each report slice, and save it as a new `tar.gz` file.  Newly generated `tar.gz` files are located in the `temp/` directory.
 
-## Preparing Custom Data for Upload
+## Create arbitrary size yupana sample data for upload
+We created a make command that will generate an arbitrary report with N hosts.  This is useful for end to end testing or performance testing. To create a report run:
+```
+make create-report hosts=500000
+```
+
+This command will create a `tar.gz` containing n hosts (500,000 in the above example). Newly generated `tar.gz` files are located in the `temp/` directory.
+
+## Update sample data for re-upload
 In addition to preparing a sample `tar.gz` file, you also have the option to prepare your own data for uploading to Insights. To prepare your custom data for upload, simply run:
 ```
 make custom-data file=<path/to/your-data.tar.gz>
