@@ -12,9 +12,9 @@ with open("yupana-manifest", "w") as manifest:
     for name, value in sorted(lockfile["default"].items()):
         if "version" in value:
             version = value["version"].replace("=", "")
-            manifest.write("yupana/python:3.6=%s:%s\n" % (name, version))
+            manifest.write("mgmt_services/subscriptions:yupana/python-%s:%s.pipfile\n" % (name, version))
         elif "ref" in value:
             ref = value["ref"]
-            manifest.write("yupana/python:3.6=%s:%s\n" % (name, ref))
+            manifest.write("mgmt_services/subscriptions:yupana/python-%s:%s.pipfile\n" % (name, ref))
         else:
             raise "unable to parse %s" % value
