@@ -12,7 +12,7 @@ docutils==0.15.2
 gunicorn==20.0.4
 idna==2.8
 jmespath==0.9.4
-kafka-python==1.4.6
+kafka-python==1.4.7
 prometheus-client==0.7.1
 psycopg2-binary==2.8.4
 python-dateutil==2.8.1; python_version >= '2.7'
