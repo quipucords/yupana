@@ -22,5 +22,5 @@ s3transfer==0.2.1
 six==1.13.0
 sqlparse==0.3.0
 urllib3==1.25.7
-watchtower==0.6.0
+watchtower==0.7.3
 whitenoise==4.1.4
