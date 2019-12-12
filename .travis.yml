@@ -31,7 +31,6 @@ before_script:
 script:
   - .travis/check_manifest.sh
   - tox
-  - make validate-swagger
 
 after_success:
   - codecov

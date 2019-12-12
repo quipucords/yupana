@@ -36,7 +36,6 @@ help:
 	@echo "--- Commands using local services ---"
 	@echo "server-migrate           run migrations against database"
 	@echo "serve                    run the Django server locally"
-	@echo "validate-swagger         to run swagger-cli validation"
 	@echo "lint                     to run linters on code"
 	@echo "unittest                 run the unit tests"
 	@echo "test-coverage            run the test coverage"
@@ -111,10 +110,6 @@ requirements:
 	pipenv lock
 	pipenv lock -r > docs/rtd_requirements.txt
 	python scripts/create_manifest.py
-
-validate-swagger:
-	npm install swagger-cli
-	node_modules/swagger-cli/bin/swagger-cli.js validate docs/swagger.yml
 
 build:
 	docker build -t $(IMAGE_NAME) .
