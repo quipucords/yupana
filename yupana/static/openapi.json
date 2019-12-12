@@ -1,0 +1,200 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "description": "The models and API for the Yupana server.",
+        "version": "1.0.0",
+        "title": "Yupana API",
+        "contact": {
+            "email": "yupana@redhat.com"
+        },
+        "license": {
+            "name": "GPL 3.0",
+            "url": "https://www.gnu.org/licenses/gpl-3.0.txt"
+        }
+    },
+    "security": [{
+        "Token": []
+    }],
+    "tags": [{
+            "name": "Status",
+            "description": "API related to the server status"
+        },
+        {
+            "name": "Metrics",
+            "description": "Operations about yupana processing metrics"
+        }
+    ],
+    "paths": {
+        "/status/": {
+            "get": {
+                "tags": [
+                    "Status"
+                ],
+                "summary": "Provides endpoint for server status",
+                "description": "Server status and setup information.",
+                "operationId": "serverStatus",
+                "security": [],
+                "responses": {
+                    "200": {
+                        "description": "Server status",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ServerStatus"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/metrics/": {
+            "get": {
+                "tags": [
+                    "Metrics"
+                ],
+                "summary": "Obtain Metrics",
+                "description": "Metrics endpoint for Prometheus to scrape.",
+                "operationId": "getMetrics",
+                "security": [],
+                "responses": {
+                    "200": {
+                        "description": "Yupana metrics",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Metrics"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "servers": [{
+        "url": "/api/v1"
+    }],
+    "components": {
+        "securitySchemes": {
+            "Token": {
+                "type": "apiKey",
+                "name": "Authorization",
+                "in": "header"
+            }
+        },
+        "schemas": {
+            "ServerStatus": {
+                "type": "object",
+                "properties": {
+                    "api_version": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "API version number",
+                        "example": 1
+                    },
+                    "commit": {
+                        "type": "string",
+                        "description": "The commit number",
+                        "example": "17de132"
+                    },
+                    "server_address": {
+                        "type": "string",
+                        "description": "The ip and port information",
+                        "example": "127.0.0.1:8001"
+                    },
+                    "python_version": {
+                        "type": "string",
+                        "description": "The python string version",
+                        "example": "3.6.4"
+                    },
+                    "modules": {
+                        "type": "object",
+                        "description": "name/version string pairs describing the modules on the server",
+                        "example": {
+                            "_ctypes": "1.1.0",
+                            "django": "2.1.1",
+                            "rest_framework": "3.8.2"
+                        }
+                    },
+                    "platform_info": {
+                        "type": "object",
+                        "description": "name/value string pairs describing the server",
+                        "example": {
+                            "system": "Darwin",
+                            "node": "jsmith-OSX.local",
+                            "release": "17.0.0",
+                            "version": "Darwin Kernel Version 17.0.0",
+                            "machine": "x86_64",
+                            "processor": "i386"
+                        }
+                    }
+                }
+            },
+            "Metrics": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MetricsOut"
+                        }
+                    }
+                }
+            },
+            "MetricsOut": {
+                "properties": {
+                    "source_type": {
+                        "type": "string"
+                    },
+                    "metric": {
+                        "type": "string"
+                    },
+                    "label_metric": {
+                        "type": "string"
+                    },
+                    "label_measurement": {
+                        "type": "string"
+                    },
+                    "label_measurement_unit": {
+                        "type": "string"
+                    }
+                }
+            },
+            "Error": {
+                "properties": {
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "example": {
+                                "detail": "Not found.",
+                                "status": 404
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

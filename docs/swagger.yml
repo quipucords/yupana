@@ -25,6 +25,8 @@ security:
 tags:
 - name: "Status"
   description: "API related to the server status"
+- name: "Metrics"
+  description: "Operations about yupana processing metrics"
 
 paths:
   /status/:
@@ -35,11 +37,36 @@ paths:
       description: "Server status and setup information."
       operationId: "serverStatus"
       security: []
+      produces:
+        - "application/json"
       responses:
         200:
           description: "Server status"
           schema:
             $ref: "#/definitions/ServerStatus"
+        500:
+          description: "Unexpected error"
+          schema:
+            $ref: "#/definitions/Error"
+  /metrics/:
+    get:
+      tags:
+        - "Metrics"
+      summary: "Obtain Metrics"
+      description: "Metrics endpoint for Prometheus to scrape."
+      operationId: "getMetrics"
+      security: []
+      produces:
+        - "application/json"
+      responses:
+        200:
+          description: "Yupana metrics"
+          schema:
+            $ref: "#/definitions/Metrics"
+        500:
+          description: "Unexpected error"
+          schema:
+            $ref: "#/definitions/Error"
 definitions:
   ServerStatus:
     type: "object"
@@ -69,3 +96,32 @@ definitions:
         type: "object"
         description: "name/value string pairs describing the server"
         example: {"system": "Darwin", "node": "jsmith-OSX.local", "release": "17.0.0", "version": "Darwin Kernel Version 17.0.0", "machine": "x86_64", "processor": "i386"}
+  Metrics:
+    type: "object"
+    properties:
+      data:
+        type: "array"
+        items:
+          $ref: "#/definitions/MetricsOut"
+  MetricsOut:
+    properties:
+      source_type:
+        type: "string"
+      metric:
+        type: "string"
+      label_metric:
+        type: "string"
+      label_measurement:
+        type: "string"
+      label_measurement_unit:
+        type: "string"
+  Error:
+    properties:
+      errors:
+        type: "array"
+        items:
+          type: "object"
+          example: {
+            "detail": "Not found.",
+            "status": 404
+          }

@@ -107,8 +107,10 @@ openshift/parameters/*.env
 # visual code
 .vscode/
 
-# Django
-yupana/static/
+# Django Static dirs
+yupana/static/admin
+yupana/static/client
+yupana/static/rest_framework
 
 # static files
 yupana/staticfiles/
