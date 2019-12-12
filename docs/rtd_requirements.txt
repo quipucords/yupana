@@ -2,11 +2,11 @@
 aiokafka==0.5.2
 boto3==1.9.200
 botocore==1.12.253
-certifi==2019.9.11
+certifi==2019.11.28
 chardet==3.0.4
 django-environ==0.4.5
 django-prometheus==1.1.0
-django==2.2.6
+django==2.2.8
 djangorestframework==3.10.3
 docutils==0.15.2
 gunicorn==19.9.0
