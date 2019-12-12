@@ -1,9 +1,9 @@
 mgmt_services/subscriptions:yupana/python-aiokafka:0.5.2.pipfile
 mgmt_services/subscriptions:yupana/python-boto3:1.9.200.pipfile
 mgmt_services/subscriptions:yupana/python-botocore:1.12.253.pipfile
-mgmt_services/subscriptions:yupana/python-certifi:2019.9.11.pipfile
+mgmt_services/subscriptions:yupana/python-certifi:2019.11.28.pipfile
 mgmt_services/subscriptions:yupana/python-chardet:3.0.4.pipfile
-mgmt_services/subscriptions:yupana/python-django:2.2.6.pipfile
+mgmt_services/subscriptions:yupana/python-django:2.2.8.pipfile
 mgmt_services/subscriptions:yupana/python-django-environ:0.4.5.pipfile
 mgmt_services/subscriptions:yupana/python-django-prometheus:1.1.0.pipfile
 mgmt_services/subscriptions:yupana/python-djangorestframework:3.10.3.pipfile
