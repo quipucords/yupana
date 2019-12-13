@@ -25,7 +25,7 @@
         }
     ],
     "paths": {
-        "api/subscriptions/v1/": {
+        "api/subscriptions/v1/status/": {
             "get": {
                 "tags": [
                     "Status"
