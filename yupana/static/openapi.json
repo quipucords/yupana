@@ -113,10 +113,15 @@
                         "description": "API version number",
                         "example": 1
                     },
-                    "commit": {
+                    "git_commit": {
                         "type": "string",
                         "description": "The commit number",
                         "example": "17de132"
+                    },
+                    "release_version": {
+                        "type": "string",
+                        "description": "The release version",
+                        "example": "0.2.1.17de132"
                     },
                     "server_address": {
                         "type": "string",
