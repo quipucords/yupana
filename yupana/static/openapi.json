@@ -25,7 +25,7 @@
         }
     ],
     "paths": {
-        "/status/": {
+        "api/subscriptions/v1/": {
             "get": {
                 "tags": [
                     "Status"
@@ -58,7 +58,7 @@
                 }
             }
         },
-        "/metrics/": {
+        "metrics": {
             "get": {
                 "tags": [
                     "Metrics"
@@ -71,7 +71,7 @@
                     "200": {
                         "description": "Yupana metrics",
                         "content": {
-                            "application/json": {
+                            "text/plain": {
                                 "schema": {
                                     "$ref": "#/components/schemas/Metrics"
                                 }
@@ -93,7 +93,7 @@
         }
     },
     "servers": [{
-        "url": "/api/v1"
+        "url": "/"
     }],
     "components": {
         "securitySchemes": {
@@ -193,8 +193,8 @@
                         "items": {
                             "type": "object",
                             "example": {
-                                "detail": "Not found.",
-                                "status": 404
+                                "detail": "Unexpected error. See logs.",
+                                "status": 500
                             }
                         }
                     }
