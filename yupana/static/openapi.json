@@ -16,16 +16,11 @@
         "Token": []
     }],
     "tags": [{
-            "name": "Status",
-            "description": "API related to the server status"
-        },
-        {
-            "name": "Metrics",
-            "description": "Operations about yupana processing metrics"
-        }
-    ],
+        "name": "Status",
+        "description": "API related to the server status"
+    }],
     "paths": {
-        "api/subscriptions/v1/status/": {
+        "/status/": {
             "get": {
                 "tags": [
                     "Status"
@@ -57,43 +52,10 @@
                     }
                 }
             }
-        },
-        "metrics": {
-            "get": {
-                "tags": [
-                    "Metrics"
-                ],
-                "summary": "Obtain Metrics",
-                "description": "Metrics endpoint for Prometheus to scrape.",
-                "operationId": "getMetrics",
-                "security": [],
-                "responses": {
-                    "200": {
-                        "description": "Yupana metrics",
-                        "content": {
-                            "text/plain": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Metrics"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Unexpected error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         }
     },
     "servers": [{
-        "url": "/"
+        "url": "/api/subscriptions/v1"
     }],
     "components": {
         "securitySchemes": {
@@ -153,36 +115,6 @@
                             "machine": "x86_64",
                             "processor": "i386"
                         }
-                    }
-                }
-            },
-            "Metrics": {
-                "type": "object",
-                "properties": {
-                    "data": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/MetricsOut"
-                        }
-                    }
-                }
-            },
-            "MetricsOut": {
-                "properties": {
-                    "source_type": {
-                        "type": "string"
-                    },
-                    "metric": {
-                        "type": "string"
-                    },
-                    "label_metric": {
-                        "type": "string"
-                    },
-                    "label_measurement": {
-                        "type": "string"
-                    },
-                    "label_measurement_unit": {
-                        "type": "string"
                     }
                 }
             },
