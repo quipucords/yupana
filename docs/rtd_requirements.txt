@@ -1,6 +1,6 @@
 -i https://pypi.python.org/simple
 aiokafka==0.5.2
-boto3==1.10.34
+boto3==1.11.9
 botocore==1.13.37
 certifi==2019.11.28
 chardet==3.0.4
