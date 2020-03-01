@@ -18,7 +18,7 @@ sqlparse = "==0.3.0"
 whitenoise = "==4.1.4"
 django-prometheus = "==1.1.0"
 prometheus-client = "==0.7.1"
-boto3 = "==1.10.34"
+boto3 = "==1.12.11"
 watchtower = "==0.7.3"
 
 
