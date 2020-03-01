@@ -609,11 +609,10 @@
         },
         "sphinx": {
             "hashes": [
-                "sha256:3b16e48e791a322d584489ab28d8800652123d1fbfdd173e2965a31d40bf22d7",
-                "sha256:559c1a8ed1365a982f77650720b41114414139a635692a23c2990824d0a84cf2"
+                "sha256:776ff8333181138fae52df65be733127539623bb46cc692e7fa0fcfc80d7aa88",
+                "sha256:ca762da97c3b5107cbf0ab9e11d3ec7ab8d3c31377266fd613b962ed971df709"
             ],
-            "index": "pypi",
-            "version": "==2.2.2"
+            "version": "==2.4.3"
         },
         "sphinx-autobuild": {
             "hashes": [
