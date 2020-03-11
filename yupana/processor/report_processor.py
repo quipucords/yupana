@@ -617,7 +617,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                                         ' %s reported %s hosts '\
                                         'but report contains %s hosts. ' % \
                                         (report_slice_id, str(num_hosts),
-                                         str(MAX_HOSTS_PER_REP))
+                                         str(len(hosts))
                                     mismatch_message += invalid_hosts
                                 if not matches_metadata:
                                     mismatch_message += 'Metadata must match report slice data. '\
