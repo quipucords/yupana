@@ -2,13 +2,13 @@
 * Requires: https://github.com/RedHatInsights/insights-pipeline-lib
 */
 
-@Library("github.com/RedHatInsights/insights-pipeline-lib@v2") _
+@Library("github.com/RedHatInsights/insights-pipeline-lib@v3") _
 
 
 // this 'if' statement makes sure this is a PR, so we don't run smoke tests again
 // after code has been merged into the stable branch.
 if (env.CHANGE_ID) {
-    runSmokeTest (
+    execSmokeTest (
         // the service-set/component for this app in e2e-deploy "buildfactory"
         ocDeployerBuilderPath: "subscriptions/yupana",
         // the service-set/component for this app in e2e-deploy "templates"
