@@ -1,7 +1,7 @@
 -i https://pypi.python.org/simple
 aiokafka==0.5.2
 boto3==1.12.33
-botocore==1.15.19
+botocore==1.15.33
 certifi==2019.11.28
 chardet==3.0.4
 django-environ==0.4.5
