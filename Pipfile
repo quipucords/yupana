@@ -34,7 +34,7 @@ pylint-django = "==2.0.15"
 pylint-plugin-utils = "==0.6"
 requests-mock = "==1.7.0"
 sphinx-rtd-theme = "==0.4.3"
-sphinx = "==2.4.3"
+sphinx = "==3.0.3"
 sphinx-autobuild = "==0.7.1"
 tox = "==3.14.5"
 
