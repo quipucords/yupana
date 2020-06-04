@@ -129,7 +129,7 @@ if CW_AWS_ACCESS_KEY_ID:
                 'formatter': LOGGING_FORMATTER,
                 'use_queues': False,
                 'create_log_group': False,
-        }
+            }
         else:
             print(
                 'Unable to configure watchtower logging. '
