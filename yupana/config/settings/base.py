@@ -92,8 +92,10 @@ LOGGING_HANDLERS = os.getenv('DJANGO_LOG_HANDLERS', 'console').split(',')
 LOGGING_FORMATTER = os.getenv('DJANGO_LOG_FORMATTER', 'simple')
 
 NAMESPACE = 'unknown'
-with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r") as f:
-    NAMESPACE = f.read()
+NAMESPACE_FILE = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+if os.path.exists(NAMESPACE_FILE):
+    with open(NAMESPACE_FILE, "r") as f:
+        NAMESPACE = f.read()
 
 if CW_AWS_ACCESS_KEY_ID:
     try:
