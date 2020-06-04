@@ -131,8 +131,10 @@ if CW_AWS_ACCESS_KEY_ID:
                 'create_log_group': False,
         }
         else:
-            print('Unable to configure watchtower logging.'
-                'Please verify watchtower logging configuration!')
+            print(
+                'Unable to configure watchtower logging. '
+                'Please verify watchtower logging configuration!'
+            )
 
 LOGGING = {
     'version': 1,
