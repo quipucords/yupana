@@ -121,14 +121,14 @@ if CW_AWS_ACCESS_KEY_ID:
         if cerr.response.get('Error', {}).get('Code') == 'ResourceAlreadyExistsException':
             LOGGING_HANDLERS += ['watchtower']
             WATCHTOWER_HANDLER = {
-            'level': LOGGING_LEVEL,
-            'class': 'watchtower.CloudWatchLogHandler',
-            'boto3_session': BOTO3_SESSION,
-            'log_group': CW_LOG_GROUP,
-            'stream_name': NAMESPACE,
-            'formatter': LOGGING_FORMATTER,
-            'use_queues': False,
-            'create_log_group': False,
+                'level': LOGGING_LEVEL,
+                'class': 'watchtower.CloudWatchLogHandler',
+                'boto3_session': BOTO3_SESSION,
+                'log_group': CW_LOG_GROUP,
+                'stream_name': NAMESPACE,
+                'formatter': LOGGING_FORMATTER,
+                'use_queues': False,
+                'create_log_group': False,
         }
         else:
             print('Unable to configure watchtower logging.'
