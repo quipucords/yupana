@@ -114,7 +114,7 @@ requirements:
 
 validate-swagger:
 	npm install swagger-cli
-	node_modules/swagger-cli/bin/swagger-cli.js validate yupana/static/openapi.json
+	node_modules/swagger-cli/swagger-cli.js validate yupana/static/openapi.json
 
 build:
 	docker build -t $(IMAGE_NAME) .
