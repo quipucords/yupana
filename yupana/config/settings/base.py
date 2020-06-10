@@ -91,8 +91,50 @@ LOGGING_LEVEL = os.getenv('DJANGO_LOG_LEVEL', 'INFO')
 LOGGING_HANDLERS = os.getenv('DJANGO_LOG_HANDLERS', 'console').split(',')
 LOGGING_FORMATTER = os.getenv('DJANGO_LOG_FORMATTER', 'simple')
 
+NAMESPACE = 'unknown'
+NAMESPACE_FILE = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+if os.path.exists(NAMESPACE_FILE):
+    with open(NAMESPACE_FILE, "r") as f:
+        NAMESPACE = f.read()
+
 if CW_AWS_ACCESS_KEY_ID:
-    LOGGING_HANDLERS += ['watchtower']
+    try:
+        BOTO3_SESSION = Session(
+            aws_access_key_id=CW_AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=CW_AWS_SECRET_ACCESS_KEY,
+            region_name=CW_AWS_REGION
+        )
+        watchtower = BOTO3_SESSION.client('logs')  # pylint: disable=invalid-name
+        watchtower.create_log_stream(logGroupName=CW_LOG_GROUP, logStreamName=NAMESPACE)
+        LOGGING_HANDLERS += ['watchtower']
+        WATCHTOWER_HANDLER = {
+            'level': LOGGING_LEVEL,
+            'class': 'watchtower.CloudWatchLogHandler',
+            'boto3_session': BOTO3_SESSION,
+            'log_group': CW_LOG_GROUP,
+            'stream_name': NAMESPACE,
+            'formatter': LOGGING_FORMATTER,
+            'use_queues': False,
+            'create_log_group': False,
+        }
+    except ClientError as cerr:
+        if cerr.response.get('Error', {}).get('Code') == 'ResourceAlreadyExistsException':
+            LOGGING_HANDLERS += ['watchtower']
+            WATCHTOWER_HANDLER = {
+                'level': LOGGING_LEVEL,
+                'class': 'watchtower.CloudWatchLogHandler',
+                'boto3_session': BOTO3_SESSION,
+                'log_group': CW_LOG_GROUP,
+                'stream_name': NAMESPACE,
+                'formatter': LOGGING_FORMATTER,
+                'use_queues': False,
+                'create_log_group': False,
+            }
+        else:
+            print(
+                'Unable to configure watchtower logging. '
+                'Please verify watchtower logging configuration!'
+            )
 
 LOGGING = {
     'version': 1,
@@ -121,32 +163,9 @@ LOGGING = {
     },
 }
 
-if CW_AWS_ACCESS_KEY_ID:
-    print('Configuring watchtower logging.')
-    NAMESPACE = 'unknown'
-    try:
-        BOTO3_SESSION = Session(aws_access_key_id=CW_AWS_ACCESS_KEY_ID,
-                                aws_secret_access_key=CW_AWS_SECRET_ACCESS_KEY,
-                                region_name=CW_AWS_REGION)
-        try:
-            with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r") as f:
-                NAMESPACE = f.read()
-        except Exception:  # pylint: disable=W0703
-            pass
-        WATCHTOWER_HANDLER = {
-            'level': LOGGING_LEVEL,
-            'class': 'watchtower.CloudWatchLogHandler',
-            'boto3_session': BOTO3_SESSION,
-            'log_group': CW_LOG_GROUP,
-            'stream_name': NAMESPACE,
-            'formatter': LOGGING_FORMATTER,
-        }
-        LOGGING['handlers']['watchtower'] = WATCHTOWER_HANDLER
-    except ClientError as cerr:
-        print('CloudWatch logging setup failed: %s' % cerr)
-else:
-    print('Unable to configure watchtower logging.'
-          'Please verify watchtower logging configuration!')
+if "watchtower" in LOGGING_HANDLERS:
+    LOGGING["handlers"]["watchtower"] = WATCHTOWER_HANDLER
+    print("CloudWatch configured.")
 
 # Default apps go here
 DJANGO_APPS = [
