@@ -15,7 +15,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 """Settings file meant for running tests."""
-# pylint: disable=wildcard-import, unused-wildcard-import
+# pylint: disable=wildcard-import, unused-wildcard-import, undefined-variable, import-error
 from .base import *  # noqa: F401,F403
 from .env import ENVIRONMENT
 
