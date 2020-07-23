@@ -14,12 +14,12 @@
 Full documentation is available through [readthedocs](https://yupana.readthedocs.io/en/latest/).
 
 # <a name="intro"></a> Getting Started
-
-This is a Python project developed using Python 3.6. Make sure you have at least this version installed.
+Yupana is a service that works with the Insights Platform services.  It's primary purpose is to receive bulk uploads of hosts.  A client will create a specially crafted tarball and send the file to the Insights Ingress service.  The Ingress service will notify yupana via Kafka that a tarball has arrived for processing. Yupana downloads the tarball, performs top level validation, and sends the host JSON to the Insight's Host Based Inventory service.  Yupana does not validate the JSON of a host. The host based inventory service will not notify yupana of validation errors.
 
 # <a name="development"></a> Development
+At this time the make file commands only work on a MacOS.  If you develop on something besides MacOS, you will need to bring up the Ingres, host based inventory, and dependent services manually.  Information for these services can be found at https://github.com/RedHatInsights/insights-ingress-go/ and https://github.com/RedHatInsights/insights-host-inventory/.  Follow their README for instructions.
 
-## Setup
+## MacOS Setup
 
 ### Obtain source for local projects
 To get started developing against Yupana first clone a local copy of the git repository.
@@ -46,7 +46,7 @@ The `/etc/hosts` file must be updated for Kafka and Minio.  Open your `/etc/host
 ```
 
 ### Using pipenv
-A Pipfile is provided. Pipenv is recommended for combining virtual environment (virtualenv) and dependency management (pip). To install pipenv, use pip :
+This is a Python project developed using Python 3.6. Make sure you have at least this version installed. A Pipfile is provided. Pipenv is recommended for combining virtual environment (virtualenv) and dependency management (pip). To install pipenv, use pip :
 
 ```
 pip3 install pipenv
