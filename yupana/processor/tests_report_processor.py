@@ -881,6 +881,30 @@ class ReportProcessorTests(TransactionTestCase):
                     kept_invalid = True
         self.assertEqual(kept_invalid, True)
 
+    def test_filter_hosts_without_system_profile(self):
+        """Test filtering out host without 'system_profile'."""
+        hosts = [{'mac_addresses': {}}, {'account': '1'}]
+        candidate_hosts = self.processor._filter_hosts(hosts)
+        self.assertEqual(candidate_hosts, [])
+
+    def test_filter_hosts_without_installed_products(self):
+        """Test filtering out host without 'installed_products'."""
+        hosts = [{'system_profile': {}}, {'account': '1'}]
+        candidate_hosts = self.processor._filter_hosts(hosts)
+        self.assertEqual(candidate_hosts, [])
+
+    def test_filter_hosts_with_empty_installed_products(self):
+        """Test filtering out host with empty 'installed_products'."""
+        hosts = [{'system_profile': {'installed_products': []}}, {'account': '1'}]
+        candidate_hosts = self.processor._filter_hosts(hosts)
+        self.assertEqual(candidate_hosts, [])
+
+    def test_not_filter_correct_hosts(self):
+        """Test not filtering correct hosts."""
+        hosts = [{'system_profile': {'installed_products': ['prod']}}]
+        candidate_hosts = self.processor._filter_hosts(hosts)
+        self.assertEqual(candidate_hosts, [{'system_profile': {'installed_products': ['prod']}}])
+
     def test_update_slice_exception(self):
         """Test udpating the slice with invalid data."""
         # test that not providing a state inside options causes

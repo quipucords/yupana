@@ -84,11 +84,15 @@ TIME_RETRIES = Counter('time_retries',
 COMMIT_RETRIES = Counter('commit_retries',
                          'The total number of retries based on commit for all reports',
                          ['account_number'])
+FILTERED_HOSTS = Counter('filtered_hosts',
+                         'The number of hosts filtered out',
+                         ['account_number'])
 REPORT_PROCESSING_LATENCY = Summary(
     'report_processing_latency',
     'The time in seconds that it takes to process a report'
 )
 VALIDATION_LATENCY = Summary('validation_latency', 'The time it takes to validate a report')
+FILTER_LATENCY = Summary('filter_latency', 'The time it takes to filter wrong hosts')
 INVALID_HOSTS = Gauge('invalid_hosts', 'The number of invalid hosts',
                       ['account_number', 'source'])
 
@@ -776,6 +780,31 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     report_platform_id=self.report_platform_id))
 
         return candidate_hosts, hosts_without_facts
+
+    @staticmethod
+    def _filter_single_host(host: dict):
+        """Filter function to filter out wrong host."""
+        installed_products = host.get('system_profile', dict()).get('installed_products', [])
+        if not installed_products:
+            return False
+        return True
+
+    @FILTER_LATENCY.time()
+    def _filter_hosts(self, hosts: list):
+        """Filter wrong hosts from hosts candidates."""
+        out_hosts = list(filter(self._filter_single_host, hosts))
+        n_removed = len(hosts) - len(out_hosts)
+        if n_removed > 0:
+            FILTERED_HOSTS.labels(account_number=self.account_number).inc(n_removed)
+            LOG.warning(format_message(self.prefix, '%d hosts removed by filter' % n_removed,
+                                       account_number=self.account_number,
+                                       report_platform_id=self.report_platform_id))
+        else:
+            LOG.info(format_message(self.prefix, 'no hosts removed by filter',
+                                    account_number=self.account_number,
+                                    report_platform_id=self.report_platform_id))
+            LOG.info('no hosts removed by filter')
+        return out_hosts
 
     def get_stale_date(self):
         """Compute the stale date based on the host source."""
