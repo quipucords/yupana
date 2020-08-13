@@ -905,6 +905,19 @@ class ReportProcessorTests(TransactionTestCase):
         candidate_hosts = self.processor._filter_hosts(hosts)
         self.assertEqual(candidate_hosts, [{'system_profile': {'installed_products': ['prod']}}])
 
+    def test_transform_os_release(self):
+        """Test transform host os_release."""
+        hosts = [{'system_profile': {'os_release':
+                                     'Red Hat Enterprise Linux Server 6.10 (Santiago)'}}]
+        candidate_hosts = self.processor._transform_hosts(hosts)
+        self.assertEqual(candidate_hosts, [{'system_profile': {'os_release': '6.10'}}])
+
+    def test_transform_no_string(self):
+        """Test do not transform no-string os_release."""
+        hosts = [{'system_profile': {'os_release': 123}}]
+        candidate_hosts = self.processor._transform_hosts(hosts)
+        self.assertEqual(candidate_hosts, [{'system_profile': {'os_release': 123}}])
+
     def test_update_slice_exception(self):
         """Test udpating the slice with invalid data."""
         # test that not providing a state inside options causes

@@ -45,6 +45,7 @@ from prometheus_client import Counter, Gauge
 from api.models import (Report, ReportSlice, Status)
 from api.serializers import ReportSerializer, ReportSliceSerializer
 from config.settings.base import (HOSTS_FILTER_ENABLED,
+                                  HOSTS_TRANSFORMATION_ENABLED,
                                   INSIGHTS_KAFKA_ADDRESS,
                                   MAX_HOSTS_PER_REP,
                                   RETRIES_ALLOWED,
@@ -188,6 +189,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 candidate_hosts = self._validate_report_details()
                 if HOSTS_FILTER_ENABLED:
                     candidate_hosts = self._filter_hosts(candidate_hosts)
+                if HOSTS_TRANSFORMATION_ENABLED:
+                    candidate_hosts = self._transform_hosts(candidate_hosts)
                 if candidate_hosts:
                     self.status = SUCCESS_CONFIRM_STATUS
                 # Here we want to update the report state of the actual report slice

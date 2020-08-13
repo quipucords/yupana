@@ -46,6 +46,7 @@ SECRET_KEY = ENVIRONMENT.get_value('DJANGO_SECRET_KEY',
                                    default='base')
 DEBUG = ENVIRONMENT.bool('DJANGO_DEBUG', default=False)
 HOSTS_FILTER_ENABLED = ENVIRONMENT.bool('HOSTS_FILTER_ENABLED', default=True)
+HOSTS_TRANSFORMATION_ENABLED = ENVIRONMENT.bool('HOSTS_TRANSFORMATION_ENABLED', default=True)
 ALLOWED_HOSTS = ENVIRONMENT.get_value('DJANGO_ALLOWED_HOSTS', default=['*'])
 
 # this is the time in minutes that we want to wait to retry a report

@@ -19,6 +19,7 @@
 import asyncio
 import json
 import logging
+import re
 import uuid
 from abc import ABC
 from datetime import datetime, timedelta
@@ -87,14 +88,21 @@ COMMIT_RETRIES = Counter('commit_retries',
 FILTERED_HOSTS = Counter('filtered_hosts',
                          'The number of hosts filtered out',
                          ['account_number'])
+OS_RELEASE_TRANSFORMED = Counter('os_release_transformed',
+                                 'Hosts with transformed os_release field',
+                                 ['account_number'])
 REPORT_PROCESSING_LATENCY = Summary(
     'report_processing_latency',
     'The time in seconds that it takes to process a report'
 )
 VALIDATION_LATENCY = Summary('validation_latency', 'The time it takes to validate a report')
 FILTER_LATENCY = Summary('filter_latency', 'The time it takes to filter wrong hosts')
+OS_TRANSFORMATION_LATENCY = Summary('os_transformation_latency',
+                                    'The time it takes to transform old os_release')
 INVALID_HOSTS = Gauge('invalid_hosts', 'The number of invalid hosts',
                       ['account_number', 'source'])
+
+OS_RELEASE_PATTERN = re.compile(r'.+(\d+\.\d+).?')
 
 
 # pylint: disable=broad-except, too-many-lines, too-many-public-methods
@@ -804,6 +812,28 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                                     account_number=self.account_number,
                                     report_platform_id=self.report_platform_id))
             LOG.info('no hosts removed by filter')
+        return out_hosts
+
+    def _transform_single_host(self, host: dict):
+        """Transform 'system_profile.os_release' label."""
+        os_release = host.get('system_profile', dict()).get('os_release', None)
+        if not isinstance(os_release, str):
+            return host
+        match_result = OS_RELEASE_PATTERN.match(os_release)
+        if match_result:
+            os_release_tf = match_result.groups()[0]
+            host['system_profile']['os_release'] = os_release_tf
+            OS_RELEASE_TRANSFORMED.labels(account_number=self.account_number).inc()
+            LOG.info(format_message(self.prefix, "os_release transformed '%s' -> '%s'"
+                                    % (os_release, os_release_tf),
+                                    account_number=self.account_number,
+                                    report_platform_id=self.report_platform_id))
+        return host
+
+    @OS_TRANSFORMATION_LATENCY.time()
+    def _transform_hosts(self, hosts: list):
+        """Transform hosts collection."""
+        out_hosts = list(map(self._transform_single_host, hosts))
         return out_hosts
 
     def get_stale_date(self):
