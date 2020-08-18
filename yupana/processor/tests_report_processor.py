@@ -557,6 +557,34 @@ class ReportProcessorTests(TransactionTestCase):
             self.assertEqual(self.report_record.state, Report.VALIDATED)
             self.assertEqual(self.processor.status, report_processor.FAILURE_CONFIRM_STATUS)
 
+    def test_transition_to_validated_filter_transform(self):
+        """Test that filtering and transformation of host are reached."""
+        self.report_record.state = Report.DOWNLOADED
+        self.report_record.save()
+        self.processor.report_or_slice = self.report_record
+
+        filter_out = []
+
+        def filter_hosts_patch(_, hosts: list):
+            """Mock filter function."""
+            filter_out.extend(hosts)
+            return hosts
+
+        transform_out = []
+
+        def transform_hosts_patch(_, hosts: list):
+            """Mock transform function."""
+            transform_out.extend(hosts)
+            return hosts
+
+        with patch.object(abstract_processor.AbstractProcessor, '_filter_hosts',
+                          filter_hosts_patch):
+            with patch.object(abstract_processor.AbstractProcessor, '_transform_hosts',
+                              transform_hosts_patch):
+                self.processor.transition_to_validated()
+                self.assertEqual(len(transform_out), 2)
+                self.assertEqual(len(filter_out), 2)
+
     async def async_test_transition_to_validation_reported(self):
         """Set up the test for transitioning to validation reported."""
         self.report_record.state = Report.VALIDATED
