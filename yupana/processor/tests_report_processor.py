@@ -881,6 +881,49 @@ class ReportProcessorTests(TransactionTestCase):
                     kept_invalid = True
         self.assertEqual(kept_invalid, True)
 
+    def test_transform_os_release(self):
+        """Test transform host os_release."""
+        hosts = [{'123': {'system_profile': {
+            'os_release': 'Red Hat Enterprise Linux Server 6.10 (Santiago)'}}}]
+
+        candidate_hosts = self.processor._transform_hosts(hosts)
+        self.assertEqual(
+            candidate_hosts,
+            [{'123': {'system_profile': {'os_release': '6.10'},
+                      'tags': [{'namespace': 'yupana', 'key': 'os_name',
+                                'value': 'Red Hat Enterprise Linux Server'}]}}])
+
+    def test_transform_no_string(self):
+        """Test do not transform no-string os_release."""
+        hosts = [{'123': {'system_profile': {'os_release': '7'}}}]
+        candidate_hosts = self.processor._transform_hosts(hosts)
+        self.assertEqual(
+            candidate_hosts,
+            [{'123': {'system_profile': {'os_release': '7'},
+                      'tags': [{'namespace': 'yupana', 'key': 'os_name', 'value': ''}]}}])
+
+    def test_transform_os_release_when_no_version(self):
+        """Test transform host os_release."""
+        hosts = [{'123': {'system_profile': {'os_release': 'Red Hat Enterprise Linux Server'}}}]
+
+        candidate_hosts = self.processor._transform_hosts(hosts)
+        self.assertEqual(
+            candidate_hosts,
+            [{'123': {'system_profile': {'os_release': ''},
+                      'tags': [{'namespace': 'yupana', 'key': 'os_name',
+                                'value': 'Red Hat Enterprise Linux Server'}]}}])
+
+    def test_transform_os_release_when_non_rhel_os(self):
+        """Test transform host os_release."""
+        hosts = [{'123': {'system_profile': {'os_release': 'CentOS Linux 7 (Core)'}}}]
+
+        candidate_hosts = self.processor._transform_hosts(hosts)
+        self.assertEqual(
+            candidate_hosts,
+            [{'123': {'system_profile': {'os_release': '7'},
+                      'tags': [{'namespace': 'yupana', 'key': 'os_name',
+                                'value': 'CentOS Linux'}]}}])
+
     def test_update_slice_exception(self):
         """Test udpating the slice with invalid data."""
         # test that not providing a state inside options causes
