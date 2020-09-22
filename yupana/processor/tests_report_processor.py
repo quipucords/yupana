@@ -893,14 +893,13 @@ class ReportProcessorTests(TransactionTestCase):
                       'tags': [{'namespace': 'yupana', 'key': 'os_name',
                                 'value': 'Red Hat Enterprise Linux Server'}]}}])
 
-    def test_transform_no_string(self):
+    def test_do_not_add_tag_based_on_os_release(self):
         """Test do not transform no-string os_release."""
         hosts = [{'123': {'system_profile': {'os_release': '7'}}}]
         candidate_hosts = self.processor._transform_hosts(hosts)
         self.assertEqual(
             candidate_hosts,
-            [{'123': {'system_profile': {'os_release': '7'},
-                      'tags': [{'namespace': 'yupana', 'key': 'os_name', 'value': ''}]}}])
+            [{'123': {'system_profile': {'os_release': '7'}}}])
 
     def test_transform_os_release_when_no_version(self):
         """Test transform host os_release."""
@@ -923,6 +922,24 @@ class ReportProcessorTests(TransactionTestCase):
             [{'123': {'system_profile': {'os_release': '7'},
                       'tags': [{'namespace': 'yupana', 'key': 'os_name',
                                 'value': 'CentOS Linux'}]}}])
+
+    def test_transform_os_fields(self):
+        """Test do not transform no-string os_release."""
+        hosts = [{'123': {'system_profile': {'os_release': '7',
+                                             'os_kernel_version': '3.10.0-1127.el7.x86_64'}}}]
+        candidate_hosts = self.processor._transform_hosts(hosts)
+        self.assertEqual(
+            candidate_hosts,
+            [{'123': {'system_profile': {'os_release': '7', 'os_kernel_version': '3.10.0'}}}])
+
+    def test_keep_os_kernel_version(self):
+        """Test do not transform no-string os_release."""
+        hosts = [{'123': {'system_profile': {'os_release': '7',
+                                             'os_kernel_version': '2.6.32'}}}]
+        candidate_hosts = self.processor._transform_hosts(hosts)
+        self.assertEqual(
+            candidate_hosts,
+            [{'123': {'system_profile': {'os_release': '7', 'os_kernel_version': '2.6.32'}}}])
 
     def test_update_slice_exception(self):
         """Test udpating the slice with invalid data."""

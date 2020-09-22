@@ -85,24 +85,24 @@ TIME_RETRIES = Counter('time_retries',
 COMMIT_RETRIES = Counter('commit_retries',
                          'The total number of retries based on commit for all reports',
                          ['account_number'])
-FILTERED_HOSTS = Counter('filtered_hosts',
-                         'The number of hosts filtered out',
-                         ['account_number'])
 OS_RELEASE_TRANSFORMED = Counter('os_release_transformed',
                                  'Hosts with transformed os_release field',
                                  ['account_number'])
+OS_KERNEL_VERSION_TRANSFORMED = Counter('os_kernel_version_transformed',
+                                        'Hosts with transformed os_kernel_version field',
+                                        ['account_number'])
 REPORT_PROCESSING_LATENCY = Summary(
     'report_processing_latency',
     'The time in seconds that it takes to process a report'
 )
 VALIDATION_LATENCY = Summary('validation_latency', 'The time it takes to validate a report')
-FILTER_LATENCY = Summary('filter_latency', 'The time it takes to filter wrong hosts')
 OS_TRANSFORMATION_LATENCY = Summary('os_transformation_latency',
                                     'The time it takes to transform old os_release')
 INVALID_HOSTS = Gauge('invalid_hosts', 'The number of invalid hosts',
                       ['account_number', 'source'])
-
-OS_RELEASE_PATTERN = re.compile(r"(?P<name>[a-zA-Z\s]*)?\s*(?P<version>[\d\.]*)\s*(\((?P<code>\S*)\))?")
+OS_RELEASE_PATTERN = re.compile(
+    r'(?P<name>[a-zA-Z\s]*)?\s*(?P<version>[\d\.]*)\s*(\((?P<code>\S*)\))?'
+)
 
 
 # pylint: disable=broad-except, too-many-lines, too-many-public-methods
@@ -800,35 +800,58 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         match_group_dict['name'] = match_group_dict['name'].strip()
         return match_group_dict
 
-    def _transform_single_host(self, host: dict):
+    def _transform_os_release(self, host: dict):
         """Transform 'system_profile.os_release' label."""
-        for host_uuid in host:
-            os_release = host[host_uuid].get('system_profile', dict()).get('os_release', '')
-            if not isinstance(os_release, str):
-                return host
+        system_profile_info = host.get('system_profile', dict())
+        os_release = system_profile_info.get('os_release', '')
 
+        if isinstance(os_release, str) and os_release and os_release.strip():
             parsed_info = self._parse_os_release_field(os_release)
             os_name = parsed_info.get('name', '')
             os_version = parsed_info['version']
+
             if os_name:
-                host[host_uuid]['system_profile']['os_release'] = os_version
+                host['system_profile']['os_release'] = os_version
                 OS_RELEASE_TRANSFORMED.labels(account_number=self.account_number).inc()
                 LOG.info(format_message(self.prefix, "os_release transformed '%s' -> '%s'"
                                         % (os_release, os_version),
                                         account_number=self.account_number,
                                         report_platform_id=self.report_platform_id))
-            if 'tags' not in host[host_uuid]:
-                host[host_uuid]['tags'] = []
+                if 'tags' not in host:
+                    host['tags'] = []
 
-            host[host_uuid]['tags'].append({
-                'namespace': 'yupana',
-                'key': 'os_name',
-                'value': os_name
-            })
-            LOG.info(format_message(self.prefix, "Added tag 'yupana' with key as '%s' & value as '%s'"
-                                    % ('os_name', os_name),
+                host['tags'].append({'namespace': 'yupana', 'key': 'os_name', 'value': os_name})
+                LOG.info(format_message(
+                    self.prefix, "Added tag 'yupana' with key as '%s' & value as '%s'"
+                    % ('os_name', os_name),
+                    account_number=self.account_number,
+                    report_platform_id=self.report_platform_id))
+
+        return host
+
+    def _transform_os_kernel_version(self, host: dict):
+        """Transform 'system_profile.os_kernel_version' label."""
+        system_profile_info = host.get('system_profile', dict())
+        os_kernel_version = system_profile_info.get('os_kernel_version', '')
+
+        if isinstance(os_kernel_version, str) and os_kernel_version:
+            version_value = os_kernel_version.split('-')[0]
+            host['system_profile']['os_kernel_version'] = version_value
+            OS_KERNEL_VERSION_TRANSFORMED.labels(account_number=self.account_number).inc()
+
+            LOG.info(format_message(self.prefix, "os_kernel_version transformed '%s' -> '%s'"
+                                    % (os_kernel_version, version_value),
                                     account_number=self.account_number,
                                     report_platform_id=self.report_platform_id))
+
+        return host
+
+    def _transform_single_host(self, host: dict):
+        """Transform 'system_profile' fields."""
+        for host_uuid, host_dict in host.items():
+            host_dict = self._transform_os_release(host_dict)
+            host_dict = self._transform_os_kernel_version(host_dict)
+            host[host_uuid] = host_dict
         return host
 
     @OS_TRANSFORMATION_LATENCY.time()
