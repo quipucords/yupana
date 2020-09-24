@@ -789,24 +789,16 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
 
         return candidate_hosts, hosts_without_facts
 
-    def _parse_os_release_field(self, os_release):
-        """
-        Parse the os_release field into name, version, code.
-
-        :param: os_release <string> os_release from host.
-        """
-        match_result = OS_RELEASE_PATTERN.match(os_release)
-        match_group_dict = match_result.groupdict()
-        match_group_dict['name'] = match_group_dict['name'].strip()
-        return match_group_dict
-
     def _transform_os_release(self, host: dict):
         """Transform 'system_profile.os_release' label."""
         system_profile_info = host.get('system_profile', dict())
         os_release = system_profile_info.get('os_release', '')
 
         if isinstance(os_release, str) and os_release and os_release.strip():
-            parsed_info = self._parse_os_release_field(os_release)
+            match_result = OS_RELEASE_PATTERN.match(os_release)
+            parsed_info = match_result.groupdict()
+            parsed_info['name'] = parsed_info['name'].strip()
+
             os_name = parsed_info.get('name', '')
             os_version = parsed_info['version']
 
@@ -817,16 +809,6 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                                         % (os_release, os_version),
                                         account_number=self.account_number,
                                         report_platform_id=self.report_platform_id))
-                if 'tags' not in host:
-                    host['tags'] = []
-
-                host['tags'].append({'namespace': 'yupana', 'key': 'os_name', 'value': os_name})
-                LOG.info(format_message(
-                    self.prefix, "Added tag 'yupana' with key as '%s' & value as '%s'"
-                    % ('os_name', os_name),
-                    account_number=self.account_number,
-                    report_platform_id=self.report_platform_id))
-
         return host
 
     def _transform_os_kernel_version(self, host: dict):

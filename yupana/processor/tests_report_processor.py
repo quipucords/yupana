@@ -881,6 +881,23 @@ class ReportProcessorTests(TransactionTestCase):
                     kept_invalid = True
         self.assertEqual(kept_invalid, True)
 
+    def test_transition_to_validated_filter_transform(self):
+        """Test that transformation of host are reached."""
+        self.report_record.state = Report.DOWNLOADED
+        self.report_record.save()
+        self.processor.report_or_slice = self.report_record
+        transform_out = []
+
+        def transform_hosts_patch(_, hosts: list):
+            """Mock transform function."""
+            transform_out.extend(hosts)
+            return hosts
+
+        with patch.object(abstract_processor.AbstractProcessor, '_transform_hosts',
+                          transform_hosts_patch):
+            self.processor.transition_to_validated()
+            self.assertEqual(len(transform_out), 2)
+
     def test_transform_os_release(self):
         """Test transform host os_release."""
         hosts = [{'123': {'system_profile': {
@@ -889,12 +906,10 @@ class ReportProcessorTests(TransactionTestCase):
         candidate_hosts = self.processor._transform_hosts(hosts)
         self.assertEqual(
             candidate_hosts,
-            [{'123': {'system_profile': {'os_release': '6.10'},
-                      'tags': [{'namespace': 'yupana', 'key': 'os_name',
-                                'value': 'Red Hat Enterprise Linux Server'}]}}])
+            [{'123': {'system_profile': {'os_release': '6.10'}}}])
 
-    def test_do_not_add_tag_based_on_os_release(self):
-        """Test do not transform no-string os_release."""
+    def test_do_not_transform_when_only_version(self):
+        """Test do not transform os_release when only version."""
         hosts = [{'123': {'system_profile': {'os_release': '7'}}}]
         candidate_hosts = self.processor._transform_hosts(hosts)
         self.assertEqual(
@@ -908,23 +923,19 @@ class ReportProcessorTests(TransactionTestCase):
         candidate_hosts = self.processor._transform_hosts(hosts)
         self.assertEqual(
             candidate_hosts,
-            [{'123': {'system_profile': {'os_release': ''},
-                      'tags': [{'namespace': 'yupana', 'key': 'os_name',
-                                'value': 'Red Hat Enterprise Linux Server'}]}}])
+            [{'123': {'system_profile': {'os_release': ''}}}])
 
     def test_transform_os_release_when_non_rhel_os(self):
-        """Test transform host os_release."""
+        """Test transform host os_release when non rhel."""
         hosts = [{'123': {'system_profile': {'os_release': 'CentOS Linux 7 (Core)'}}}]
 
         candidate_hosts = self.processor._transform_hosts(hosts)
         self.assertEqual(
             candidate_hosts,
-            [{'123': {'system_profile': {'os_release': '7'},
-                      'tags': [{'namespace': 'yupana', 'key': 'os_name',
-                                'value': 'CentOS Linux'}]}}])
+            [{'123': {'system_profile': {'os_release': '7'}}}])
 
     def test_transform_os_fields(self):
-        """Test do not transform no-string os_release."""
+        """Test transform os fields."""
         hosts = [{'123': {'system_profile': {'os_release': '7',
                                              'os_kernel_version': '3.10.0-1127.el7.x86_64'}}}]
         candidate_hosts = self.processor._transform_hosts(hosts)
@@ -932,8 +943,8 @@ class ReportProcessorTests(TransactionTestCase):
             candidate_hosts,
             [{'123': {'system_profile': {'os_release': '7', 'os_kernel_version': '3.10.0'}}}])
 
-    def test_keep_os_kernel_version(self):
-        """Test do not transform no-string os_release."""
+    def test_do_not_tranform_os_fields(self):
+        """Test do not transform os fields when already in format."""
         hosts = [{'123': {'system_profile': {'os_release': '7',
                                              'os_kernel_version': '2.6.32'}}}]
         candidate_hosts = self.processor._transform_hosts(hosts)
