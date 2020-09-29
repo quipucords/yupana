@@ -143,6 +143,7 @@ class ReportConsumer():
                         'arrival_time': datetime.now(pytz.utc),
                         'retry_count': 0
                     }
+                    LOG.info('Originating Request ID: %s.' % request_id)
                     report_serializer = ReportSerializer(data=uploaded_report)
                     report_serializer.is_valid(raise_exception=True)
                     report_serializer.save()
