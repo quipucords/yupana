@@ -27,7 +27,7 @@ from processor.abstract_processor import (AbstractProcessor, FAILED_TO_VALIDATE)
 from processor.processor_utils import (PROCESSOR_INSTANCES,
                                        SLICE_PROCESSING_LOOP,
                                        format_message,
-                                       stop_all_event_loops)
+                                       print_error_loop_event)
 from processor.report_consumer import (KAFKA_ERRORS,
                                        KafkaMsgHandlerError,
                                        QPCReportException)
@@ -204,11 +204,11 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         except (KafkaConnectionError, TimeoutError):
             KAFKA_ERRORS.inc()
             self.should_run = False
-            stop_all_event_loops()
+            print_error_loop_event()
             raise KafkaMsgHandlerError(
                 format_message(
                     self.prefix,
-                    'Unable to connect to kafka server. Closing producer.',
+                    'Unable to connect to kafka server.',
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id))
         total_hosts = len(hosts)
@@ -258,7 +258,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 self.prefix, 'The following error occurred: %s' % err))
             KAFKA_ERRORS.inc()
             self.should_run = False
-            stop_all_event_loops()
+            print_error_loop_event()
             raise KafkaMsgHandlerError(
                 format_message(
                     self.prefix,
