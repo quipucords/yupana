@@ -923,7 +923,7 @@ class ReportProcessorTests(TransactionTestCase):
         candidate_hosts = self.processor._transform_hosts(hosts)
         self.assertEqual(
             candidate_hosts,
-            [{'123': {'system_profile': {'os_release': ''}}}])
+            [{'123': {'system_profile': {}}}])
 
     def test_transform_os_release_when_non_rhel_os(self):
         """Test transform host os_release when non rhel."""

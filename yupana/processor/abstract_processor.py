@@ -803,7 +803,11 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             os_version = parsed_info['version']
 
             if os_name:
-                host['system_profile']['os_release'] = os_version
+                if os_version.strip():
+                    host['system_profile']['os_release'] = os_version
+                else:
+                    del host['system_profile']['os_release']
+
                 OS_RELEASE_TRANSFORMED.labels(account_number=self.account_number).inc()
                 LOG.info(format_message(self.prefix, "os_release transformed '%s' -> '%s'"
                                         % (os_release, os_version),
