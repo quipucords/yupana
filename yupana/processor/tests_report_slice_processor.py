@@ -599,3 +599,53 @@ class ReportSliceProcessorTests(TestCase):
         # by cutting off the last 13 i am comparing 2019-11-14T
         # which is the year/month/day
         self.assertEqual(expected[:-13], actual[:-13])
+
+    def test_transform_os_release(self):
+        """Test transform host os_release."""
+        host = {'system_profile': {
+            'os_release': 'Red Hat Enterprise Linux Server 6.10 (Santiago)'
+        }}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(host, {'system_profile': {'os_release': '6.10'}})
+
+    def test_do_not_transform_when_only_version(self):
+        """Test do not transform os_release when only version."""
+        host = {'system_profile': {'os_release': '7'}}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(host, {'system_profile': {'os_release': '7'}})
+
+    def test_transform_os_release_when_no_version(self):
+        """Test transform host os_release."""
+        host = {
+            'system_profile': {
+                'os_release': 'Red Hat Enterprise Linux Server'}}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(host, {'system_profile': {}})
+
+    def test_transform_os_release_when_non_rhel_os(self):
+        """Test transform host os_release when non rhel."""
+        host = {'system_profile': {'os_release': 'CentOS Linux 7 (Core)'}}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(host, {'system_profile': {'os_release': '7'}})
+
+    def test_transform_os_fields(self):
+        """Test transform os fields."""
+        host = {'system_profile': {
+            'os_release': '7', 'os_kernel_version': '3.10.0-1127.el7.x86_64'
+        }}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(
+            host,
+            {'system_profile': {
+                'os_release': '7', 'os_kernel_version': '3.10.0'}})
+
+    def test_do_not_tranform_os_fields(self):
+        """Test do not transform os fields when already in format."""
+        host = {'system_profile': {
+            'os_release': '7', 'os_kernel_version': '2.6.32'}}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(
+            host,
+            {'system_profile': {
+                'os_release': '7', 'os_kernel_version': '2.6.32'}}
+        )

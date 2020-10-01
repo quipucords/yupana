@@ -34,7 +34,8 @@ from processor.report_consumer import (KAFKA_ERRORS,
 
 from api.models import ReportSlice
 from api.serializers import ReportSliceSerializer
-from config.settings.base import (HOSTS_UPLOAD_FUTURES_COUNT,
+from config.settings.base import (HOSTS_TRANSFORMATION_ENABLED,
+                                  HOSTS_UPLOAD_FUTURES_COUNT,
                                   HOSTS_UPLOAD_TIMEOUT,
                                   INSIGHTS_KAFKA_ADDRESS,
                                   RETRIES_ALLOWED,
@@ -118,6 +119,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         try:
             self.report_json = json.loads(self.report_or_slice.report_json)
             self.candidate_hosts = self._validate_report_details()
+
             # Here we want to update the report state of the actual report slice & when finished
             self.next_state = ReportSlice.VALIDATED
             options = {'candidate_hosts': self.candidate_hosts}
@@ -221,6 +223,10 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                                             self.report_or_slice.report_slice_id)
         try:  # pylint: disable=too-many-nested-blocks
             for host_id, host in hosts.items():
+
+                if HOSTS_TRANSFORMATION_ENABLED:
+                    host = self._transform_single_host(host)
+
                 system_unique_id = unique_id_base + host_id
                 count += 1
                 upload_msg = {

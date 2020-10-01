@@ -96,8 +96,6 @@ REPORT_PROCESSING_LATENCY = Summary(
     'The time in seconds that it takes to process a report'
 )
 VALIDATION_LATENCY = Summary('validation_latency', 'The time it takes to validate a report')
-OS_TRANSFORMATION_LATENCY = Summary('os_transformation_latency',
-                                    'The time it takes to transform old os_release')
 INVALID_HOSTS = Gauge('invalid_hosts', 'The number of invalid hosts',
                       ['account_number', 'source'])
 OS_RELEASE_PATTERN = re.compile(
@@ -834,17 +832,9 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
 
     def _transform_single_host(self, host: dict):
         """Transform 'system_profile' fields."""
-        for host_uuid, host_dict in host.items():
-            host_dict = self._transform_os_release(host_dict)
-            host_dict = self._transform_os_kernel_version(host_dict)
-            host[host_uuid] = host_dict
+        host = self._transform_os_release(host)
+        host = self._transform_os_kernel_version(host)
         return host
-
-    @OS_TRANSFORMATION_LATENCY.time()
-    def _transform_hosts(self, hosts: list):
-        """Transform hosts collection."""
-        out_hosts = list(map(self._transform_single_host, hosts))
-        return out_hosts
 
     def get_stale_date(self):
         """Compute the stale date based on the host source."""
