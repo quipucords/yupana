@@ -92,8 +92,9 @@ class Status:
     def environment_vars(self):
         """Return the non-sensitive envs."""
         env_dict = {}
+        sensitive_tokens = ['password', 'secret']
         for key, value in os.environ.items():
-            if 'password' in key.lower() or 'secret' in key.lower():
+            if any(token in key.lower() for token in sensitive_tokens):
                 value = '*' * 8
             env_dict[key] = value
         return env_dict
