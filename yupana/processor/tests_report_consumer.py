@@ -20,6 +20,7 @@ import asyncio
 import io
 import json
 import tarfile
+from datetime import datetime
 from unittest.mock import patch
 
 import processor.report_consumer as msg_handler
@@ -72,7 +73,8 @@ class KafkaMsgHandlerTest(TestCase):
 
     def setUp(self):
         """Create test setup."""
-        self.payload_url = 'http://insights-upload.com/q/file_to_validate'
+        self.payload_url = 'http://minio:9000/insights-upload-perma'\
+                           '?X-Amz-Date=20200930T063623Z&X-Amz-Expires=86400'
         self.report_consumer = msg_handler.ReportConsumer()
 
     def tearDown(self):
@@ -104,34 +106,45 @@ class KafkaMsgHandlerTest(TestCase):
         self.report_consumer.consumer.commit = CoroutineMock()
         qpc_msg = KafkaMsg(msg_handler.QPC_TOPIC, self.payload_url)
         # test happy case
-        with patch('processor.report_consumer.ReportConsumer.unpack_consumer_record',
-                   return_value={'account': '8910', 'request_id': '1234'}):
-            await self.report_consumer.save_message_and_ack(qpc_msg)
-            report = Report.objects.get(account='8910')
-            self.assertEqual(json.loads(report.upload_srv_kafka_msg),
-                             {'account': '8910', 'request_id': '1234'})
-            self.assertEqual(report.state, Report.NEW)
+        with patch('processor.report_consumer.datetime') as mock_date:
+            mock_date.now.return_value = datetime(2020, 9, 30, 10, 36, 23)
+            mock_date.strptime.side_effect = datetime.strptime
+            with patch('processor.report_consumer.ReportConsumer.unpack_consumer_record',
+                       return_value={'account': '8910', 'request_id': '1234',
+                                     'url': 'http://minio:9000/insights-upload-perma'
+                                            '?X-Amz-Date=20200930T063623Z&X-Amz-Expires=86400'}):
+                await self.report_consumer.save_message_and_ack(qpc_msg)
+                report = Report.objects.get(account='8910')
+                self.assertEqual(json.loads(report.upload_srv_kafka_msg),
+                                 {'account': '8910', 'request_id': '1234',
+                                  'url': 'http://minio:9000/insights-upload-perma'
+                                         '?X-Amz-Date=20200930T063623Z&X-Amz-Expires=86400'})
+                self.assertEqual(report.state, Report.NEW)
 
-        # test no rh_account or request_id
-        with patch('processor.report_consumer.ReportConsumer.unpack_consumer_record',
-                   return_value={'foo': 'bar'}):
-            await self.report_consumer.save_message_and_ack(qpc_msg)
-            with self.assertRaises(Report.DoesNotExist):
-                Report.objects.get(upload_srv_kafka_msg=json.dumps({'foo': 'bar'}))
+            # test no rh_account or request_id
+            with patch('processor.report_consumer.ReportConsumer.unpack_consumer_record',
+                       return_value={'foo': 'bar'}):
+                await self.report_consumer.save_message_and_ack(qpc_msg)
+                with self.assertRaises(Report.DoesNotExist):
+                    Report.objects.get(upload_srv_kafka_msg=json.dumps({'foo': 'bar'}))
 
-        # test general exception
-        def raise_error():
-            """Raise a general error."""
-            raise Exception('Test')
+            # test general exception
+            def raise_error():
+                """Raise a general error."""
+                raise Exception('Test')
 
-        self.report_consumer.consumer.commit = CoroutineMock(side_effect=raise_error)
-        with patch('processor.report_consumer.ReportConsumer.unpack_consumer_record',
-                   return_value={'rh_account': '1112', 'request_id': '1234'}):
-            await self.report_consumer.save_message_and_ack(qpc_msg)
-            report = Report.objects.get(account='1112')
-            self.assertEqual(json.loads(report.upload_srv_kafka_msg),
-                             {'rh_account': '1112', 'request_id': '1234'})
-            self.assertEqual(report.state, Report.NEW)
+            self.report_consumer.consumer.commit = CoroutineMock(side_effect=raise_error)
+            with patch('processor.report_consumer.ReportConsumer.unpack_consumer_record',
+                       return_value={'rh_account': '1112', 'request_id': '1234',
+                                     'url': 'http://minio:9000/insights-upload-perma'
+                                            '?X-Amz-Date=20200930T063623Z&X-Amz-Expires=86400'}):
+                await self.report_consumer.save_message_and_ack(qpc_msg)
+                report = Report.objects.get(account='1112')
+                self.assertEqual(json.loads(report.upload_srv_kafka_msg),
+                                 {'rh_account': '1112', 'request_id': '1234',
+                                  'url': 'http://minio:9000/insights-upload-perma'
+                                         '?X-Amz-Date=20200930T063623Z&X-Amz-Expires=86400'})
+                self.assertEqual(report.state, Report.NEW)
 
     def test_save_and_ack_success(self):
         """Test the async save and ack function."""
