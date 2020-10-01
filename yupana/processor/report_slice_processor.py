@@ -23,7 +23,7 @@ import re
 import threading
 
 from aiokafka import AIOKafkaProducer
-from kafka.errors import ConnectionError as KafkaConnectionError
+from kafka.errors import KafkaConnectionError
 from processor.abstract_processor import (AbstractProcessor, FAILED_TO_VALIDATE)
 from processor.processor_utils import (PROCESSOR_INSTANCES,
                                        SLICE_PROCESSING_LOOP,
