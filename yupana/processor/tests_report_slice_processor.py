@@ -55,6 +55,7 @@ class ReportSliceProcessorTests(TestCase):
         self.uuid5 = uuid.uuid4()
         self.uuid6 = uuid.uuid4()
         self.uuid7 = uuid.uuid4()
+        self.uuid8 = uuid.uuid4()
         self.fake_record = test_handler.KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
         self.report_consumer = msg_handler.ReportConsumer()
         self.msg = self.report_consumer.unpack_consumer_record(self.fake_record)
@@ -404,13 +405,17 @@ class ReportSliceProcessorTests(TestCase):
     async def async_test_upload_to_host_inventory_via_kafka(self):
         """Test uploading to inventory via kafka."""
         self.processor.report_or_slice = self.report_slice
-        hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
-                 str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'},
-                 str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'},
-                 str(self.uuid4): {'mac_addresses': 'value', 'name': 'foo'},
-                 str(self.uuid5): {'vm_uuid': 'value', 'name': 'foo'},
-                 str(self.uuid6): {'etc_machine_id': 'value'},
-                 str(self.uuid7): {'subscription_manager_id': 'value'}}
+        hosts = {
+            str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
+            str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'},
+            str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'},
+            str(self.uuid4): {'mac_addresses': 'value', 'name': 'foo'},
+            str(self.uuid5): {'vm_uuid': 'value', 'name': 'foo'},
+            str(self.uuid6): {'etc_machine_id': 'value'},
+            str(self.uuid7): {'subscription_manager_id': 'value'},
+            str(self.uuid8): {'system_profile': {'os_release': '7',
+                                                 'os_kernel_version': '2.6.32'}
+                              }}
         test_producer = AIOKafkaProducer(
             loop=report_slice_processor.SLICE_PROCESSING_LOOP,
             bootstrap_servers=report_slice_processor.INSIGHTS_KAFKA_ADDRESS

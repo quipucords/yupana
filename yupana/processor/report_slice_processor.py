@@ -268,7 +268,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
     def _transform_single_host(self, host: dict):
         """Transform 'system_profile' fields."""
-        if 'system_profile'in host.keys():
+        if 'system_profile' in host.keys():
             host = self._transform_os_release(host)
             host = self._transform_os_kernel_version(host)
         return host
