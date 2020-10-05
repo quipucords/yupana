@@ -121,6 +121,14 @@ class KafkaMsgHandlerTest(TestCase):
                                          '?X-Amz-Date=20200930T063623Z&X-Amz-Expires=86400'})
                 self.assertEqual(report.state, Report.NEW)
 
+            # test expired url(bad case)
+            with patch('processor.report_consumer.ReportConsumer.unpack_consumer_record',
+                       return_value={'account': '8910', 'request_id': '1234',
+                                     'url': 'http://minio:9000/insights-upload-perma'
+                                            '?X-Amz-Date=20200928T063623Z&X-Amz-Expires=86400'}):
+                await self.report_consumer.save_message_and_ack(qpc_msg)
+                self.assertRaises(msg_handler.QPCKafkaMsgException)
+
             # test no rh_account or request_id
             with patch('processor.report_consumer.ReportConsumer.unpack_consumer_record',
                        return_value={'foo': 'bar'}):
