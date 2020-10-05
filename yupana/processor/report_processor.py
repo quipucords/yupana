@@ -185,7 +185,6 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             try:
                 self.report_json = json.loads(report_slice.report_json)
                 candidate_hosts = self._validate_report_details()
-
                 if candidate_hosts:
                     self.status = SUCCESS_CONFIRM_STATUS
                 # Here we want to update the report state of the actual report slice

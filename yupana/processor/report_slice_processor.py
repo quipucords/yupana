@@ -19,6 +19,7 @@
 import asyncio
 import json
 import logging
+import re
 import threading
 
 from aiokafka import AIOKafkaProducer
@@ -31,6 +32,7 @@ from processor.processor_utils import (PROCESSOR_INSTANCES,
 from processor.report_consumer import (KAFKA_ERRORS,
                                        KafkaMsgHandlerError,
                                        QPCReportException)
+from prometheus_client import Counter
 
 from api.models import ReportSlice
 from api.serializers import ReportSliceSerializer
@@ -49,6 +51,15 @@ FAILED_UPLOAD = 'UPLOAD'
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
 UPLOAD_TOPIC = 'platform.inventory.host-ingress'  # placeholder topic
+OS_RELEASE_TRANSFORMED = Counter('os_release_transformed',
+                                 'Hosts with transformed os_release field',
+                                 ['account_number'])
+OS_KERNEL_VERSION_TRANSFORMED = Counter('os_kernel_version_transformed',
+                                        'Hosts with transformed os_kernel_version field',
+                                        ['account_number'])
+OS_RELEASE_PATTERN = re.compile(
+    r'(?P<name>[a-zA-Z\s]*)?\s*(?P<version>[\d\.]*)\s*(\((?P<code>\S*)\))?'
+)
 
 
 class RetryUploadTimeException(Exception):
@@ -187,6 +198,61 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         candidates = {key: host[key] for host in candidate_hosts
                       for key in host.keys() if key not in ['cause', 'status_code']}
         return candidates
+
+    def _transform_os_release(self, host: dict):
+        """Transform 'system_profile.os_release' label."""
+        system_profile_info = host.get('system_profile', dict())
+        os_release = system_profile_info.get('os_release', '')
+
+        if isinstance(os_release, str) and os_release and os_release.strip():
+            match_result = OS_RELEASE_PATTERN.match(os_release)
+            parsed_info = match_result.groupdict()
+            parsed_info['name'] = parsed_info['name'].strip()
+
+            os_name = parsed_info.get('name', '')
+            os_version = parsed_info['version']
+
+            if os_name:
+                if os_version.strip():
+                    host['system_profile']['os_release'] = os_version
+                else:
+                    del host['system_profile']['os_release']
+
+                OS_RELEASE_TRANSFORMED.labels(
+                    account_number=self.account_number).inc()
+                LOG.info(
+                    format_message(
+                        self.prefix, "os_release transformed '%s' -> '%s'"
+                        % (os_release, os_version),
+                        account_number=self.account_number,
+                        report_platform_id=self.report_platform_id))
+        return host
+
+    def _transform_os_kernel_version(self, host: dict):
+        """Transform 'system_profile.os_kernel_version' label."""
+        system_profile_info = host.get('system_profile', dict())
+        os_kernel_version = system_profile_info.get('os_kernel_version', '')
+
+        if isinstance(os_kernel_version, str) and os_kernel_version:
+            version_value = os_kernel_version.split('-')[0]
+            host['system_profile']['os_kernel_version'] = version_value
+            OS_KERNEL_VERSION_TRANSFORMED.labels(
+                account_number=self.account_number).inc()
+
+            LOG.info(
+                format_message(
+                    self.prefix, "os_kernel_version transformed '%s' -> '%s'"
+                    % (os_kernel_version, version_value),
+                    account_number=self.account_number,
+                    report_platform_id=self.report_platform_id))
+
+        return host
+
+    def _transform_single_host(self, host: dict):
+        """Transform 'system_profile' fields."""
+        host = self._transform_os_release(host)
+        host = self._transform_os_kernel_version(host)
+        return host
 
     # pylint:disable=too-many-locals
     @KAFKA_ERRORS.count_exceptions()  # noqa: C901 (too-complex)

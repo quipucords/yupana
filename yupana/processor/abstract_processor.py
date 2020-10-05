@@ -19,7 +19,6 @@
 import asyncio
 import json
 import logging
-import re
 import uuid
 from abc import ABC
 from datetime import datetime, timedelta
@@ -85,12 +84,6 @@ TIME_RETRIES = Counter('time_retries',
 COMMIT_RETRIES = Counter('commit_retries',
                          'The total number of retries based on commit for all reports',
                          ['account_number'])
-OS_RELEASE_TRANSFORMED = Counter('os_release_transformed',
-                                 'Hosts with transformed os_release field',
-                                 ['account_number'])
-OS_KERNEL_VERSION_TRANSFORMED = Counter('os_kernel_version_transformed',
-                                        'Hosts with transformed os_kernel_version field',
-                                        ['account_number'])
 REPORT_PROCESSING_LATENCY = Summary(
     'report_processing_latency',
     'The time in seconds that it takes to process a report'
@@ -98,9 +91,6 @@ REPORT_PROCESSING_LATENCY = Summary(
 VALIDATION_LATENCY = Summary('validation_latency', 'The time it takes to validate a report')
 INVALID_HOSTS = Gauge('invalid_hosts', 'The number of invalid hosts',
                       ['account_number', 'source'])
-OS_RELEASE_PATTERN = re.compile(
-    r'(?P<name>[a-zA-Z\s]*)?\s*(?P<version>[\d\.]*)\s*(\((?P<code>\S*)\))?'
-)
 
 
 # pylint: disable=broad-except, too-many-lines, too-many-public-methods
@@ -786,55 +776,6 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     report_platform_id=self.report_platform_id))
 
         return candidate_hosts, hosts_without_facts
-
-    def _transform_os_release(self, host: dict):
-        """Transform 'system_profile.os_release' label."""
-        system_profile_info = host.get('system_profile', dict())
-        os_release = system_profile_info.get('os_release', '')
-
-        if isinstance(os_release, str) and os_release and os_release.strip():
-            match_result = OS_RELEASE_PATTERN.match(os_release)
-            parsed_info = match_result.groupdict()
-            parsed_info['name'] = parsed_info['name'].strip()
-
-            os_name = parsed_info.get('name', '')
-            os_version = parsed_info['version']
-
-            if os_name:
-                if os_version.strip():
-                    host['system_profile']['os_release'] = os_version
-                else:
-                    del host['system_profile']['os_release']
-
-                OS_RELEASE_TRANSFORMED.labels(account_number=self.account_number).inc()
-                LOG.info(format_message(self.prefix, "os_release transformed '%s' -> '%s'"
-                                        % (os_release, os_version),
-                                        account_number=self.account_number,
-                                        report_platform_id=self.report_platform_id))
-        return host
-
-    def _transform_os_kernel_version(self, host: dict):
-        """Transform 'system_profile.os_kernel_version' label."""
-        system_profile_info = host.get('system_profile', dict())
-        os_kernel_version = system_profile_info.get('os_kernel_version', '')
-
-        if isinstance(os_kernel_version, str) and os_kernel_version:
-            version_value = os_kernel_version.split('-')[0]
-            host['system_profile']['os_kernel_version'] = version_value
-            OS_KERNEL_VERSION_TRANSFORMED.labels(account_number=self.account_number).inc()
-
-            LOG.info(format_message(self.prefix, "os_kernel_version transformed '%s' -> '%s'"
-                                    % (os_kernel_version, version_value),
-                                    account_number=self.account_number,
-                                    report_platform_id=self.report_platform_id))
-
-        return host
-
-    def _transform_single_host(self, host: dict):
-        """Transform 'system_profile' fields."""
-        host = self._transform_os_release(host)
-        host = self._transform_os_kernel_version(host)
-        return host
 
     def get_stale_date(self):
         """Compute the stale date based on the host source."""
