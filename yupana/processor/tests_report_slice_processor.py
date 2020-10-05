@@ -614,11 +614,29 @@ class ReportSliceProcessorTests(TestCase):
         host = self.processor._transform_single_host(host)
         self.assertEqual(host, {'system_profile': {'os_release': '7'}})
 
-    def test_transform_os_release_when_no_version(self):
-        """Test transform host os_release."""
+    def test_remove_os_release_when_no_version(self):
+        """Test remove host os_release."""
         host = {
             'system_profile': {
                 'os_release': 'Red Hat Enterprise Linux Server'}}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(host, {'system_profile': {}})
+
+    def test_remove_os_release_when_no_version_with_parentheses(self):
+        """Test remove host os_release when include empty parentheses."""
+        host = {'system_profile': {'os_release': '  ()'}}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(host, {'system_profile': {}})
+
+    def test_remove_os_release_when_only_string_in_parentheses(self):
+        """Test remove host os_release when only string in parentheses."""
+        host = {'system_profile': {'os_release': '  (Core)'}}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(host, {'system_profile': {}})
+
+    def test_remove_os_release_when_empty_string(self):
+        """Test remove host os_release when empty string."""
+        host = {'system_profile': {'os_release': ''}}
         host = self.processor._transform_single_host(host)
         self.assertEqual(host, {'system_profile': {}})
 

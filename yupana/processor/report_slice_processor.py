@@ -201,31 +201,49 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
     def _transform_os_release(self, host: dict):
         """Transform 'system_profile.os_release' label."""
-        system_profile_info = host.get('system_profile', dict())
-        os_release = system_profile_info.get('os_release', '')
-
-        if isinstance(os_release, str) and os_release and os_release.strip():
-            match_result = OS_RELEASE_PATTERN.match(os_release)
-            parsed_info = match_result.groupdict()
-            parsed_info['name'] = parsed_info['name'].strip()
-
-            os_name = parsed_info.get('name', '')
-            os_version = parsed_info['version']
-
-            if os_name:
-                if os_version.strip():
-                    host['system_profile']['os_release'] = os_version
+        if 'os_release' in host['system_profile'].keys():
+            os_release = host['system_profile']['os_release']
+            if isinstance(os_release, str):
+                if os_release and os_release.strip():
+                    match_result = OS_RELEASE_PATTERN.match(os_release)
+                    parsed_info = match_result.groupdict()
+                    os_version = parsed_info['version'].strip()
+                    LOG.info(
+                        format_message(
+                            self.prefix,
+                            "os version after parsing os_release: '%s'"
+                            % os_version,
+                            account_number=self.account_number,
+                            report_platform_id=self.report_platform_id))
+                    if os_version:
+                        if os_release != os_version:
+                            host['system_profile']['os_release'] = os_version
+                            LOG.info(
+                                format_message(
+                                    self.prefix,
+                                    "os_release transformed '%s' -> '%s'"
+                                    % (os_release, os_version),
+                                    account_number=self.account_number,
+                                    report_platform_id=self.report_platform_id)
+                            )
+                    else:
+                        del host['system_profile']['os_release']
+                        LOG.info(
+                            format_message(
+                                self.prefix,
+                                'Removed empty os_release fact',
+                                account_number=self.account_number,
+                                report_platform_id=self.report_platform_id))
                 else:
                     del host['system_profile']['os_release']
-
+                    LOG.info(
+                        format_message(
+                            self.prefix,
+                            'Removed empty os_release fact',
+                            account_number=self.account_number,
+                            report_platform_id=self.report_platform_id))
                 OS_RELEASE_TRANSFORMED.labels(
                     account_number=self.account_number).inc()
-                LOG.info(
-                    format_message(
-                        self.prefix, "os_release transformed '%s' -> '%s'"
-                        % (os_release, os_version),
-                        account_number=self.account_number,
-                        report_platform_id=self.report_platform_id))
         return host
 
     def _transform_os_kernel_version(self, host: dict):
@@ -250,8 +268,9 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
     def _transform_single_host(self, host: dict):
         """Transform 'system_profile' fields."""
-        host = self._transform_os_release(host)
-        host = self._transform_os_kernel_version(host)
+        if 'system_profile'in host.keys():
+            host = self._transform_os_release(host)
+            host = self._transform_os_kernel_version(host)
         return host
 
     # pylint:disable=too-many-locals
