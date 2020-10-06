@@ -201,7 +201,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
     def _transform_os_release(self, host: dict):
         """Transform 'system_profile.os_release' label."""
-        if 'os_release' in host['system_profile'].keys():
+        if 'os_release' in host['system_profile']:
             os_release = host['system_profile']['os_release']
             if isinstance(os_release, str):
                 if os_release and os_release.strip():
@@ -268,7 +268,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
     def _transform_single_host(self, host: dict):
         """Transform 'system_profile' fields."""
-        if 'system_profile' in host.keys():
+        if 'system_profile' in host:
             host = self._transform_os_release(host)
             host = self._transform_os_kernel_version(host)
         return host
