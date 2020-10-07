@@ -77,6 +77,12 @@ ARCHIVE_RECORD_RETENTION_PERIOD = ENVIRONMENT.get_value(
 GARBAGE_COLLECTION_INTERVAL = ENVIRONMENT.get_value(
     'GARBAGE_COLLECTION_INTERVAL', default=604800)
 
+# this is the sleep period when an event loop error occurred (in seconds)
+# so that it will do retry
+# the default is set to 10 secs
+SLEEP_PERIOD_WHEN_EVENT_LOOP_ERROR = ENVIRONMENT.get_value(
+    'SLEEP_PERIOD_WHEN_EVENT_LOOP_ERROR', default=10)
+
 # Logging
 # https://docs.djangoproject.com/en/dev/topics/logging/
 # https://docs.python.org/3.6/library/logging.html

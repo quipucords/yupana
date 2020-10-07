@@ -35,7 +35,7 @@ from processor.abstract_processor import (
 from processor.processor_utils import (PROCESSOR_INSTANCES,
                                        REPORT_PROCESSING_LOOP,
                                        format_message,
-                                       stop_all_event_loops)
+                                       print_error_loop_event)
 from processor.report_consumer import (DB_ERRORS,
                                        KAFKA_ERRORS,
                                        KafkaMsgHandlerError,
@@ -389,7 +389,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 self.prefix,
                 'Could not update report slice record due to the following error %s.' % str(error),
                 account_number=self.account_number, report_platform_id=self.report_platform_id))
-            stop_all_event_loops()
+            print_error_loop_event()
 
     def _download_report(self):
         """
@@ -695,11 +695,11 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             KAFKA_ERRORS.inc()
             self.should_run = False
             await self.producer.stop()
-            stop_all_event_loops()
+            print_error_loop_event()
             raise KafkaMsgHandlerError(
                 format_message(
                     self.prefix,
-                    'Unable to connect to kafka server.  Closing producer.',
+                    'Unable to connect to kafka server.',
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id))
         try:
@@ -720,7 +720,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             KAFKA_ERRORS.inc()
             LOG.error(format_message(
                 self.prefix, 'The following error occurred: %s' % err))
-            stop_all_event_loops()
+            print_error_loop_event()
 
         finally:
             await self.producer.stop()
