@@ -690,3 +690,17 @@ class ReportSliceProcessorTests(TestCase):
         os_version = self.processor._match_regex_and_find_version(
             host['system_profile']['os_release'])
         self.assertEqual(host_os_version, os_version)
+
+    def test_remove_ip_addresses(self):
+        """Test remove host ip_addresses."""
+        host = {
+            'ip_addresses': []}
+        host = self.processor._remove_ip_addresses(host)
+        self.assertEqual(host, {})
+
+    def test_remove_mac_addresses(self):
+        """Test remove host mac_addresses."""
+        host = {
+            'mac_addresses': []}
+        host = self.processor._remove_mac_addresses(host)
+        self.assertEqual(host, {})
