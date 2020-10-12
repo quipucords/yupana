@@ -32,8 +32,6 @@ from processor.processor_utils import (PROCESSOR_INSTANCES,
 from processor.report_consumer import (KAFKA_ERRORS,
                                        KafkaMsgHandlerError,
                                        QPCReportException)
-from prometheus_client import Counter
-
 from api.models import ReportSlice
 from api.serializers import ReportSliceSerializer
 from config.settings.base import (HOSTS_TRANSFORMATION_ENABLED,
@@ -51,12 +49,6 @@ FAILED_UPLOAD = 'UPLOAD'
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
 UPLOAD_TOPIC = 'platform.inventory.host-ingress'  # placeholder topic
-OS_RELEASE_TRANSFORMED = Counter('os_release_transformed',
-                                 'Hosts with transformed os_release field',
-                                 ['account_number'])
-OS_KERNEL_VERSION_TRANSFORMED = Counter('os_kernel_version_transformed',
-                                        'Hosts with transformed os_kernel_version field',
-                                        ['account_number'])
 OS_RELEASE_PATTERN = re.compile(
     r'(?P<name>[a-zA-Z\s]*)?\s*(?P<version>[\d\.]*)\s*(\((?P<code>\S*)\))?'
 )
@@ -199,51 +191,54 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                       for key in host.keys() if key not in ['cause', 'status_code']}
         return candidates
 
+    def _match_regex_and_find_version(self, os_release):
+        """Match Regex with os_release and return os_version."""
+        source_os_release = os_release.strip()
+        if not source_os_release:
+            return None
+
+        match_result = OS_RELEASE_PATTERN.match(source_os_release)
+        parsed_info = match_result.groupdict()
+        os_version = parsed_info['version'].strip()
+        LOG.info(
+            format_message(
+                self.prefix,
+                "os version after parsing os_release: '%s'"
+                % os_version,
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id))
+        return os_version
+
     def _transform_os_release(self, host: dict):
         """Transform 'system_profile.os_release' label."""
-        if 'os_release' in host['system_profile']:
-            os_release = host['system_profile']['os_release']
-            if isinstance(os_release, str):
-                if os_release and os_release.strip():
-                    match_result = OS_RELEASE_PATTERN.match(os_release)
-                    parsed_info = match_result.groupdict()
-                    os_version = parsed_info['version'].strip()
-                    LOG.info(
-                        format_message(
-                            self.prefix,
-                            "os version after parsing os_release: '%s'"
-                            % os_version,
-                            account_number=self.account_number,
-                            report_platform_id=self.report_platform_id))
-                    if os_version:
-                        if os_release != os_version:
-                            host['system_profile']['os_release'] = os_version
-                            LOG.info(
-                                format_message(
-                                    self.prefix,
-                                    "os_release transformed '%s' -> '%s'"
-                                    % (os_release, os_version),
-                                    account_number=self.account_number,
-                                    report_platform_id=self.report_platform_id)
-                            )
-                    else:
-                        del host['system_profile']['os_release']
-                        LOG.info(
-                            format_message(
-                                self.prefix,
-                                'Removed empty os_release fact',
-                                account_number=self.account_number,
-                                report_platform_id=self.report_platform_id))
-                else:
-                    del host['system_profile']['os_release']
-                    LOG.info(
-                        format_message(
-                            self.prefix,
-                            'Removed empty os_release fact',
-                            account_number=self.account_number,
-                            report_platform_id=self.report_platform_id))
-                OS_RELEASE_TRANSFORMED.labels(
-                    account_number=self.account_number).inc()
+        os_release_key_present = 'os_release' in host['system_profile']
+        if not os_release_key_present or (
+                os_release_key_present and
+                not isinstance(host['system_profile']['os_release'], str)):
+            return host
+
+        os_release = host['system_profile']['os_release']
+        os_version = self._match_regex_and_find_version(os_release)
+        if not os_version:
+            del host['system_profile']['os_release']
+            LOG.info(format_message(
+                self.prefix, 'Removed empty os_release fact',
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id))
+            return host
+
+        if os_release == os_version:
+            return host
+
+        host['system_profile']['os_release'] = os_version
+        LOG.info(
+            format_message(
+                self.prefix,
+                "os_release transformed '%s' -> '%s'"
+                % (os_release, os_version),
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id)
+        )
         return host
 
     def _transform_os_kernel_version(self, host: dict):
@@ -251,18 +246,17 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         system_profile_info = host.get('system_profile', dict())
         os_kernel_version = system_profile_info.get('os_kernel_version', '')
 
-        if isinstance(os_kernel_version, str) and os_kernel_version:
-            version_value = os_kernel_version.split('-')[0]
-            host['system_profile']['os_kernel_version'] = version_value
-            OS_KERNEL_VERSION_TRANSFORMED.labels(
-                account_number=self.account_number).inc()
+        if not (isinstance(os_kernel_version, str) and os_kernel_version):
+            return host
 
-            LOG.info(
-                format_message(
-                    self.prefix, "os_kernel_version transformed '%s' -> '%s'"
-                    % (os_kernel_version, version_value),
-                    account_number=self.account_number,
-                    report_platform_id=self.report_platform_id))
+        version_value = os_kernel_version.split('-')[0]
+        host['system_profile']['os_kernel_version'] = version_value
+        LOG.info(
+            format_message(
+                self.prefix, "os_kernel_version transformed '%s' -> '%s'"
+                % (os_kernel_version, version_value),
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id))
 
         return host
 

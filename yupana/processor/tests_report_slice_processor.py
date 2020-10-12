@@ -672,3 +672,21 @@ class ReportSliceProcessorTests(TestCase):
             {'system_profile': {
                 'os_release': '7', 'os_kernel_version': '2.6.32'}}
         )
+
+    def test_do_not_tranform_os_release_with_number_field(self):
+        """Test do not transform os release when passed as number."""
+        host = {'system_profile': {'os_release': 7}}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(
+            host,
+            {'system_profile': {'os_release': 7}}
+        )
+
+    def test_match_regex_and_find_version(self):
+        """Test match Regex with os_release and return os_version."""
+        host = {'system_profile': {
+            'os_release': 'Red Hat Enterprise Linux Server 7'}}
+        host_os_version = '7'
+        os_version = self.processor._match_regex_and_find_version(
+            host['system_profile']['os_release'])
+        self.assertEqual(host_os_version, os_version)
