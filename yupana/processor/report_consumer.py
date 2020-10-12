@@ -136,7 +136,7 @@ class ReportConsumer():
                         format_message(
                             self.prefix,
                             'Message missing required field(s): %s.' % ', '.join(missing_fields)))
-                self.check_if_url_expired(url)
+                self.check_if_url_expired(url, request_id)
                 try:
                     uploaded_report = {
                         'upload_srv_kafka_msg': json.dumps(self.upload_message),
@@ -171,7 +171,7 @@ class ReportConsumer():
             LOG.debug(format_message(
                 self.prefix, 'Message not on %s topic: %s' % (QPC_TOPIC, consumer_record)))
 
-    def check_if_url_expired(self, url):
+    def check_if_url_expired(self, url, request_id):
         """Validate if url is expired."""
         self.prefix = 'NEW REPORT VALIDATION'
         parsed_url_query = parse_qs(urlparse(url).query)
@@ -180,7 +180,10 @@ class ReportConsumer():
         creation_datatime = datetime.strptime(str(creation_timestamp[0]), '%Y%m%dT%H%M%SZ')
         if datetime.now().replace(microsecond=0) > (creation_datatime + expire_time):
             raise QPCKafkaMsgException(
-                format_message(self.prefix, 'Can not process reports older than %s.' % expire_time))
+                format_message(self.prefix,
+                               'Request_id = %s is already expired and cannot be processed:'
+                               'Creation time = %s, Expiry interval = %s.'
+                               % (request_id, creation_datatime, expire_time)))
 
     def unpack_consumer_record(self, consumer_record):
         """Decode the uploaded message and return it in JSON format."""
