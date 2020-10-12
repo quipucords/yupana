@@ -212,12 +212,11 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
     def _transform_os_release(self, host: dict):
         """Transform 'system_profile.os_release' label."""
-        os_key_present = 'os_release' in host['system_profile']
-        if (not os_key_present or (os_key_present and not isinstance(
-                host['system_profile']['os_release'], str))):
+        system_profile = host.get('system_profile', {})
+        os_release = system_profile.get('os_release')
+        if not isinstance(os_release, str):
             return host
 
-        os_release = host['system_profile']['os_release']
         os_version = self._match_regex_and_find_version(os_release)
         if not os_version:
             del host['system_profile']['os_release']
@@ -243,10 +242,10 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
     def _transform_os_kernel_version(self, host: dict):
         """Transform 'system_profile.os_kernel_version' label."""
-        system_profile_info = host.get('system_profile', dict())
-        os_kernel_version = system_profile_info.get('os_kernel_version', '')
+        system_profile = host.get('system_profile', {})
+        os_kernel_version = system_profile.get('os_kernel_version')
 
-        if not (isinstance(os_kernel_version, str) and os_kernel_version):
+        if not isinstance(os_kernel_version, str):
             return host
 
         version_value = os_kernel_version.split('-')[0]
@@ -302,7 +301,6 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                                             self.report_or_slice.report_slice_id)
         try:  # pylint: disable=too-many-nested-blocks
             for host_id, host in hosts.items():
-
                 if HOSTS_TRANSFORMATION_ENABLED:
                     host = self._transform_single_host(host)
 
