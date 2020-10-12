@@ -32,6 +32,7 @@ from processor.processor_utils import (PROCESSOR_INSTANCES,
 from processor.report_consumer import (KAFKA_ERRORS,
                                        KafkaMsgHandlerError,
                                        QPCReportException)
+
 from api.models import ReportSlice
 from api.serializers import ReportSliceSerializer
 from config.settings.base import (HOSTS_TRANSFORMATION_ENABLED,
@@ -211,10 +212,9 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
     def _transform_os_release(self, host: dict):
         """Transform 'system_profile.os_release' label."""
-        os_release_key_present = 'os_release' in host['system_profile']
-        if not os_release_key_present or (
-                os_release_key_present and
-                not isinstance(host['system_profile']['os_release'], str)):
+        os_key_present = 'os_release' in host['system_profile']
+        if (not os_key_present or (os_key_present and not isinstance(
+                host['system_profile']['os_release'], str))):
             return host
 
         os_release = host['system_profile']['os_release']
