@@ -19,6 +19,7 @@
 import asyncio
 import json
 import logging
+import re
 import threading
 
 from aiokafka import AIOKafkaProducer
@@ -34,7 +35,8 @@ from processor.report_consumer import (KAFKA_ERRORS,
 
 from api.models import ReportSlice
 from api.serializers import ReportSliceSerializer
-from config.settings.base import (HOSTS_UPLOAD_FUTURES_COUNT,
+from config.settings.base import (HOSTS_TRANSFORMATION_ENABLED,
+                                  HOSTS_UPLOAD_FUTURES_COUNT,
                                   HOSTS_UPLOAD_TIMEOUT,
                                   INSIGHTS_KAFKA_ADDRESS,
                                   RETRIES_ALLOWED,
@@ -48,6 +50,9 @@ FAILED_UPLOAD = 'UPLOAD'
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
 UPLOAD_TOPIC = 'platform.inventory.host-ingress'  # placeholder topic
+OS_RELEASE_PATTERN = re.compile(
+    r'(?P<name>[a-zA-Z\s]*)?\s*(?P<version>[\d\.]*)\s*(\((?P<code>\S*)\))?'
+)
 
 
 class RetryUploadTimeException(Exception):
@@ -118,6 +123,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         try:
             self.report_json = json.loads(self.report_or_slice.report_json)
             self.candidate_hosts = self._validate_report_details()
+
             # Here we want to update the report state of the actual report slice & when finished
             self.next_state = ReportSlice.VALIDATED
             options = {'candidate_hosts': self.candidate_hosts}
@@ -186,6 +192,80 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                       for key in host.keys() if key not in ['cause', 'status_code']}
         return candidates
 
+    def _match_regex_and_find_version(self, os_release):
+        """Match Regex with os_release and return os_version."""
+        source_os_release = os_release.strip()
+        if not source_os_release:
+            return None
+
+        match_result = OS_RELEASE_PATTERN.match(source_os_release)
+        parsed_info = match_result.groupdict()
+        os_version = parsed_info['version'].strip()
+        LOG.info(
+            format_message(
+                self.prefix,
+                "os version after parsing os_release: '%s'"
+                % os_version,
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id))
+        return os_version
+
+    def _transform_os_release(self, host: dict):
+        """Transform 'system_profile.os_release' label."""
+        system_profile = host.get('system_profile', {})
+        os_release = system_profile.get('os_release')
+        if not isinstance(os_release, str):
+            return host
+
+        os_version = self._match_regex_and_find_version(os_release)
+        if not os_version:
+            del host['system_profile']['os_release']
+            LOG.info(format_message(
+                self.prefix, 'Removed empty os_release fact',
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id))
+            return host
+
+        if os_release == os_version:
+            return host
+
+        host['system_profile']['os_release'] = os_version
+        LOG.info(
+            format_message(
+                self.prefix,
+                "os_release transformed '%s' -> '%s'"
+                % (os_release, os_version),
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id)
+        )
+        return host
+
+    def _transform_os_kernel_version(self, host: dict):
+        """Transform 'system_profile.os_kernel_version' label."""
+        system_profile = host.get('system_profile', {})
+        os_kernel_version = system_profile.get('os_kernel_version')
+
+        if not isinstance(os_kernel_version, str):
+            return host
+
+        version_value = os_kernel_version.split('-')[0]
+        host['system_profile']['os_kernel_version'] = version_value
+        LOG.info(
+            format_message(
+                self.prefix, "os_kernel_version transformed '%s' -> '%s'"
+                % (os_kernel_version, version_value),
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id))
+
+        return host
+
+    def _transform_single_host(self, host: dict):
+        """Transform 'system_profile' fields."""
+        if 'system_profile' in host:
+            host = self._transform_os_release(host)
+            host = self._transform_os_kernel_version(host)
+        return host
+
     # pylint:disable=too-many-locals
     @KAFKA_ERRORS.count_exceptions()  # noqa: C901 (too-complex)
     async def _upload_to_host_inventory_via_kafka(self, hosts):
@@ -221,6 +301,9 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                                             self.report_or_slice.report_slice_id)
         try:  # pylint: disable=too-many-nested-blocks
             for host_id, host in hosts.items():
+                if HOSTS_TRANSFORMATION_ENABLED:
+                    host = self._transform_single_host(host)
+
                 system_unique_id = unique_id_base + host_id
                 count += 1
                 upload_msg = {
