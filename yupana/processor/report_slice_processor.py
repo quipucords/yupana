@@ -193,18 +193,15 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         return candidates
 
     def _remove_ip_addresses(self, host: dict):
-        """Remove 'ip_addresses' field. """
+        """Remove 'ip_addresses' field."""
         if 'ip_addresses' in host:
             ip_addresses = host['ip_addresses']
-            """Remove empty strings from list, if any."""
-            while("" in ip_addresses):
-                ip_addresses.remove("")
             if not ip_addresses:
                 del host['ip_addresses']
                 LOG.info(
                     format_message(
                         self.prefix,
-                        "Removed empty ip_addresses fact.",
+                        'Removed empty ip_addresses fact.',
                         account_number=self.account_number,
                         report_platform_id=self.report_platform_id
                     )
@@ -212,18 +209,15 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         return host
 
     def _remove_mac_addresses(self, host: dict):
-        """Remove 'mac_addresses' field. """
+        """Remove 'mac_addresses' field."""
         if 'mac_addresses' in host:
             mac_addresses = host['mac_addresses']
-            """Remove empty strings from list, if any."""
-            while("" in mac_addresses):
-                mac_addresses.remove("")
             if not mac_addresses:
                 del host['mac_addresses']
                 LOG.info(
                     format_message(
                         self.prefix,
-                        "Removed empty mac_addresses fact.",
+                        'Removed empty mac_addresses fact.',
                         account_number=self.account_number,
                         report_platform_id=self.report_platform_id
                     )
