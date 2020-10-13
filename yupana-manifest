@@ -1,7 +1,7 @@
-mgmt_services/subscriptions:yupana/python-aiokafka:0.5.2.pipfile
+mgmt_services/subscriptions:yupana/python-aiokafka:0.6.0.pipfile
 mgmt_services/subscriptions:yupana/python-boto3:1.13.0.pipfile
 mgmt_services/subscriptions:yupana/python-botocore:1.16.26.pipfile
-mgmt_services/subscriptions:yupana/python-certifi:2020.4.5.2.pipfile
+mgmt_services/subscriptions:yupana/python-certifi:2020.6.20.pipfile
 mgmt_services/subscriptions:yupana/python-chardet:3.0.4.pipfile
 mgmt_services/subscriptions:yupana/python-django:2.2.13.pipfile
 mgmt_services/subscriptions:yupana/python-django-environ:0.4.5.pipfile
@@ -9,9 +9,9 @@ mgmt_services/subscriptions:yupana/python-django-prometheus:2.0.0.pipfile
 mgmt_services/subscriptions:yupana/python-djangorestframework:3.11.0.pipfile
 mgmt_services/subscriptions:yupana/python-docutils:0.15.2.pipfile
 mgmt_services/subscriptions:yupana/python-gunicorn:20.0.4.pipfile
-mgmt_services/subscriptions:yupana/python-idna:2.9.pipfile
+mgmt_services/subscriptions:yupana/python-idna:2.10.pipfile
 mgmt_services/subscriptions:yupana/python-jmespath:0.10.0.pipfile
-mgmt_services/subscriptions:yupana/python-kafka-python:1.4.6.pipfile
+mgmt_services/subscriptions:yupana/python-kafka-python:2.0.2.pipfile
 mgmt_services/subscriptions:yupana/python-prometheus-client:0.7.1.pipfile
 mgmt_services/subscriptions:yupana/python-psycopg2-binary:2.8.5.pipfile
 mgmt_services/subscriptions:yupana/python-python-dateutil:2.8.1.pipfile
@@ -20,6 +20,6 @@ mgmt_services/subscriptions:yupana/python-requests:2.23.0.pipfile
 mgmt_services/subscriptions:yupana/python-s3transfer:0.3.3.pipfile
 mgmt_services/subscriptions:yupana/python-six:1.15.0.pipfile
 mgmt_services/subscriptions:yupana/python-sqlparse:0.3.1.pipfile
-mgmt_services/subscriptions:yupana/python-urllib3:1.25.9.pipfile
+mgmt_services/subscriptions:yupana/python-urllib3:1.25.10.pipfile
 mgmt_services/subscriptions:yupana/python-watchtower:0.7.3.pipfile
 mgmt_services/subscriptions:yupana/python-whitenoise:5.0.1.pipfile
