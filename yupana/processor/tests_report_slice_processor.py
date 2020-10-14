@@ -704,3 +704,17 @@ class ReportSliceProcessorTests(TestCase):
             'mac_addresses': []}
         host = self.processor._remove_mac_addresses(host)
         self.assertEqual(host, {})
+
+    def test_do_not_remove_ip_addresses(self):
+        """Test do not remove host ip_addresses."""
+        host = {
+            'ip_addresses': ['192.168.10.10']}
+        host = self.processor._remove_ip_addresses(host)
+        self.assertEqual(host, {'ip_addresses': ['192.168.10.10']})
+
+    def test_do_not_remove_mac_addresses(self):
+        """Test do not remove host mac_addresses."""
+        host = {
+            'mac_addresses': ['aa:bb:00:11:22:33']}
+        host = self.processor._remove_mac_addresses(host)
+        self.assertEqual(host, {'mac_addresses': ['aa:bb:00:11:22:33']})
