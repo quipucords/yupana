@@ -192,36 +192,36 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                       for key in host.keys() if key not in ['cause', 'status_code']}
         return candidates
 
-    def _remove_ip_addresses(self, host: dict):
+    def _remove_empty_ip_addresses(self, host: dict):
         """Remove 'ip_addresses' field."""
-        if 'ip_addresses' in host:
-            ip_addresses = host['ip_addresses']
-            if not ip_addresses:
-                del host['ip_addresses']
-                LOG.info(
-                    format_message(
-                        self.prefix,
-                        'Removed empty ip_addresses fact.',
-                        account_number=self.account_number,
-                        report_platform_id=self.report_platform_id
-                    )
-                )
+        ip_addresses = host.get('ip_addresses')
+        if ip_addresses is None or ip_addresses:
+            return host
+
+        del host['ip_addresses']
+        LOG.info(
+            format_message(
+                self.prefix,
+                'Removed empty ip_addresses fact.',
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id
+            ))
         return host
 
-    def _remove_mac_addresses(self, host: dict):
+    def _remove_empty_mac_addresses(self, host: dict):
         """Remove 'mac_addresses' field."""
-        if 'mac_addresses' in host:
-            mac_addresses = host['mac_addresses']
-            if not mac_addresses:
-                del host['mac_addresses']
-                LOG.info(
-                    format_message(
-                        self.prefix,
-                        'Removed empty mac_addresses fact.',
-                        account_number=self.account_number,
-                        report_platform_id=self.report_platform_id
-                    )
-                )
+        mac_addresses = host.get('mac_addresses')
+        if mac_addresses is None or mac_addresses:
+            return host
+
+        del host['mac_addresses']
+        LOG.info(
+            format_message(
+                self.prefix,
+                'Removed empty mac_addresses fact.',
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id
+            ))
         return host
 
     def _match_regex_and_find_version(self, os_release):
@@ -296,8 +296,9 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         if 'system_profile' in host:
             host = self._transform_os_release(host)
             host = self._transform_os_kernel_version(host)
-            host = self._remove_ip_addresses(host)
-            host = self._remove_mac_addresses(host)
+
+        host = self._remove_empty_ip_addresses(host)
+        host = self._remove_empty_mac_addresses(host)
         return host
 
     # pylint:disable=too-many-locals
