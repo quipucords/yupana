@@ -28,7 +28,7 @@ from kafka.errors import ConnectionError as KafkaConnectionError
 from processor.processor_utils import (PROCESSOR_INSTANCES,
                                        UPLOAD_REPORT_CONSUMER_LOOP,
                                        format_message,
-                                       stop_all_event_loops)
+                                       print_error_loop_event)
 from prometheus_client import Counter
 
 from api.models import Report
@@ -156,7 +156,7 @@ class ReportConsumer():
                         self.prefix,
                         'The following error occurred while trying to save and '
                         'commit the message: %s' % error))
-                    stop_all_event_loops()
+                    print_error_loop_event()
             except QPCKafkaMsgException as message_error:
                 LOG.error(format_message(
                     self.prefix, 'Error processing records.  Message: %s, Error: %s' %
@@ -201,13 +201,13 @@ class ReportConsumer():
             await self.consumer.start()
         except KafkaConnectionError:
             KAFKA_ERRORS.inc()
-            stop_all_event_loops()
-            raise KafkaMsgHandlerError('Unable to connect to kafka server.  Closing consumer.')
+            print_error_loop_event()
+            raise KafkaMsgHandlerError('Unable to connect to kafka server.')
         except Exception as err:  # pylint: disable=broad-except
             KAFKA_ERRORS.inc()
             LOG.error(format_message(
                 self.prefix, 'The following error occurred: %s' % err))
-            stop_all_event_loops()
+            print_error_loop_event()
 
         LOG.info(log_message)
         try:
@@ -218,7 +218,7 @@ class ReportConsumer():
             KAFKA_ERRORS.inc()
             LOG.error(format_message(
                 self.prefix, 'The following error occurred: %s' % err))
-            stop_all_event_loops()
+            print_error_loop_event()
         finally:
             # Will leave consumer group; perform autocommit if enabled.
             await self.consumer.stop()

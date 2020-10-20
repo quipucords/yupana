@@ -55,6 +55,7 @@ class ReportSliceProcessorTests(TestCase):
         self.uuid5 = uuid.uuid4()
         self.uuid6 = uuid.uuid4()
         self.uuid7 = uuid.uuid4()
+        self.uuid8 = uuid.uuid4()
         self.fake_record = test_handler.KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
         self.report_consumer = msg_handler.ReportConsumer()
         self.msg = self.report_consumer.unpack_consumer_record(self.fake_record)
@@ -404,13 +405,17 @@ class ReportSliceProcessorTests(TestCase):
     async def async_test_upload_to_host_inventory_via_kafka(self):
         """Test uploading to inventory via kafka."""
         self.processor.report_or_slice = self.report_slice
-        hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
-                 str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'},
-                 str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'},
-                 str(self.uuid4): {'mac_addresses': 'value', 'name': 'foo'},
-                 str(self.uuid5): {'vm_uuid': 'value', 'name': 'foo'},
-                 str(self.uuid6): {'etc_machine_id': 'value'},
-                 str(self.uuid7): {'subscription_manager_id': 'value'}}
+        hosts = {
+            str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
+            str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'},
+            str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'},
+            str(self.uuid4): {'mac_addresses': 'value', 'name': 'foo'},
+            str(self.uuid5): {'vm_uuid': 'value', 'name': 'foo'},
+            str(self.uuid6): {'etc_machine_id': 'value'},
+            str(self.uuid7): {'subscription_manager_id': 'value'},
+            str(self.uuid8): {'system_profile': {'os_release': '7',
+                                                 'os_kernel_version': '2.6.32'}
+                              }}
         test_producer = AIOKafkaProducer(
             loop=report_slice_processor.SLICE_PROCESSING_LOOP,
             bootstrap_servers=report_slice_processor.INSIGHTS_KAFKA_ADDRESS
@@ -599,3 +604,89 @@ class ReportSliceProcessorTests(TestCase):
         # by cutting off the last 13 i am comparing 2019-11-14T
         # which is the year/month/day
         self.assertEqual(expected[:-13], actual[:-13])
+
+    def test_transform_os_release(self):
+        """Test transform host os_release."""
+        host = {'system_profile': {
+            'os_release': 'Red Hat Enterprise Linux Server 6.10 (Santiago)'
+        }}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(host, {'system_profile': {'os_release': '6.10'}})
+
+    def test_do_not_transform_when_only_version(self):
+        """Test do not transform os_release when only version."""
+        host = {'system_profile': {'os_release': '7'}}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(host, {'system_profile': {'os_release': '7'}})
+
+    def test_remove_os_release_when_no_version(self):
+        """Test remove host os_release."""
+        host = {
+            'system_profile': {
+                'os_release': 'Red Hat Enterprise Linux Server'}}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(host, {'system_profile': {}})
+
+    def test_remove_os_release_when_no_version_with_parentheses(self):
+        """Test remove host os_release when include empty parentheses."""
+        host = {'system_profile': {'os_release': '  ()'}}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(host, {'system_profile': {}})
+
+    def test_remove_os_release_when_only_string_in_parentheses(self):
+        """Test remove host os_release when only string in parentheses."""
+        host = {'system_profile': {'os_release': '  (Core)'}}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(host, {'system_profile': {}})
+
+    def test_remove_os_release_when_empty_string(self):
+        """Test remove host os_release when empty string."""
+        host = {'system_profile': {'os_release': ''}}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(host, {'system_profile': {}})
+
+    def test_transform_os_release_when_non_rhel_os(self):
+        """Test transform host os_release when non rhel."""
+        host = {'system_profile': {'os_release': 'CentOS Linux 7 (Core)'}}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(host, {'system_profile': {'os_release': '7'}})
+
+    def test_transform_os_fields(self):
+        """Test transform os fields."""
+        host = {'system_profile': {
+            'os_release': '7', 'os_kernel_version': '3.10.0-1127.el7.x86_64'
+        }}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(
+            host,
+            {'system_profile': {
+                'os_release': '7', 'os_kernel_version': '3.10.0'}})
+
+    def test_do_not_tranform_os_fields(self):
+        """Test do not transform os fields when already in format."""
+        host = {'system_profile': {
+            'os_release': '7', 'os_kernel_version': '2.6.32'}}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(
+            host,
+            {'system_profile': {
+                'os_release': '7', 'os_kernel_version': '2.6.32'}}
+        )
+
+    def test_do_not_tranform_os_release_with_number_field(self):
+        """Test do not transform os release when passed as number."""
+        host = {'system_profile': {'os_release': 7}}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(
+            host,
+            {'system_profile': {'os_release': 7}}
+        )
+
+    def test_match_regex_and_find_version(self):
+        """Test match Regex with os_release and return os_version."""
+        host = {'system_profile': {
+            'os_release': 'Red Hat Enterprise Linux Server 7'}}
+        host_os_version = '7'
+        os_version = self.processor._match_regex_and_find_version(
+            host['system_profile']['os_release'])
+        self.assertEqual(host_os_version, os_version)

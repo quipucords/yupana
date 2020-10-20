@@ -25,6 +25,7 @@ from unittest.mock import patch
 import processor.report_consumer as msg_handler
 from asynctest import CoroutineMock
 from django.test import TestCase
+from kafka.errors import ConnectionError as KafkaConnectionError
 
 from api.models import Report
 
@@ -137,5 +138,27 @@ class KafkaMsgHandlerTest(TestCase):
         event_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(event_loop)
         coro = asyncio.coroutine(self.save_and_ack)
+        event_loop.run_until_complete(coro())
+        event_loop.close()
+
+    async def async_test_listen_for_messages(self):
+        """Test listen for messages via kafka."""
+        # test KafkaConnectionException
+        def raise_kafka_error():
+            """Raise a kafka error."""
+            raise KafkaConnectionError('Test')
+
+        self.report_consumer.consumer.start = CoroutineMock(side_effect=raise_kafka_error)
+        self.report_consumer.consumer.stop = CoroutineMock()
+
+        with self.assertRaises(msg_handler.KafkaMsgHandlerError):
+            await self.report_consumer.listen_for_messages([], 'Test message!')
+
+    def test_listen_for_messages_via_kafka_exception(self):
+        """Test the async listen for messages exception."""
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        coro = asyncio.coroutine(
+            self.async_test_listen_for_messages)
         event_loop.run_until_complete(coro())
         event_loop.close()

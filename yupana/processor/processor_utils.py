@@ -17,7 +17,11 @@
 """Utilities for all of the processor classes."""
 import asyncio
 import logging
+from time import sleep
 
+from config.settings.base import (SLEEP_PERIOD_WHEN_EVENT_LOOP_ERROR)
+
+SLEEP_PERIOD_WHEN_EVENT_LOOP_ERROR = int(SLEEP_PERIOD_WHEN_EVENT_LOOP_ERROR)
 
 LOG = logging.getLogger(__name__)
 UPLOAD_REPORT_CONSUMER_LOOP = asyncio.get_event_loop()
@@ -50,34 +54,8 @@ def format_message(prefix, message, account_number=None,
     return actual_message
 
 
-def stop_all_event_loops():
-    """Stop all of the event loops."""
-    prefix = 'STOPPING EVENT LOOPS'
-    for i in PROCESSOR_INSTANCES:
-        try:
-            # the only processor with a consumer is the ReportConsumer
-            # so we check the class and stop the consumer if we have a
-            # ReportConsumer instance - otherwise we stop a producer
-            if i.__class__.__name__ == 'ReportConsumer':
-                i.consumer.stop()
-            else:
-                i.producer.stop()
-        except Exception as err:  # pylint:disable=broad-except
-            LOG.error(format_message(
-                prefix, 'The following error occurred: %s' % err))
-    try:
-        LOG.error(format_message(
-            prefix,
-            'A fatal error occurred. Shutting down all processors: '))
-        LOG.info(format_message(prefix, 'Shutting down the report consumer.'))
-        UPLOAD_REPORT_CONSUMER_LOOP.stop()
-        LOG.info(format_message(prefix, 'Shutting down the report processor.'))
-        REPORT_PROCESSING_LOOP.stop()
-        LOG.info(format_message(prefix, 'Shutting down the report slice processor.'))
-        SLICE_PROCESSING_LOOP.stop()
-        LOG.info(format_message(prefix, 'Shutting down the garbage collector.'))
-        GARBAGE_COLLECTION_LOOP.stop()
-    except Exception as err:  # pylint: disable=broad-except
-        LOG.error(format_message(
-            prefix,
-            str(err)))
+def print_error_loop_event():
+    """Print & wait for seconds when event loop error occurred."""
+    prefix = 'EVENT LOOP ERROR WHILE PROCESSING'
+    LOG.warning(format_message(prefix, 'Wait for %s seconds.' % SLEEP_PERIOD_WHEN_EVENT_LOOP_ERROR))
+    sleep(SLEEP_PERIOD_WHEN_EVENT_LOOP_ERROR)

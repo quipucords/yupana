@@ -45,6 +45,7 @@ APPS_DIR = ROOT_DIR.path('yupana')
 SECRET_KEY = ENVIRONMENT.get_value('DJANGO_SECRET_KEY',
                                    default='base')
 DEBUG = ENVIRONMENT.bool('DJANGO_DEBUG', default=False)
+HOSTS_TRANSFORMATION_ENABLED = ENVIRONMENT.bool('HOSTS_TRANSFORMATION_ENABLED', default=True)
 ALLOWED_HOSTS = ENVIRONMENT.get_value('DJANGO_ALLOWED_HOSTS', default=['*'])
 
 # this is the time in minutes that we want to wait to retry a report
@@ -76,6 +77,12 @@ ARCHIVE_RECORD_RETENTION_PERIOD = ENVIRONMENT.get_value(
 # the default is set to 1 week
 GARBAGE_COLLECTION_INTERVAL = ENVIRONMENT.get_value(
     'GARBAGE_COLLECTION_INTERVAL', default=604800)
+
+# this is the sleep period when an event loop error occurred (in seconds)
+# so that it will do retry
+# the default is set to 10 secs
+SLEEP_PERIOD_WHEN_EVENT_LOOP_ERROR = ENVIRONMENT.get_value(
+    'SLEEP_PERIOD_WHEN_EVENT_LOOP_ERROR', default=10)
 
 # Logging
 # https://docs.djangoproject.com/en/dev/topics/logging/
