@@ -705,6 +705,13 @@ class ReportSliceProcessorTests(TestCase):
         host = self.processor._remove_empty_mac_addresses(host)
         self.assertEqual(host, {})
 
+    def test_remove_both_empty_ip_mac_addresses(self):
+        """Test remove both empty ip and mac addresses."""
+        host = {}
+        host = self.processor._remove_empty_ip_addresses(host)
+        host = self.processor._remove_empty_mac_addresses(host)
+        self.assertEqual(host, {})
+
     def test_do_not_remove_set_ip_addresses(self):
         """Test do not remove set host ip_addresses."""
         host = {
