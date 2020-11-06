@@ -264,6 +264,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         if 'system_profile' in host:
             host = self._transform_os_release(host)
             host = self._transform_os_kernel_version(host)
+
         return host
 
     # pylint:disable=too-many-locals
@@ -301,6 +302,18 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                                             self.report_or_slice.report_slice_id)
         try:  # pylint: disable=too-many-nested-blocks
             for host_id, host in hosts.items():
+                system_profile = host.get('system_profile', {})
+                number_of_sockets = system_profile.get('number_of_sockets')
+                if number_of_sockets <= 0:
+                    del host
+                    LOG.info(
+                        format_message(
+                            self.prefix, "Removed the host: '%s' with 0 number_of_sockets."
+                            % host_id,
+                            account_number=self.account_number,
+                            report_platform_id=self.report_platform_id))
+                    continue
+
                 if HOSTS_TRANSFORMATION_ENABLED:
                     host = self._transform_single_host(host)
 
