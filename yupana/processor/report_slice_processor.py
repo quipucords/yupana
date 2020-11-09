@@ -202,7 +202,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         LOG.info(
             format_message(
                 self.prefix,
-                'Removed empty ip_addresses fact.',
+                "Removed empty ip_addresses fact for host with FQDN '%s'"
+                % (host.get('fqdn', '')),
                 account_number=self.account_number,
                 report_platform_id=self.report_platform_id
             ))
@@ -218,7 +219,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         LOG.info(
             format_message(
                 self.prefix,
-                'Removed empty mac_addresses fact.',
+                "Removed empty mac_addresses fact for host with FQDN '%s'"
+                % (host.get('fqdn', '')),
                 account_number=self.account_number,
                 report_platform_id=self.report_platform_id
             ))
@@ -253,7 +255,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         if not os_version:
             del host['system_profile']['os_release']
             LOG.info(format_message(
-                self.prefix, 'Removed empty os_release fact',
+                self.prefix, "Removed empty os_release fact for host with FQDN '%s'"
+                % (host.get('fqdn', '')),
                 account_number=self.account_number,
                 report_platform_id=self.report_platform_id))
             return host
@@ -284,8 +287,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         host['system_profile']['os_kernel_version'] = version_value
         LOG.info(
             format_message(
-                self.prefix, "os_kernel_version transformed '%s' -> '%s'"
-                % (os_kernel_version, version_value),
+                self.prefix, "os_kernel_version transformed '%s' -> '%s' for host with FQDN '%s'"
+                % (os_kernel_version, version_value, host.get('fqdn', '')),
                 account_number=self.account_number,
                 report_platform_id=self.report_platform_id))
 
