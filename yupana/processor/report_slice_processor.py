@@ -319,7 +319,6 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     % (host.get('fqdn', '')),
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id))
-        host['system_profile']['network_interfaces'] = network_interfaces
         return host
 
     def _transform_single_host(self, host: dict):
