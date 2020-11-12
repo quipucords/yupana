@@ -303,13 +303,13 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             return host
 
         mtu_transformed = False
-        for index, item in enumerate(network_interfaces):
-            if 'mtu' not in item or not item['mtu']:
+        for nic in network_interfaces:
+            if ('mtu' not in nic or not nic['mtu'] or
+                    isinstance(nic['mtu'], int)):
                 continue
 
-            if not isinstance(item['mtu'], int):
-                network_interfaces[index]['mtu'] = int(item['mtu'])
-                mtu_transformed = True
+            nic['mtu'] = int(nic['mtu'])
+            mtu_transformed = True
 
         if mtu_transformed:
             LOG.info(
