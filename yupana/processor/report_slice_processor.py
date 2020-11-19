@@ -267,6 +267,16 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             return host
 
         host['system_profile']['os_release'] = os_version
+        version_split = os_version.split('.', 1)
+        host['system_profile']['operating_system'] = {}
+        host['system_profile']['operating_system']['major'] = version_split[0]
+
+        if len(version_split) > 1:
+            host['system_profile']['operating_system']['minor'] = version_split[1]
+        else:
+            host['system_profile']['operating_system']['minor'] = '0'
+
+        host['system_profile']['operating_system']['name'] = 'RHEL'
         LOG.info(
             format_message(
                 self.prefix,

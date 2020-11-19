@@ -611,7 +611,8 @@ class ReportSliceProcessorTests(TestCase):
             'os_release': 'Red Hat Enterprise Linux Server 6.10 (Santiago)'
         }}
         host = self.processor._transform_single_host(host)
-        self.assertEqual(host, {'system_profile': {'os_release': '6.10'}})
+        self.assertEqual(host, {'system_profile': {'operating_system': {
+            'major': '6', 'minor': '10', 'name': 'RHEL'}, 'os_release': '6.10'}})
 
     def test_do_not_transform_when_only_version(self):
         """Test do not transform os_release when only version."""
@@ -649,7 +650,8 @@ class ReportSliceProcessorTests(TestCase):
         """Test transform host os_release when non rhel."""
         host = {'system_profile': {'os_release': 'CentOS Linux 7 (Core)'}}
         host = self.processor._transform_single_host(host)
-        self.assertEqual(host, {'system_profile': {'os_release': '7'}})
+        self.assertEqual(host, {'system_profile': {'operating_system': {
+            'major': '7', 'minor': '0', 'name': 'RHEL'}, 'os_release': '7'}})
 
     def test_transform_os_fields(self):
         """Test transform os fields."""
