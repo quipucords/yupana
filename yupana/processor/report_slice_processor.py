@@ -304,8 +304,10 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
         mtu_transformed = False
         for nic in network_interfaces:
-            if ('mtu' not in nic or not nic['mtu'] or
-                    isinstance(nic['mtu'], int)):
+            if (
+                    'mtu' not in nic or not nic['mtu'] or isinstance(
+                        nic['mtu'], int)
+            ):
                 continue
 
             nic['mtu'] = int(nic['mtu'])
