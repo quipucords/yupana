@@ -48,6 +48,7 @@ MSG_UPLOADS = Counter('yupana_message_uploads',
 
 KAFKA_ERRORS = Counter('yupana_kafka_errors', 'Number of Kafka errors')
 DB_ERRORS = Counter('yupana_db_errors', 'Number of db errors')
+PROCESSOR_NAME = 'report_consumer'
 
 
 class QPCReportException(Exception):
@@ -78,6 +79,7 @@ class ReportConsumer():
 
     def __init__(self):
         """Create a report consumer."""
+        self.processor_name = PROCESSOR_NAME
         self.should_run = True
         self.prefix = 'REPORT CONSUMER'
         self.account_number = None
@@ -258,6 +260,7 @@ def initialize_upload_report_consumer():  # pragma: no cover
     :returns None
     """
     event_loop_thread = threading.Thread(
-        target=create_upload_report_consumer_loop, args=(UPLOAD_REPORT_CONSUMER_LOOP,))
+        target=create_upload_report_consumer_loop, name=PROCESSOR_NAME,
+        args=(UPLOAD_REPORT_CONSUMER_LOOP,))
     event_loop_thread.daemon = True
     event_loop_thread.start()

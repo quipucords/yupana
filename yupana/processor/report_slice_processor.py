@@ -53,6 +53,7 @@ UPLOAD_TOPIC = 'platform.inventory.host-ingress'  # placeholder topic
 OS_RELEASE_PATTERN = re.compile(
     r'(?P<name>[a-zA-Z\s]*)?\s*(?P<version>[\d\.]*)\s*(\((?P<code>\S*)\))?'
 )
+PROCESSOR_NAME = 'report_slice_processor'
 
 
 class RetryUploadTimeException(Exception):
@@ -72,6 +73,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
     def __init__(self):
         """Create a report slice state machine."""
+        self.processor_name = PROCESSOR_NAME
         state_functions = {
             ReportSlice.RETRY_VALIDATION: self.transition_to_validated,
             ReportSlice.NEW: self.transition_to_started,
@@ -447,6 +449,7 @@ def initialize_report_slice_processor():  # pragma: no cover
     :returns None
     """
     event_loop_thread = threading.Thread(target=asyncio_report_processor_thread,
+                                         name=PROCESSOR_NAME,
                                          args=(SLICE_PROCESSING_LOOP,))
     event_loop_thread.daemon = True
     event_loop_thread.start()

@@ -65,6 +65,7 @@ HOSTS_PER_REPORT_QPC = Gauge('hosts_per_qpc_rep',
 HOSTS_COUNTER = Counter('yupana_hosts_count',
                         'Total number of hosts uploaded',
                         ['account_number', 'source'])
+PROCESSOR_NAME = 'report_processor'
 
 
 class FailDownloadException(Exception):
@@ -96,6 +97,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
 
     def __init__(self):
         """Create a report processor."""
+        self.processor_name = PROCESSOR_NAME
         state_functions = {
             Report.NEW: self.transition_to_started,
             Report.STARTED: self.transition_to_downloaded,
@@ -770,6 +772,7 @@ def initialize_report_processor():  # pragma: no cover
     :returns None
     """
     event_loop_thread = threading.Thread(target=asyncio_report_processor_thread,
+                                         name=PROCESSOR_NAME,
                                          args=(REPORT_PROCESSING_LOOP,))
     event_loop_thread.daemon = True
     event_loop_thread.start()
