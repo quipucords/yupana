@@ -690,3 +690,38 @@ class ReportSliceProcessorTests(TestCase):
         os_version = self.processor._match_regex_and_find_version(
             host['system_profile']['os_release'])
         self.assertEqual(host_os_version, os_version)
+
+    def test_remove_empty_ip_addresses(self):
+        """Test remove host ip_addresses."""
+        host = {
+            'ip_addresses': []}
+        host = self.processor._remove_empty_ip_addresses(host)
+        self.assertEqual(host, {})
+
+    def test_remove_empty_mac_addresses(self):
+        """Test remove host mac_addresses."""
+        host = {
+            'mac_addresses': []}
+        host = self.processor._remove_empty_mac_addresses(host)
+        self.assertEqual(host, {})
+
+    def test_remove_both_empty_ip_mac_addresses(self):
+        """Test remove both empty ip and mac addresses."""
+        host = {}
+        host = self.processor._remove_empty_ip_addresses(host)
+        host = self.processor._remove_empty_mac_addresses(host)
+        self.assertEqual(host, {})
+
+    def test_do_not_remove_set_ip_addresses(self):
+        """Test do not remove set host ip_addresses."""
+        host = {
+            'ip_addresses': ['192.168.10.10']}
+        host = self.processor._remove_empty_ip_addresses(host)
+        self.assertEqual(host, {'ip_addresses': ['192.168.10.10']})
+
+    def test_do_not_remove_set_mac_addresses(self):
+        """Test do not remove set host mac_addresses."""
+        host = {
+            'mac_addresses': ['aa:bb:00:11:22:33']}
+        host = self.processor._remove_empty_mac_addresses(host)
+        self.assertEqual(host, {'mac_addresses': ['aa:bb:00:11:22:33']})

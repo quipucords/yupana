@@ -192,6 +192,40 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                       for key in host.keys() if key not in ['cause', 'status_code']}
         return candidates
 
+    def _remove_empty_ip_addresses(self, host: dict):
+        """Remove 'ip_addresses' field."""
+        ip_addresses = host.get('ip_addresses')
+        if ip_addresses is None or ip_addresses:
+            return host
+
+        del host['ip_addresses']
+        LOG.info(
+            format_message(
+                self.prefix,
+                "Removed empty ip_addresses fact for host with FQDN '%s'"
+                % (host.get('fqdn', '')),
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id
+            ))
+        return host
+
+    def _remove_empty_mac_addresses(self, host: dict):
+        """Remove 'mac_addresses' field."""
+        mac_addresses = host.get('mac_addresses')
+        if mac_addresses is None or mac_addresses:
+            return host
+
+        del host['mac_addresses']
+        LOG.info(
+            format_message(
+                self.prefix,
+                "Removed empty mac_addresses fact for host with FQDN '%s'"
+                % (host.get('fqdn', '')),
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id
+            ))
+        return host
+
     def _match_regex_and_find_version(self, os_release):
         """Match Regex with os_release and return os_version."""
         source_os_release = os_release.strip()
@@ -221,7 +255,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         if not os_version:
             del host['system_profile']['os_release']
             LOG.info(format_message(
-                self.prefix, 'Removed empty os_release fact',
+                self.prefix, "Removed empty os_release fact for host with FQDN '%s'"
+                % (host.get('fqdn', '')),
                 account_number=self.account_number,
                 report_platform_id=self.report_platform_id))
             return host
@@ -252,8 +287,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         host['system_profile']['os_kernel_version'] = version_value
         LOG.info(
             format_message(
-                self.prefix, "os_kernel_version transformed '%s' -> '%s'"
-                % (os_kernel_version, version_value),
+                self.prefix, "os_kernel_version transformed '%s' -> '%s' for host with FQDN '%s'"
+                % (os_kernel_version, version_value, host.get('fqdn', '')),
                 account_number=self.account_number,
                 report_platform_id=self.report_platform_id))
 
@@ -264,6 +299,9 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         if 'system_profile' in host:
             host = self._transform_os_release(host)
             host = self._transform_os_kernel_version(host)
+
+        host = self._remove_empty_ip_addresses(host)
+        host = self._remove_empty_mac_addresses(host)
         return host
 
     # pylint:disable=too-many-locals
