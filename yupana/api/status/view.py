@@ -16,9 +16,7 @@
 #
 
 """View for server status."""
-import threading
-
-from processor.processor_utils import PROCESSOR_INSTANCES
+from processor.processor_utils import list_name_of_active_threads, list_name_of_processors
 from rest_framework import permissions, status as http_status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -80,9 +78,9 @@ def status(request):
     serializer = StatusSerializer(status_info)
     server_info = serializer.data
     server_info['server_address'] = request.META.get('HTTP_HOST', 'localhost')
-    processes = list(map(lambda i: i.processor_name, PROCESSOR_INSTANCES))
-    threads = list(map(lambda i: i.name, threading.enumerate()))
-    if not all(item in threads for item in processes):
+    processor = list_name_of_processors()
+    threads = list_name_of_active_threads()
+    if not all(item in threads for item in processor):
         return Response('Report processor thread exited',
                         status=http_status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response(server_info)
