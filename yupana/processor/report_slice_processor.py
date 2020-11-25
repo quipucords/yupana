@@ -294,11 +294,41 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
         return host
 
+    def _transform_mtu(self, host: dict):
+        """Transform 'system_profile.network_interfaces[]['mtu'] to Integer."""
+        system_profile = host.get('system_profile', {})
+        network_interfaces = system_profile.get('network_interfaces')
+
+        if not network_interfaces:
+            return host
+
+        mtu_transformed = False
+        for nic in network_interfaces:
+            if (
+                    'mtu' not in nic or not nic['mtu'] or isinstance(
+                        nic['mtu'], int)
+            ):
+                continue
+
+            nic['mtu'] = int(nic['mtu'])
+            mtu_transformed = True
+
+        if mtu_transformed:
+            LOG.info(
+                format_message(
+                    self.prefix,
+                    "Transformed mtu value to integer for host with FQDN '%s'"
+                    % (host.get('fqdn', '')),
+                    account_number=self.account_number,
+                    report_platform_id=self.report_platform_id))
+        return host
+
     def _transform_single_host(self, host: dict):
         """Transform 'system_profile' fields."""
         if 'system_profile' in host:
             host = self._transform_os_release(host)
             host = self._transform_os_kernel_version(host)
+            host = self._transform_mtu(host)
 
         host = self._remove_empty_ip_addresses(host)
         host = self._remove_empty_mac_addresses(host)

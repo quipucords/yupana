@@ -725,3 +725,66 @@ class ReportSliceProcessorTests(TestCase):
             'mac_addresses': ['aa:bb:00:11:22:33']}
         host = self.processor._remove_empty_mac_addresses(host)
         self.assertEqual(host, {'mac_addresses': ['aa:bb:00:11:22:33']})
+
+    def test_transform_mtu_to_integer(self):
+        """Test mtu transformation for host."""
+        host = {
+            'system_profile': {
+                'network_interfaces': [
+                    {'ipv4_addresses': [], 'ipv6_addresses': [],
+                     'mtu': 1400, 'name': 'eth0'},
+                    {'ipv4_addresses': [], 'ipv6_addresses': [],
+                     'mtu': '1500', 'name': 'eth1'}]
+            }}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(
+            host,
+            {
+                'system_profile': {
+                    'network_interfaces': [
+                        {'ipv4_addresses': [], 'ipv6_addresses': [],
+                         'mtu': 1400, 'name': 'eth0'},
+                        {'ipv4_addresses': [], 'ipv6_addresses': [],
+                         'mtu': 1500, 'name': 'eth1'}]
+                }
+            })
+
+    def test_do_not_run_mtu_transformation_when_none(self):
+        """Test not to run mtu transformation when it is None."""
+        host = {
+            'system_profile': {
+                'network_interfaces': [
+                    {'ipv4_addresses': [], 'ipv6_addresses': [],
+                     'mtu': None, 'name': 'eth0'}]
+            }}
+
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(
+            host,
+            {
+                'system_profile': {
+                    'network_interfaces': [
+                        {'ipv4_addresses': [], 'ipv6_addresses': [],
+                         'mtu':None, 'name':'eth0'}]
+                }
+            })
+
+    def test_do_not_run_mtu_transformation_when_not_exists(self):
+        """Test not to run mtu transformation when it doesn't exist."""
+        host = {
+            'system_profile': {
+                'network_interfaces': [
+                    {'ipv4_addresses': [], 'ipv6_addresses': [],
+                     'name': 'eth0'}]
+            }}
+
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(
+            host,
+            {
+                'system_profile': {
+                    'network_interfaces': [
+                        {'ipv4_addresses': [], 'ipv6_addresses': [],
+                         'name':'eth0'}]
+                }
+            })
