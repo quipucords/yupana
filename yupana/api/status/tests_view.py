@@ -34,8 +34,8 @@ class StatusViewTest(TestCase):
         self.assertEqual(json_result['api_version'], 1)
 
     @patch('api.status.view.list_name_of_processors')
-    def test_test_test(self, mock_active_processor):
-        """Test the status endpoint."""
+    def test_status_with_dead_thread(self, mock_active_processor):
+        """Test the status endpoint with some exited thread."""
         mock_active_processor.return_value = ['report_consumer', 'report_processor']
         url = reverse('server-status')
         res = self.client.get(url)
