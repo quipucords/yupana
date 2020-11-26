@@ -102,8 +102,7 @@ class KafkaMsgHandlerTest(TestCase):
             self.report_consumer.unpack_consumer_record(fake_record)
 
     def test_check_if_url_expired(self):
-        """Test check_if_url_expired method."""
-        # test expired url(bad case)
+        """Test expired url(bad case)."""
         url = 'http://minio:9000/insights-upload-perma'\
               '?X-Amz-Date=20200928T063623Z&X-Amz-Expires=86400'
         request_id = '123456'
