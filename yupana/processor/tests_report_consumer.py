@@ -20,6 +20,7 @@ import asyncio
 import io
 import json
 import tarfile
+from datetime import datetime
 from unittest.mock import patch
 
 import processor.report_consumer as msg_handler
@@ -72,7 +73,8 @@ class KafkaMsgHandlerTest(TestCase):
 
     def setUp(self):
         """Create test setup."""
-        self.payload_url = 'http://insights-upload.com/q/file_to_validate'
+        self.payload_url = f"http://minio:9000/insights-upload-perma?X-Amz-Date=\
+                            {datetime.now().strftime('%Y%m%dT%H%M%SZ')}&X-Amz-Expires=86400"
         self.report_consumer = msg_handler.ReportConsumer()
 
     def tearDown(self):
@@ -99,17 +101,29 @@ class KafkaMsgHandlerTest(TestCase):
         with self.assertRaises(msg_handler.QPCKafkaMsgException):
             self.report_consumer.unpack_consumer_record(fake_record)
 
+    def test_check_if_url_expired(self):
+        """Test expired url(bad case)."""
+        url = 'http://minio:9000/insights-upload-perma'\
+              '?X-Amz-Date=20200928T063623Z&X-Amz-Expires=86400'
+        request_id = '123456'
+        with self.assertRaises(msg_handler.QPCKafkaMsgException):
+            self.report_consumer.check_if_url_expired(url, request_id)
+
     async def save_and_ack(self):
         """Test the save and ack message method."""
         self.report_consumer.consumer.commit = CoroutineMock()
         qpc_msg = KafkaMsg(msg_handler.QPC_TOPIC, self.payload_url)
+        url = 'http://minio:9000/insights-upload-perma?X-Amz-Date='\
+              f"{datetime.now().strftime('%Y%m%dT%H%M%SZ')}&X-Amz-Expires=86400"
         # test happy case
         with patch('processor.report_consumer.ReportConsumer.unpack_consumer_record',
-                   return_value={'account': '8910', 'request_id': '1234'}):
+                   return_value={'account': '8910', 'request_id': '1234',
+                                 'url': url}):
             await self.report_consumer.save_message_and_ack(qpc_msg)
             report = Report.objects.get(account='8910')
             self.assertEqual(json.loads(report.upload_srv_kafka_msg),
-                             {'account': '8910', 'request_id': '1234'})
+                             {'account': '8910', 'request_id': '1234',
+                              'url': url})
             self.assertEqual(report.state, Report.NEW)
 
         # test no rh_account or request_id
@@ -126,11 +140,13 @@ class KafkaMsgHandlerTest(TestCase):
 
         self.report_consumer.consumer.commit = CoroutineMock(side_effect=raise_error)
         with patch('processor.report_consumer.ReportConsumer.unpack_consumer_record',
-                   return_value={'rh_account': '1112', 'request_id': '1234'}):
+                   return_value={'rh_account': '1112', 'request_id': '1234',
+                                 'url': url}):
             await self.report_consumer.save_message_and_ack(qpc_msg)
             report = Report.objects.get(account='1112')
             self.assertEqual(json.loads(report.upload_srv_kafka_msg),
-                             {'rh_account': '1112', 'request_id': '1234'})
+                             {'rh_account': '1112', 'request_id': '1234',
+                              'url': url})
             self.assertEqual(report.state, Report.NEW)
 
     def test_save_and_ack_success(self):
