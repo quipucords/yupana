@@ -26,7 +26,7 @@ import pytz
 from aiokafka import AIOKafkaProducer
 from asynctest import CoroutineMock
 from django.test import TestCase
-from kafka.errors import ConnectionError as KafkaConnectionError
+from kafka.errors import KafkaConnectionError
 from processor import (abstract_processor,
                        report_consumer as msg_handler,
                        report_slice_processor,

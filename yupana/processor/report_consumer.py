@@ -25,7 +25,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytz
 from aiokafka import AIOKafkaConsumer
-from kafka.errors import ConnectionError as KafkaConnectionError
+from kafka.errors import KafkaConnectionError
 from processor.processor_utils import (PROCESSOR_INSTANCES,
                                        UPLOAD_REPORT_CONSUMER_LOOP,
                                        format_message,

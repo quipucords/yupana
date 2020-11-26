@@ -23,7 +23,7 @@ import os
 import threading
 
 from aiokafka import AIOKafkaConsumer
-from kafka.errors import ConnectionError as KafkaConnectionError
+from kafka.errors import KafkaConnectionError
 
 print('#' * 65)
 print('Starting up test kakfa consumer')

@@ -28,7 +28,7 @@ import pytz
 import requests
 from aiokafka import AIOKafkaProducer
 from django.db import transaction
-from kafka.errors import ConnectionError as KafkaConnectionError
+from kafka.errors import KafkaConnectionError
 from processor.abstract_processor import (
     AbstractProcessor,
     FAILED_TO_DOWNLOAD, FAILED_TO_VALIDATE, RETRY)

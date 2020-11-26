@@ -26,7 +26,7 @@ from unittest.mock import patch
 import processor.report_consumer as msg_handler
 from asynctest import CoroutineMock
 from django.test import TestCase
-from kafka.errors import ConnectionError as KafkaConnectionError
+from kafka.errors import KafkaConnectionError
 
 from api.models import Report
 
