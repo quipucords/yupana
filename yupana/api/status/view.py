@@ -84,11 +84,11 @@ def status(request):
     serializer = StatusSerializer(status_info)
     server_info = serializer.data
     server_info['server_address'] = request.META.get('HTTP_HOST', 'localhost')
-    processors = list_name_of_processors()
-    threads = list_name_of_active_threads()
-    if not all(item in threads for item in processors):
-        dead_threads = set(processors).difference(threads)
-        LOG.error(format_message('SERVICE STATUS', 'Dead processors - %s' % dead_threads))
+    total_processors_names = list_name_of_processors()
+    active_threads_names = list_name_of_active_threads()
+    if not all(item in active_threads_names for item in total_processors_names):
+        dead_processors = set(total_processors_names).difference(active_threads_names)
+        LOG.error(format_message('SERVICE STATUS', 'Dead processors - %s' % dead_processors))
         return Response('ERROR: Processor thread exited',
                         status=http_status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response(server_info)
