@@ -20,11 +20,12 @@ import asyncio
 import json
 import logging
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
+from urllib.parse import parse_qs, urlparse
 
 import pytz
 from aiokafka import AIOKafkaConsumer
-from kafka.errors import ConnectionError as KafkaConnectionError
+from kafka.errors import KafkaConnectionError
 from processor.processor_utils import (PROCESSOR_INSTANCES,
                                        UPLOAD_REPORT_CONSUMER_LOOP,
                                        format_message,
@@ -47,6 +48,7 @@ MSG_UPLOADS = Counter('yupana_message_uploads',
 
 KAFKA_ERRORS = Counter('yupana_kafka_errors', 'Number of Kafka errors')
 DB_ERRORS = Counter('yupana_db_errors', 'Number of db errors')
+PROCESSOR_NAME = 'report_consumer'
 
 
 class QPCReportException(Exception):
@@ -77,6 +79,7 @@ class ReportConsumer():
 
     def __init__(self):
         """Create a report consumer."""
+        self.processor_name = PROCESSOR_NAME
         self.should_run = True
         self.prefix = 'REPORT CONSUMER'
         self.account_number = None
@@ -122,16 +125,20 @@ class ReportConsumer():
                 # account is not there
                 rh_account = self.upload_message.get('rh_account')
                 request_id = self.upload_message.get('request_id')
+                url = self.upload_message.get('url')
                 self.account_number = self.upload_message.get('account', rh_account)
                 if not self.account_number:
                     missing_fields.append('account')
                 if not request_id:
                     missing_fields.append('request_id')
+                if not url:
+                    missing_fields.append('url')
                 if missing_fields:
                     raise QPCKafkaMsgException(
                         format_message(
                             self.prefix,
                             'Message missing required field(s): %s.' % ', '.join(missing_fields)))
+                self.check_if_url_expired(url, request_id)
                 try:
                     uploaded_report = {
                         'upload_srv_kafka_msg': json.dumps(self.upload_message),
@@ -165,6 +172,20 @@ class ReportConsumer():
         else:
             LOG.debug(format_message(
                 self.prefix, 'Message not on %s topic: %s' % (QPC_TOPIC, consumer_record)))
+
+    def check_if_url_expired(self, url, request_id):
+        """Validate if url is expired."""
+        self.prefix = 'NEW REPORT VALIDATION'
+        parsed_url_query = parse_qs(urlparse(url).query)
+        creation_timestamp = parsed_url_query['X-Amz-Date']
+        expire_time = timedelta(seconds=int(parsed_url_query['X-Amz-Expires'][0]))
+        creation_datatime = datetime.strptime(str(creation_timestamp[0]), '%Y%m%dT%H%M%SZ')
+        if datetime.now().replace(microsecond=0) > (creation_datatime + expire_time):
+            raise QPCKafkaMsgException(
+                format_message(self.prefix,
+                               'Request_id = %s is already expired and cannot be processed:'
+                               'Creation time = %s, Expiry interval = %s.'
+                               % (request_id, creation_datatime, expire_time)))
 
     def unpack_consumer_record(self, consumer_record):
         """Decode the uploaded message and return it in JSON format."""
@@ -239,6 +260,7 @@ def initialize_upload_report_consumer():  # pragma: no cover
     :returns None
     """
     event_loop_thread = threading.Thread(
-        target=create_upload_report_consumer_loop, args=(UPLOAD_REPORT_CONSUMER_LOOP,))
+        target=create_upload_report_consumer_loop, name=PROCESSOR_NAME,
+        args=(UPLOAD_REPORT_CONSUMER_LOOP,))
     event_loop_thread.daemon = True
     event_loop_thread.start()

@@ -17,6 +17,7 @@
 """Utilities for all of the processor classes."""
 import asyncio
 import logging
+import threading
 from time import sleep
 
 from config.settings.base import (SLEEP_PERIOD_WHEN_EVENT_LOOP_ERROR)
@@ -29,6 +30,16 @@ REPORT_PROCESSING_LOOP = asyncio.new_event_loop()
 SLICE_PROCESSING_LOOP = asyncio.new_event_loop()
 GARBAGE_COLLECTION_LOOP = asyncio.new_event_loop()
 PROCESSOR_INSTANCES = []  # this list holds processor instances that have kafka components
+
+
+def list_name_of_active_threads():
+    """List of names of active thread."""
+    return list(map(lambda i: i.name, threading.enumerate()))
+
+
+def list_name_of_processors():
+    """List of processor."""
+    return list(map(lambda i: i.processor_name, PROCESSOR_INSTANCES))
 
 
 def format_message(prefix, message, account_number=None,

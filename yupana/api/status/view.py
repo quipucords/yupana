@@ -16,13 +16,19 @@
 #
 
 """View for server status."""
+import logging
 
-from rest_framework import permissions
+from processor.processor_utils import (format_message,
+                                       list_name_of_active_threads,
+                                       list_name_of_processors)
+from rest_framework import permissions, status as http_status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from api.status.model import Status
 from api.status.serializer import StatusSerializer
+
+LOG = logging.getLogger(__name__)
 
 
 @api_view(['GET', 'HEAD'])
@@ -78,4 +84,11 @@ def status(request):
     serializer = StatusSerializer(status_info)
     server_info = serializer.data
     server_info['server_address'] = request.META.get('HTTP_HOST', 'localhost')
+    total_processors_names = list_name_of_processors()
+    active_threads_names = list_name_of_active_threads()
+    if not all(item in active_threads_names for item in total_processors_names):
+        dead_processors = set(total_processors_names).difference(active_threads_names)
+        LOG.error(format_message('SERVICE STATUS', 'Dead processors - %s' % dead_processors))
+        return Response('ERROR: Processor thread exited',
+                        status=http_status.HTTP_500_INTERNAL_SERVER_ERROR)
     return Response(server_info)
