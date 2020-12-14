@@ -51,7 +51,8 @@ RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
 UPLOAD_TOPIC = 'platform.inventory.host-ingress'  # placeholder topic
 OS_RELEASE_PATTERN = re.compile(
-    r'(?P<name>[a-zA-Z\s]*)?\s*(?P<version>[\d\.]*)\s*(\((?P<code>\S*)\))?'
+    r'(?P<name>[a-zA-Z\s]*)?\s*((?P<major>\d*)(\.?(?P<minor>\d*)(\.?(?P<patch>\d*))?)?)\s*'
+    r'(\((?P<code>\S*)\))?'
 )
 PROCESSOR_NAME = 'report_slice_processor'
 
@@ -235,8 +236,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             return None
 
         match_result = OS_RELEASE_PATTERN.match(source_os_release)
-        parsed_info = match_result.groupdict()
-        os_version = parsed_info['version'].strip()
+        os_version = match_result.groupdict()
         LOG.info(
             format_message(
                 self.prefix,
@@ -254,7 +254,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             return host
 
         os_version = self._match_regex_and_find_version(os_release)
-        if not os_version:
+        if not os_version or not os_version['major']:
             del host['system_profile']['os_release']
             LOG.info(format_message(
                 self.prefix, "Removed empty os_release fact for host with FQDN '%s'"
@@ -263,25 +263,33 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 report_platform_id=self.report_platform_id))
             return host
 
-        if os_release == os_version:
-            return host
+        if os_version['minor']:
+            os_version['version'] = f"{os_version['major'].strip()}.{os_version['minor'].strip()}"
+        else:
+            os_version['version'] = os_version['major'].strip()
 
-        host['system_profile']['os_release'] = os_version
-        version_split = os_version.split('.', 1)
+        host['system_profile']['os_release'] = os_version['version'].strip()
         host['system_profile']['operating_system'] = {}
-        host['system_profile']['operating_system']['major'] = version_split[0]
+        host['system_profile']['operating_system']['major'] = os_version['major'].strip()
 
-        if len(version_split) > 1:
-            host['system_profile']['operating_system']['minor'] = version_split[1]
+        if os_version['minor']:
+            host['system_profile']['operating_system']['minor'] = os_version['minor'].strip()
         else:
             host['system_profile']['operating_system']['minor'] = '0'
 
-        host['system_profile']['operating_system']['name'] = 'RHEL'
+        if 'Red Hat' in os_version['name']:
+            host['system_profile']['operating_system']['name'] = 'RHEL'
+        else:
+            host['system_profile']['operating_system']['name'] = os_version['name'].strip()
+
+        if os_release == os_version['version'].strip():
+            return host
+
         LOG.info(
             format_message(
                 self.prefix,
                 "os_release transformed '%s' -> '%s'"
-                % (os_release, os_version),
+                % (os_release, os_version['version']),
                 account_number=self.account_number,
                 report_platform_id=self.report_platform_id)
         )
