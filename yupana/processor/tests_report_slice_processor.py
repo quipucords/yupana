@@ -689,12 +689,12 @@ class ReportSliceProcessorTests(TestCase):
             {'system_profile': {'os_release': 7}}
         )
 
-    def test_match_regex_and_find_version(self):
+    def test_match_regex_and_find_os_details(self):
         """Test match Regex with os_release and return os_version."""
         host = {'system_profile': {
             'os_release': 'Red Hat Enterprise Linux Server 7'}}
         host_os_version = '7'
-        os_version = self.processor._match_regex_and_find_version(
+        os_version = self.processor._match_regex_and_find_os_details(
             host['system_profile']['os_release'])
         self.assertEqual(host_os_version, os_version['major'])
 
