@@ -230,7 +230,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         return host
 
     def _match_regex_and_find_os_details(self, os_release):
-        """Match Regex with os_release and return os_version."""
+        """Match Regex with os_release and return os_details."""
         source_os_release = os_release.strip()
         if not source_os_release:
             return None
@@ -270,14 +270,11 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             return host
 
         host['system_profile']['os_release'] = os_details['version']
-        host['system_profile']['operating_system'] = {}
-        host['system_profile']['operating_system']['major'] = os_details['major']
-        host['system_profile']['operating_system']['minor'] = os_details['minor']
-
-        if 'Red Hat' in os_details['name']:
-            host['system_profile']['operating_system']['name'] = 'RHEL'
-        else:
-            host['system_profile']['operating_system']['name'] = os_details['name'].strip()
+        host['system_profile']['operating_system'] = {
+            'major': os_details['major'],
+            'minor': os_details['minor'],
+            'name': ('RHEL' if 'Red Hat' in os_details['name'] else os_details['name']).strip()
+        }
 
         if os_release == os_details['version']:
             return host
