@@ -272,9 +272,11 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         host['system_profile']['os_release'] = os_details['version']
         host['system_profile']['operating_system'] = {
             'major': os_details['major'],
-            'minor': os_details['minor'],
-            'name': ('RHEL' if 'Red Hat' in os_details['name'] else os_details['name']).strip()
+            'minor': os_details['minor']
         }
+
+        if 'Red Hat' in os_details['name']:
+            host['system_profile']['operating_system']['name'] = 'RHEL'
 
         if os_release == os_details['version']:
             return host

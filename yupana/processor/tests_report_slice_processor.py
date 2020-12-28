@@ -620,8 +620,7 @@ class ReportSliceProcessorTests(TestCase):
         host = self.processor._transform_single_host(host)
         self.assertEqual(host,
                          {'system_profile': {'os_release': '7',
-                                             'operating_system': {'major': '7', 'minor': '0',
-                                                                  'name': ''}}})
+                                             'operating_system': {'major': '7', 'minor': '0'}}})
 
     def test_remove_os_release_when_no_version(self):
         """Test remove host os_release."""
@@ -654,7 +653,7 @@ class ReportSliceProcessorTests(TestCase):
         host = {'system_profile': {'os_release': 'CentOS Linux 7 (Core)'}}
         host = self.processor._transform_single_host(host)
         self.assertEqual(host, {'system_profile': {'operating_system': {
-            'major': '7', 'minor': '0', 'name': 'CentOS Linux'}, 'os_release': '7'}})
+            'major': '7', 'minor': '0'}, 'os_release': '7'}})
 
     def test_transform_os_fields(self):
         """Test transform os fields."""
@@ -666,7 +665,7 @@ class ReportSliceProcessorTests(TestCase):
             host,
             {'system_profile': {
                 'os_release': '7', 'os_kernel_version': '3.10.0',
-                'operating_system': {'major': '7', 'minor': '0', 'name': ''}}})
+                'operating_system': {'major': '7', 'minor': '0'}}})
 
     def test_do_not_tranform_os_fields(self):
         """Test do not transform os fields when already in format."""
@@ -677,7 +676,7 @@ class ReportSliceProcessorTests(TestCase):
             host,
             {'system_profile': {
                 'os_release': '7', 'os_kernel_version': '2.6.32',
-                'operating_system': {'major': '7', 'minor': '0', 'name': ''}}}
+                'operating_system': {'major': '7', 'minor': '0'}}}
         )
 
     def test_do_not_tranform_os_release_with_number_field(self):
