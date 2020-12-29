@@ -51,7 +51,8 @@ RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
 UPLOAD_TOPIC = 'platform.inventory.host-ingress'  # placeholder topic
 OS_RELEASE_PATTERN = re.compile(
-    r'(?P<name>[a-zA-Z\s]*)?\s*(?P<version>[\d\.]*)\s*(\((?P<code>\S*)\))?'
+    r'(?P<name>[a-zA-Z\s]*)?\s*((?P<major>\d*)(\.?(?P<minor>\d*)(\.?(?P<patch>\d*))?)?)\s*'
+    r'(\((?P<code>\S*)\))?'
 )
 PROCESSOR_NAME = 'report_slice_processor'
 
@@ -228,23 +229,28 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             ))
         return host
 
-    def _match_regex_and_find_version(self, os_release):
-        """Match Regex with os_release and return os_version."""
+    def _match_regex_and_find_os_details(self, os_release):
+        """Match Regex with os_release and return os_details."""
         source_os_release = os_release.strip()
         if not source_os_release:
             return None
 
         match_result = OS_RELEASE_PATTERN.match(source_os_release)
-        parsed_info = match_result.groupdict()
-        os_version = parsed_info['version'].strip()
+        os_details = match_result.groupdict()
+        if os_details['minor']:
+            os_details['version'] = f"{os_details['major']}.{os_details['minor']}"
+        else:
+            os_details['version'] = os_details['major']
+            os_details['minor'] = '0'
+
         LOG.info(
             format_message(
                 self.prefix,
                 "os version after parsing os_release: '%s'"
-                % os_version,
+                % os_details,
                 account_number=self.account_number,
                 report_platform_id=self.report_platform_id))
-        return os_version
+        return os_details
 
     def _transform_os_release(self, host: dict):
         """Transform 'system_profile.os_release' label."""
@@ -253,8 +259,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         if not isinstance(os_release, str):
             return host
 
-        os_version = self._match_regex_and_find_version(os_release)
-        if not os_version:
+        os_details = self._match_regex_and_find_os_details(os_release)
+        if not os_details or not os_details['major']:
             del host['system_profile']['os_release']
             LOG.info(format_message(
                 self.prefix, "Removed empty os_release fact for host with FQDN '%s'"
@@ -263,15 +269,23 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 report_platform_id=self.report_platform_id))
             return host
 
-        if os_release == os_version:
+        host['system_profile']['os_release'] = os_details['version']
+        host['system_profile']['operating_system'] = {
+            'major': os_details['major'],
+            'minor': os_details['minor']
+        }
+
+        if 'Red Hat' in os_details['name']:
+            host['system_profile']['operating_system']['name'] = 'RHEL'
+
+        if os_release == os_details['version']:
             return host
 
-        host['system_profile']['os_release'] = os_version
         LOG.info(
             format_message(
                 self.prefix,
                 "os_release transformed '%s' -> '%s'"
-                % (os_release, os_version),
+                % (os_release, os_details['version']),
                 account_number=self.account_number,
                 report_platform_id=self.report_platform_id)
         )

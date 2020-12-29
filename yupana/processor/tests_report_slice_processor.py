@@ -611,13 +611,16 @@ class ReportSliceProcessorTests(TestCase):
             'os_release': 'Red Hat Enterprise Linux Server 6.10 (Santiago)'
         }}
         host = self.processor._transform_single_host(host)
-        self.assertEqual(host, {'system_profile': {'os_release': '6.10'}})
+        self.assertEqual(host, {'system_profile': {'operating_system': {
+            'major': '6', 'minor': '10', 'name': 'RHEL'}, 'os_release': '6.10'}})
 
     def test_do_not_transform_when_only_version(self):
         """Test do not transform os_release when only version."""
         host = {'system_profile': {'os_release': '7'}}
         host = self.processor._transform_single_host(host)
-        self.assertEqual(host, {'system_profile': {'os_release': '7'}})
+        self.assertEqual(host,
+                         {'system_profile': {'os_release': '7',
+                                             'operating_system': {'major': '7', 'minor': '0'}}})
 
     def test_remove_os_release_when_no_version(self):
         """Test remove host os_release."""
@@ -649,7 +652,8 @@ class ReportSliceProcessorTests(TestCase):
         """Test transform host os_release when non rhel."""
         host = {'system_profile': {'os_release': 'CentOS Linux 7 (Core)'}}
         host = self.processor._transform_single_host(host)
-        self.assertEqual(host, {'system_profile': {'os_release': '7'}})
+        self.assertEqual(host, {'system_profile': {'operating_system': {
+            'major': '7', 'minor': '0'}, 'os_release': '7'}})
 
     def test_transform_os_fields(self):
         """Test transform os fields."""
@@ -660,7 +664,8 @@ class ReportSliceProcessorTests(TestCase):
         self.assertEqual(
             host,
             {'system_profile': {
-                'os_release': '7', 'os_kernel_version': '3.10.0'}})
+                'os_release': '7', 'os_kernel_version': '3.10.0',
+                'operating_system': {'major': '7', 'minor': '0'}}})
 
     def test_do_not_tranform_os_fields(self):
         """Test do not transform os fields when already in format."""
@@ -670,7 +675,8 @@ class ReportSliceProcessorTests(TestCase):
         self.assertEqual(
             host,
             {'system_profile': {
-                'os_release': '7', 'os_kernel_version': '2.6.32'}}
+                'os_release': '7', 'os_kernel_version': '2.6.32',
+                'operating_system': {'major': '7', 'minor': '0'}}}
         )
 
     def test_do_not_tranform_os_release_with_number_field(self):
@@ -682,14 +688,14 @@ class ReportSliceProcessorTests(TestCase):
             {'system_profile': {'os_release': 7}}
         )
 
-    def test_match_regex_and_find_version(self):
+    def test_match_regex_and_find_os_details(self):
         """Test match Regex with os_release and return os_version."""
         host = {'system_profile': {
             'os_release': 'Red Hat Enterprise Linux Server 7'}}
         host_os_version = '7'
-        os_version = self.processor._match_regex_and_find_version(
+        os_version = self.processor._match_regex_and_find_os_details(
             host['system_profile']['os_release'])
-        self.assertEqual(host_os_version, os_version)
+        self.assertEqual(host_os_version, os_version['major'])
 
     def test_remove_empty_ip_addresses(self):
         """Test remove host ip_addresses."""
