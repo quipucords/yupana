@@ -919,6 +919,35 @@ class ReportProcessorTests(TransactionTestCase):
         }
         self.assertEqual(result, expected_result)
 
+    def test_extract_and_create_slices_success_using_bz2(self):
+        """Testing the extract method with valid buffer content using bz2."""
+        metadata_json = {
+            'report_id': 1,
+            'host_inventory_api_version': '1.0.0',
+            'source': 'qpc',
+            'source_metadata': {'foo': 'bar'},
+            'report_slices': {str(self.uuid): {'number_hosts': 1}}
+        }
+        report_json = {
+            'report_slice_id': str(self.uuid),
+            'hosts': {str(self.uuid): {'key': 'value'}}}
+        report_files = {
+            'metadata.json': metadata_json,
+            '%s.json' % str(self.uuid): report_json
+        }
+        self.processor.report_or_slice = self.report_record
+        self.processor.account_number = '0001'
+        buffer_content = test_handler.create_tar_buffer(
+            report_files, 'utf-8', 'utf-8', 'bz2')
+        result = self.processor._extract_and_create_slices(buffer_content)
+        expected_result = {
+            'report_platform_id': 1,
+            'host_inventory_api_version': '1.0.0',
+            'source': 'qpc',
+            'source_metadata': {'foo': 'bar'}
+        }
+        self.assertEqual(result, expected_result)
+
     def test_extract_and_create_slices_mismatch(self):
         """Testing the extract method with mismatched metadata content."""
         metadata_json = {
