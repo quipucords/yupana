@@ -891,7 +891,7 @@ class ReportProcessorTests(TransactionTestCase):
         self.report_slice.refresh_from_db()
         self.assertEqual(self.report_slice.state, ReportSlice.PENDING)
 
-    def test_extract_and_create_slices_success(self):
+    def test_extract_and_create_slices_success_using_gz(self):
         """Testing the extract method with valid buffer content."""
         metadata_json = {
             'report_id': 1,
@@ -919,8 +919,8 @@ class ReportProcessorTests(TransactionTestCase):
         }
         self.assertEqual(result, expected_result)
 
-    def test_extract_and_create_slices_success_using_bz2(self):
-        """Testing the extract method with valid buffer content using bz2."""
+    def test_extract_and_create_slices_success_using_xz(self):
+        """Testing the extract method with valid buffer content using xz."""
         metadata_json = {
             'report_id': 1,
             'host_inventory_api_version': '1.0.0',
@@ -938,7 +938,7 @@ class ReportProcessorTests(TransactionTestCase):
         self.processor.report_or_slice = self.report_record
         self.processor.account_number = '0001'
         buffer_content = test_handler.create_tar_buffer(
-            report_files, 'utf-8', 'utf-8', 'bz2')
+            report_files, 'utf-8', 'utf-8', 'xz')
         result = self.processor._extract_and_create_slices(buffer_content)
         expected_result = {
             'report_platform_id': 1,
