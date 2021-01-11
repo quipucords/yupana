@@ -346,6 +346,8 @@ class ReportProcessorTests(TransactionTestCase):
         self.report_record.upload_ack_status = report_processor.SUCCESS_CONFIRM_STATUS
         self.report_record.save()
         self.processor.report_or_slice = self.report_record
+        # Note - hacky way to fix random test failure
+        await asyncio.sleep(0.01)
 
         def download_side_effect():
             """Transition the state to downloaded."""
