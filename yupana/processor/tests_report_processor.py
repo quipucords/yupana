@@ -346,6 +346,8 @@ class ReportProcessorTests(TransactionTestCase):
         self.report_record.upload_ack_status = report_processor.SUCCESS_CONFIRM_STATUS
         self.report_record.save()
         self.processor.report_or_slice = self.report_record
+        # Note - hacky way to fix random test failure
+        await asyncio.sleep(0.01)
 
         def download_side_effect():
             """Transition the state to downloaded."""
@@ -891,7 +893,7 @@ class ReportProcessorTests(TransactionTestCase):
         self.report_slice.refresh_from_db()
         self.assertEqual(self.report_slice.state, ReportSlice.PENDING)
 
-    def test_extract_and_create_slices_success(self):
+    def test_extract_and_create_slices_success_using_gz(self):
         """Testing the extract method with valid buffer content."""
         metadata_json = {
             'report_id': 1,
@@ -910,6 +912,35 @@ class ReportProcessorTests(TransactionTestCase):
         self.processor.report_or_slice = self.report_record
         self.processor.account_number = '0001'
         buffer_content = test_handler.create_tar_buffer(report_files)
+        result = self.processor._extract_and_create_slices(buffer_content)
+        expected_result = {
+            'report_platform_id': 1,
+            'host_inventory_api_version': '1.0.0',
+            'source': 'qpc',
+            'source_metadata': {'foo': 'bar'}
+        }
+        self.assertEqual(result, expected_result)
+
+    def test_extract_and_create_slices_success_using_xz(self):
+        """Testing the extract method with valid buffer content using xz."""
+        metadata_json = {
+            'report_id': 1,
+            'host_inventory_api_version': '1.0.0',
+            'source': 'qpc',
+            'source_metadata': {'foo': 'bar'},
+            'report_slices': {str(self.uuid): {'number_hosts': 1}}
+        }
+        report_json = {
+            'report_slice_id': str(self.uuid),
+            'hosts': {str(self.uuid): {'key': 'value'}}}
+        report_files = {
+            'metadata.json': metadata_json,
+            '%s.json' % str(self.uuid): report_json
+        }
+        self.processor.report_or_slice = self.report_record
+        self.processor.account_number = '0001'
+        buffer_content = test_handler.create_tar_buffer(
+            report_files, 'utf-8', 'utf-8', 'xz')
         result = self.processor._extract_and_create_slices(buffer_content)
         expected_result = {
             'report_platform_id': 1,

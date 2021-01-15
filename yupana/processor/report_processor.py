@@ -151,8 +151,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             'State is "%s".' % self.report_or_slice.state,
             account_number=self.account_number))
         try:
-            report_tar_gz = self._download_report()
-            options = self._extract_and_create_slices(report_tar_gz)
+            report_tar = self._download_report()
+            options = self._extract_and_create_slices(report_tar)
             self.next_state = Report.DOWNLOADED
             # update the report or slice with downloaded info
             self.update_object_state(options=options)
@@ -397,7 +397,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         """
         Download report.
 
-        :returns content: The tar.gz binary content or None if there are errors.
+        :returns content: The tar binary content or None if there are errors.
         """
         self.prefix = 'REPORT DOWNLOAD'
         try:
@@ -551,16 +551,16 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         return valid_slice_ids, options
 
     # pylint: disable=too-many-branches, too-many-statements
-    def _extract_and_create_slices(self, report_tar_gz):  # noqa: C901 (too-complex)
-        """Extract Insights report from tar.gz file.
+    def _extract_and_create_slices(self, report_tar):  # noqa: C901 (too-complex)
+        """Extract Insights report from tar file.
 
-        :param report_tar_gz: A hexstring or BytesIO tarball
-            saved in memory with gzip compression.
+        :param report_tar: A hexstring or BytesIO tarball
+            saved in memory with gzip|bz2|lzma compression.
         :returns: Insights report as dict
         """
         self.prefix = 'EXTRACT REPORT FROM TAR'
         try:  # pylint: disable=too-many-nested-blocks
-            tar = tarfile.open(fileobj=BytesIO(report_tar_gz), mode='r:gz')
+            tar = tarfile.open(fileobj=BytesIO(report_tar), mode='r:*')
             files = tar.getmembers()
             json_files = []
             metadata_file = None
@@ -667,12 +667,12 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         except tarfile.ReadError as err:
             raise FailExtractException(format_message(
                 self.prefix,
-                'Unexpected error reading tar.gz: %s' % str(err),
+                'Unexpected error reading tar file: %s' % str(err),
                 account_number=self.account_number))
         except Exception as err:
             raise RetryExtractException(
                 format_message(self.prefix,
-                               'Unexpected error reading tar.gz: %s' % str(err),
+                               'Unexpected error reading tar file: %s' % str(err),
                                account_number=self.account_number))
 
     @KAFKA_ERRORS.count_exceptions()
