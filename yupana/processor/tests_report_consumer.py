@@ -31,14 +31,16 @@ from kafka.errors import KafkaConnectionError
 from api.models import Report
 
 
-def create_tar_buffer(files_data, encoding='utf-8', meta_encoding='utf-8'):
+def create_tar_buffer(files_data, encoding='utf-8', meta_encoding='utf-8',
+                      compression_algo='gz'):
     """Generate a file buffer based off a dictionary."""
     if not isinstance(files_data, (dict,)):
         return None
     if not all(isinstance(v, (str, dict)) for v in files_data.values()):
         return None
     tar_buffer = io.BytesIO()
-    with tarfile.open(fileobj=tar_buffer, mode='w:gz') as tar_file:
+    mode = f'w:{compression_algo}'
+    with tarfile.open(fileobj=tar_buffer, mode=mode) as tar_file:
         for file_name, file_content in files_data.items():
             if 'metadata.json' in file_name:
                 file_buffer = \
