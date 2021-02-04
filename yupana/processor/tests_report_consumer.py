@@ -30,6 +30,12 @@ from kafka.errors import KafkaConnectionError
 
 from api.models import Report
 
+# pylint: disable=invalid-name
+b64_identity = ('eyJpZGVudGl0eSI6IHsiYWNjb3VudF9udW1iZXIiOiAic3lzYWNjb3VudCIsICJ0eXBlIjogIlN5c3R'
+                'lbSIsICJhdXRoX3R5cGUiOiAiY2VydC1hdXRoIiwgInN5c3RlbSI6IHsiY24iOiAiMWIzNmIyMGYtN2'
+                'ZhMC00NDU0LWE2ZDItMDA4Mjk0ZTA2Mzc4IiwgImNlcnRfdHlwZSI6ICJzeXN0ZW0ifSwgImludGVyb'
+                'mFsIjogeyJvcmdfaWQiOiAiMzM0MDg1MSIsICJhdXRoX3RpbWUiOiA2MzAwfX19')
+
 
 def create_tar_buffer(files_data, encoding='utf-8', meta_encoding='utf-8',
                       compression_algo='gz'):
@@ -62,10 +68,12 @@ def create_tar_buffer(files_data, encoding='utf-8', meta_encoding='utf-8',
 class KafkaMsg:  # pylint:disable=too-few-public-methods
     """Create a kafka msg."""
 
+    # pylint: disable=line-too-long
     def __init__(self, topic, url):
         """Initialize the message."""
         self.topic = topic
-        value_dict = {'url': url, 'rh_account': '1234', 'request_id': '234332'}
+        value_dict = {'url': url, 'rh_account': '1234', 'request_id': '234332',
+                      'b64_identity': b64_identity}
         value_str = json.dumps(value_dict)
         self.value = value_str.encode('utf-8')
 
@@ -88,11 +96,13 @@ class KafkaMsgHandlerTest(TestCase):
         msg = msg_handler.format_message('p', 'm')
         self.assertEqual(msg, 'Report p - m')
 
+    # pylint: disable=line-too-long
     def test_unpack_consumer_record(self):
         """Test format message without account or report id."""
         fake_record = KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')
         msg = self.report_consumer.unpack_consumer_record(fake_record)
-        self.assertEqual(msg, {'url': 'http://internet.com', 'rh_account': '1234',
+        self.assertEqual(msg, {'b64_identity': b64_identity,
+                               'url': 'http://internet.com', 'rh_account': '1234',
                                'request_id': '234332'})
 
     def test_unpack_consumer_record_not_json(self):

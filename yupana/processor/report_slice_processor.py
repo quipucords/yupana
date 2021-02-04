@@ -17,6 +17,7 @@
 """Report Slice Processor."""
 
 import asyncio
+import base64
 import json
 import logging
 import re
@@ -351,6 +352,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         return host
 
     # pylint:disable=too-many-locals
+    # pylint: disable=too-many-statements
     @KAFKA_ERRORS.count_exceptions()  # noqa: C901 (too-complex)
     async def _upload_to_host_inventory_via_kafka(self, hosts):
         """
@@ -380,6 +382,10 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         send_futures = []
         associated_msg = []
         report = self.report_or_slice.report
+        b64_identity = json.loads(report.upload_srv_kafka_msg)['b64_identity']
+        raw_b64_identity = base64.b64decode(b64_identity).decode('utf-8')
+        identity = json.loads(raw_b64_identity)
+        cert_cn = identity['identity']['system']['cn']
         unique_id_base = '{}:{}:{}:'.format(report.request_id,
                                             report.report_platform_id,
                                             self.report_or_slice.report_slice_id)
@@ -387,13 +393,16 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             for host_id, host in hosts.items():
                 if HOSTS_TRANSFORMATION_ENABLED:
                     host = self._transform_single_host(host)
+                    if 'system_profile' in host:
+                        host['system_profile']['owner_id'] = cert_cn
 
                 system_unique_id = unique_id_base + host_id
                 count += 1
                 upload_msg = {
                     'operation': 'add_host',
                     'data': host,
-                    'platform_metadata': {'request_id': system_unique_id}
+                    'platform_metadata': {'request_id': system_unique_id,
+                                          'b64_identity': b64_identity}
                 }
                 msg = bytes(json.dumps(upload_msg), 'utf-8')
                 future = await self.producer.send(UPLOAD_TOPIC, msg)
