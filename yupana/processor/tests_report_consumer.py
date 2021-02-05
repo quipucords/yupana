@@ -68,7 +68,6 @@ def create_tar_buffer(files_data, encoding='utf-8', meta_encoding='utf-8',
 class KafkaMsg:  # pylint:disable=too-few-public-methods
     """Create a kafka msg."""
 
-    # pylint: disable=line-too-long
     def __init__(self, topic, url):
         """Initialize the message."""
         self.topic = topic
@@ -96,7 +95,6 @@ class KafkaMsgHandlerTest(TestCase):
         msg = msg_handler.format_message('p', 'm')
         self.assertEqual(msg, 'Report p - m')
 
-    # pylint: disable=line-too-long
     def test_unpack_consumer_record(self):
         """Test format message without account or report id."""
         fake_record = KafkaMsg(msg_handler.QPC_TOPIC, 'http://internet.com')

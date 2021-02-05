@@ -382,10 +382,16 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         send_futures = []
         associated_msg = []
         report = self.report_or_slice.report
-        b64_identity = json.loads(report.upload_srv_kafka_msg)['b64_identity']
-        raw_b64_identity = base64.b64decode(b64_identity).decode('utf-8')
-        identity = json.loads(raw_b64_identity)
-        cert_cn = identity['identity']['system']['cn']
+        cert_cn = None
+        try:
+            b64_identity = json.loads(report.upload_srv_kafka_msg)['b64_identity']
+            raw_b64_identity = base64.b64decode(b64_identity).decode('utf-8')
+            identity = json.loads(raw_b64_identity)
+            cert_cn = identity['identity']['system']['cn']
+        except KeyError as err:
+            LOG.error(format_message(
+                self.prefix, 'Invalid identity. Key not found: %s' % err))
+
         unique_id_base = '{}:{}:{}:'.format(report.request_id,
                                             report.report_platform_id,
                                             self.report_or_slice.report_slice_id)
@@ -393,7 +399,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             for host_id, host in hosts.items():
                 if HOSTS_TRANSFORMATION_ENABLED:
                     host = self._transform_single_host(host)
-                    if 'system_profile' in host:
+                    if cert_cn and ('system_profile' in host):
                         host['system_profile']['owner_id'] = cert_cn
 
                 system_unique_id = unique_id_base + host_id
