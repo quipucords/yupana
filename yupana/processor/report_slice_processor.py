@@ -311,41 +311,71 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
         return host
 
-    def _transform_mtu(self, host: dict):
-        """Transform 'system_profile.network_interfaces[]['mtu'] to Integer."""
+    def _transform_network_interfaces(self, host: dict):
+        """Transform 'system_profile.network_interfaces[]."""
         system_profile = host.get('system_profile', {})
         network_interfaces = system_profile.get('network_interfaces')
 
         if not network_interfaces:
             return host
 
-        mtu_transformed = False
-        for nic in network_interfaces:
-            if (
-                    'mtu' not in nic or not nic['mtu'] or isinstance(
-                        nic['mtu'], int)
-            ):
-                continue
+        filtered_nics = list(filter(lambda nic: nic.get('name'), network_interfaces))
+        increment_counts = {
+            'mtu': 0,
+            'ipv6_addresses': 0
+        }
+        for nic in filtered_nics:
+            increment_counts, nic = self._transform_mtu(
+                nic, increment_counts)
+            increment_counts, nic = self._transform_ipv6(
+                nic, increment_counts)
 
-            nic['mtu'] = int(nic['mtu'])
-            mtu_transformed = True
-
-        if mtu_transformed:
+        modified_fields = [
+            field for field, count in increment_counts.items() if count > 0
+        ]
+        if len(modified_fields) > 0:
             LOG.info(
                 format_message(
                     self.prefix,
-                    "Transformed mtu value to integer for host with FQDN '%s'"
-                    % (host.get('fqdn', '')),
+                    "Transformed %s for host with FQDN '%s'"
+                    % (",".join(modified_fields), host.get('fqdn', '')),
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id))
+
+        host['system_profile']['network_interfaces'] = filtered_nics
         return host
+
+    @staticmethod
+    def _transform_ipv6(nic: dict, increment_counts: dict):
+        """ Remove empty 'network_interfaces[]['ipv6_addresses']."""
+        old_len = len(nic['ipv6_addresses'])
+        nic['ipv6_addresses'] = list(
+            filter(lambda ipv6: ipv6, nic['ipv6_addresses'])
+        )
+        new_len = len(nic['ipv6_addresses'])
+        if old_len != new_len:
+            increment_counts['ipv6_addresses'] += 1
+
+        return increment_counts, nic
+
+    @staticmethod
+    def _transform_mtu(nic: dict, increment_counts: dict):
+        """Transform 'system_profile.network_interfaces[]['mtu'] to Integer."""
+        if (
+                'mtu' not in nic or not nic['mtu'] or isinstance(
+                    nic['mtu'], int)
+        ):
+            return increment_counts, nic
+        nic['mtu'] = int(nic['mtu'])
+        increment_counts['mtu'] += 1
+        return increment_counts, nic
 
     def _transform_single_host(self, host: dict):
         """Transform 'system_profile' fields."""
         if 'system_profile' in host:
             host = self._transform_os_release(host)
             host = self._transform_os_kernel_version(host)
-            host = self._transform_mtu(host)
+            host = self._transform_network_interfaces(host)
 
         host = self._remove_empty_ip_addresses(host)
         host = self._remove_empty_mac_addresses(host)
