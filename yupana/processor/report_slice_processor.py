@@ -338,7 +338,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 format_message(
                     self.prefix,
                     "Transformed %s for host with FQDN '%s'"
-                    % (",".join(modified_fields), host.get('fqdn', '')),
+                    % (','.join(modified_fields), host.get('fqdn', '')),
                     account_number=self.account_number,
                     report_platform_id=self.report_platform_id))
 
@@ -347,7 +347,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
     @staticmethod
     def _transform_ipv6(nic: dict, increment_counts: dict):
-        """ Remove empty 'network_interfaces[]['ipv6_addresses']."""
+        """Remove empty 'network_interfaces[]['ipv6_addresses']."""
         old_len = len(nic['ipv6_addresses'])
         nic['ipv6_addresses'] = list(
             filter(lambda ipv6: ipv6, nic['ipv6_addresses'])
