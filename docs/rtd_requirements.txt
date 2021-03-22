@@ -1,12 +1,12 @@
--i https://pypi.python.org/simple
+-i https://pypi.python.org/simple/
 aiokafka==0.6.0
 boto3==1.13.0
 botocore==1.16.26
-certifi==2020.6.20
+certifi==2020.12.5
 chardet==3.0.4
 django-environ==0.4.5
 django-prometheus==2.0.0
-django==2.2.13
+django==2.2.18
 djangorestframework==3.11.0
 docutils==0.15.2
 gunicorn==20.0.4
@@ -16,11 +16,11 @@ kafka-python==2.0.2
 prometheus-client==0.7.1
 psycopg2-binary==2.8.5
 python-dateutil==2.8.1
-pytz==2020.1
+pytz==2021.1
 requests==2.23.0
-s3transfer==0.3.3
+s3transfer==0.3.6
 six==1.15.0
 sqlparse==0.3.1
-urllib3==1.25.10 ; python_version != '3.4'
+urllib3==1.25.11 ; python_version != '3.4'
 watchtower==0.7.3
 whitenoise==5.0.1
