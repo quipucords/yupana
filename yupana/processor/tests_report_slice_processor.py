@@ -794,3 +794,58 @@ class ReportSliceProcessorTests(TestCase):
                          'name':'eth0'}]
                 }
             })
+
+    def test_remove_nic_when_empty_string_in_name(self):
+        """Test to remove network_interface when name is empty."""
+        host = {
+            'system_profile': {
+                'network_interfaces': [
+                    {'ipv4_addresses': [], 'ipv6_addresses': [], 'name': ''},
+                    {'ipv4_addresses': [], 'ipv6_addresses': []},
+                    {'ipv4_addresses': [],
+                     'ipv6_addresses': [], 'name': 'eth0'}
+                ]
+            }}
+
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(
+            host,
+            {
+                'system_profile': {
+                    'network_interfaces': [
+                        {'ipv4_addresses': [], 'ipv6_addresses': [],
+                         'name':'eth0'}]
+                }
+            })
+
+    def test_remove_empty_strings_in_ipv6_addresses(self):
+        """Test to verify transformation for 'ipv6 addresses' in host."""
+        ipv6_address = '2021:0db8:85a3:0000:0000:8a2e:0370:7335'
+        host = {
+            'system_profile': {
+                'network_interfaces': [
+                    {'ipv4_addresses': [],
+                     'ipv6_addresses': ['', ipv6_address, ''],
+                     'name':'eth0'},
+                    {'ipv4_addresses': [],
+                     'ipv6_addresses': [''], 'name':'eth1'}]
+            }}
+
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(
+            host,
+            {
+                'system_profile': {
+                    'network_interfaces': [
+                        {'ipv4_addresses': [],
+                         'ipv6_addresses': [ipv6_address],
+                         'name':'eth0'},
+                        {'ipv4_addresses': [],
+                         'ipv6_addresses': [], 'name':'eth1'}]
+                }
+            })
+        nics = host['system_profile']['network_interfaces']
+        self.assertEqual(len(nics), 2)
+        filtered_nics = [nic for nic in nics if nic.get('name') == 'eth0']
+        self.assertTrue(len(filtered_nics))
+        self.assertEqual(len(filtered_nics[0]['ipv6_addresses']), 1)
