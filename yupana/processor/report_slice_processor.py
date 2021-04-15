@@ -196,6 +196,23 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                       for key in host.keys() if key not in ['cause', 'status_code']}
         return candidates
 
+    def _remove_display_name(self, host: dict):
+        """Remove 'display_name' field."""
+        display_name = host.get('display_name')
+        if display_name is None:
+            return host
+
+        del host['display_name']
+        LOG.info(
+            format_message(
+                self.prefix,
+                "Removed display_name fact for host with FQDN '%s'"
+                % (host.get('fqdn', '')),
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id
+            ))
+        return host
+
     def _remove_empty_ip_addresses(self, host: dict):
         """Remove 'ip_addresses' field."""
         ip_addresses = host.get('ip_addresses')
@@ -379,6 +396,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
         host = self._remove_empty_ip_addresses(host)
         host = self._remove_empty_mac_addresses(host)
+        host = self._remove_display_name(host)
         return host
 
     # pylint:disable=too-many-locals
