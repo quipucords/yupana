@@ -697,6 +697,12 @@ class ReportSliceProcessorTests(TestCase):
             host['system_profile']['os_release'])
         self.assertEqual(host_os_version, os_version['major'])
 
+    def test_remove_display_name(self):
+        """Test remove host display_name."""
+        host = {'display_name': 'test.example.com'}
+        host = self.processor._remove_display_name(host)
+        self.assertEqual(host, {})
+
     def test_remove_empty_ip_addresses(self):
         """Test remove host ip_addresses."""
         host = {
