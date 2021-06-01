@@ -21,17 +21,17 @@ import logging
 from processor.processor_utils import (format_message,
                                        list_name_of_active_threads,
                                        list_name_of_processors)
+from prometheus_client import Counter
 from rest_framework import permissions, status as http_status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from api.status.model import Status
 from api.status.serializer import StatusSerializer
-from prometheus_client import Counter
 
 LOG = logging.getLogger(__name__)
 PROCESSOR_DEAD_EXCEPTION = Counter('yupana_processor_dead',
-                        'Total number of time yupana process thread dies')
+                                   'Total number of time yupana process thread dies')
 
 
 @api_view(['GET', 'HEAD'])
