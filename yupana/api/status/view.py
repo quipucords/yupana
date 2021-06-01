@@ -27,8 +27,11 @@ from rest_framework.response import Response
 
 from api.status.model import Status
 from api.status.serializer import StatusSerializer
+from prometheus_client import Counter
 
 LOG = logging.getLogger(__name__)
+PROCESSOR_DEAD_EXCEPTION = Counter('yupana_processor_dead',
+                        'Total number of time yupana process thread dies')
 
 
 @api_view(['GET', 'HEAD'])
@@ -88,6 +91,7 @@ def status(request):
     active_threads_names = list_name_of_active_threads()
     if not all(item in active_threads_names for item in total_processors_names):
         dead_processors = set(total_processors_names).difference(active_threads_names)
+        PROCESSOR_DEAD_EXCEPTION.inc()
         LOG.error(format_message('SERVICE STATUS', 'Dead processors - %s' % dead_processors))
         return Response('ERROR: Processor thread exited',
                         status=http_status.HTTP_500_INTERNAL_SERVER_ERROR)
