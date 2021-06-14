@@ -22,6 +22,7 @@ import json
 import logging
 import re
 import threading
+from uuid import UUID
 
 from aiokafka import AIOKafkaProducer
 from kafka.errors import KafkaConnectionError
@@ -249,6 +250,31 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             ))
         return host
 
+    @staticmethod
+    def is_valid_uuid(uuid):
+        """Validate a UUID string."""
+        try:
+            uuid_obj = UUID(uuid)
+        except ValueError:
+            return False
+
+        return str(uuid_obj) == uuid
+
+    def _remove_invalid_bios_uuid(self, host):
+        """Remove invalid bios UUID."""
+        uuid = host.get('bios_uuid')
+        if not isinstance(uuid, str):
+            return host
+
+        if not self.is_valid_uuid(uuid):
+            LOG.error(format_message(
+                self.prefix,
+                "Invalid uuid: %s for host with FQDN '%s'"
+                % (uuid, host.get('fqdn', ''))))
+            del host['bios_uuid']
+
+        return host
+
     def _match_regex_and_find_os_details(self, os_release):
         """Match Regex with os_release and return os_details."""
         source_os_release = os_release.strip()
@@ -399,6 +425,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         host = self._remove_empty_ip_addresses(host)
         host = self._remove_empty_mac_addresses(host)
         host = self._remove_display_name(host)
+        host = self._remove_invalid_bios_uuid(host)
         return host
 
     # pylint:disable=too-many-locals
