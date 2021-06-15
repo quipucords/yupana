@@ -40,6 +40,7 @@ from config.settings.base import (HOSTS_TRANSFORMATION_ENABLED,
                                   HOSTS_UPLOAD_FUTURES_COUNT,
                                   HOSTS_UPLOAD_TIMEOUT,
                                   INSIGHTS_KAFKA_ADDRESS,
+                                  KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE,
                                   RETRIES_ALLOWED,
                                   RETRY_TIME)
 
@@ -88,7 +89,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             ReportSlice.FAILED_VALIDATION: FAILED_TO_VALIDATE
         }
         self.producer = AIOKafkaProducer(
-            loop=SLICE_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
+            loop=SLICE_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS,
+            max_request_size=KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE
         )
         super().__init__(pre_delegate=self.pre_delegate,
                          state_functions=state_functions,
@@ -411,7 +413,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         self.prefix = 'UPLOAD TO INVENTORY VIA KAFKA'
         await self.producer.stop()
         self.producer = AIOKafkaProducer(
-            loop=SLICE_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
+            loop=SLICE_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS,
+            max_request_size=KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE
         )
         try:
             await self.producer.start()

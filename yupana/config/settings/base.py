@@ -340,6 +340,11 @@ INSIGHTS_KAFKA_PORT = os.getenv('INSIGHTS_KAFKA_PORT', '29092')
 # Insights Kafka server address
 INSIGHTS_KAFKA_ADDRESS = f'{INSIGHTS_KAFKA_HOST}:{INSIGHTS_KAFKA_PORT}'
 
+# override max_request_size for kafka producer to 2(MB)
+KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE = os.getenv(
+    'KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE', 2097152
+)
+
 # Culling variables to compute the stale date
 # the time to live in number of days (the time from insertion into HBI until the stale date)
 DISCOVERY_HOST_TTL = os.getenv('DISCOVERY_HOST_TTL', '30')
