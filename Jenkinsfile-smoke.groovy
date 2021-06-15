@@ -16,7 +16,7 @@ if (env.CHANGE_ID) {
         // the service sets to deploy into the test environment
         ocDeployerServiceSets: "ingress,inventory,platform-mq,subscriptions",
         // the iqe plugins to install for the test
-        iqePlugins: ["iqe-yupana-plugin"],
+        iqePlugins: ["iqe-foreman-rh-cloud-plugin"],
         // the pytest marker to use when calling `iqe tests all`
         pytestMarker: "yupana_smoke",
         // optional id for an IQE configuration file stored as a secret in Jenkins
