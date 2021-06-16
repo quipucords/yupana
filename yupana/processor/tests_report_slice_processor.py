@@ -882,3 +882,12 @@ class ReportSliceProcessorTests(TestCase):
         }
         new_host = self.processor._remove_invalid_bios_uuid(host)
         self.assertEqual(new_host, host)
+
+    def test_bios_uuid_validation_should_be_case_insensitive(self):
+        """Test bios UUID validation should be case insensitive."""
+        host = {
+            'fqdn': 'virt-who.example.com',
+            'bios_uuid': '801CA199-9402-41CE-98DC-F3AA6E5BC6B3'
+        }
+        new_host = self.processor._remove_invalid_bios_uuid(host)
+        self.assertEqual(new_host, host)
