@@ -64,8 +64,8 @@ jobs:
 
     - name: Setup node
       uses: actions/setup-node@v2
-        with:
-          node-version: ${{ matrix.node_version }}
+      with:
+        node-version: ${{ matrix.node_version }}
 
     - name: Run make command to validate Swagger API
       run: |
