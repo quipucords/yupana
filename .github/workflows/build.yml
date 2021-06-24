@@ -77,3 +77,9 @@ jobs:
     - name: Upload coverage reports to Codecov
       run: |
         codecov
+        
+    - name: Slack notification     
+      id: slack
+      uses: slackapi/slack-github-action@v1.14.0   
+      env:
+        SLACK_BOT_TOKEN: ${{ secrets.SLACK_SECRET }}
