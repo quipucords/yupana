@@ -268,7 +268,7 @@ class ReportSliceProcessorTests(TestCase):
 
     async def async_test_transition_to_hosts_uploaded(self):
         """Test the transition to hosts being uploaded."""
-        hosts = [{str(self.uuid): {'bios_uuid': 'value', 'name': 'value',
+        hosts = [{str(self.uuid): {'bios_uuid': str(self.uuid), 'name': 'value',
                                    'system_platform_id': str(self.uuid)}},
                  {str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo',
                                     'system_platform_id': str(self.uuid2)}},
@@ -303,7 +303,7 @@ class ReportSliceProcessorTests(TestCase):
 
     async def async_test_transition_to_hosts_uploaded_kafka_mode(self):
         """Test the transition to hosts being uploaded."""
-        hosts = [{str(self.uuid): {'bios_uuid': 'value', 'name': 'value',
+        hosts = [{str(self.uuid): {'bios_uuid': str(self.uuid), 'name': 'value',
                                    'system_platform_id': str(self.uuid)}},
                  {str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo',
                                     'system_platform_id': str(self.uuid2)}},
@@ -373,7 +373,7 @@ class ReportSliceProcessorTests(TestCase):
 
     async def async_test_transition_to_hosts_uploaded_exception(self):
         """Test the transition to hosts being uploaded."""
-        hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
+        hosts = {str(self.uuid): {'bios_uuid': str(self.uuid), 'name': 'value'},
                  str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'},
                  str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'},
                  str(self.uuid4): {'mac_addresses': 'value', 'name': 'foo'},
@@ -406,7 +406,7 @@ class ReportSliceProcessorTests(TestCase):
         """Test uploading to inventory via kafka."""
         self.processor.report_or_slice = self.report_slice
         hosts = {
-            str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
+            str(self.uuid): {'bios_uuid': str(self.uuid), 'name': 'value'},
             str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'},
             str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'},
             str(self.uuid4): {'mac_addresses': 'value', 'name': 'foo'},
@@ -442,7 +442,7 @@ class ReportSliceProcessorTests(TestCase):
     async def async_test_upload_to_host_inventory_via_kafka_exception(self):
         """Test uploading to inventory via kafka."""
         self.processor.report_or_slice = self.report_slice
-        hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
+        hosts = {str(self.uuid): {'bios_uuid': str(self.uuid), 'name': 'value'},
                  str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'},
                  str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'},
                  str(self.uuid4): {'mac_addresses': 'value', 'name': 'foo'},
@@ -479,7 +479,7 @@ class ReportSliceProcessorTests(TestCase):
     async def async_test_upload_to_host_inventory_via_kafka_send_exception(self):
         """Test uploading to inventory via kafka."""
         self.processor.report_or_slice = self.report_slice
-        hosts = {str(self.uuid): {'bios_uuid': 'value', 'name': 'value'},
+        hosts = {str(self.uuid): {'bios_uuid': str(self.uuid), 'name': 'value'},
                  str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'},
                  str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'},
                  str(self.uuid4): {'mac_addresses': 'value', 'name': 'foo'},
@@ -855,3 +855,39 @@ class ReportSliceProcessorTests(TestCase):
         filtered_nics = [nic for nic in nics if nic.get('name') == 'eth0']
         self.assertTrue(len(filtered_nics))
         self.assertEqual(len(filtered_nics[0]['ipv6_addresses']), 1)
+
+    def test_remove_invalid_bios_uuid(self):
+        """Test remove invalid bios UUID."""
+        host = {
+            'fqdn': 'virt-who.example.com',
+            'bios_uuid': '45AA7104-5CB0-4A75-945D-7173C8DC5744443'
+        }
+        host = self.processor._remove_invalid_bios_uuid(host)
+        self.assertEqual(host, {'fqdn': 'virt-who.example.com'})
+
+    def test_remove_empty_bios_uuid(self):
+        """Test remove empty bios UUID field."""
+        host = {
+            'fqdn': 'virt-who.example.com',
+            'bios_uuid': ''
+        }
+        host = self.processor._remove_invalid_bios_uuid(host)
+        self.assertEqual(host, {'fqdn': 'virt-who.example.com'})
+
+    def test_do_not_remove_valid_bios_uuid(self):
+        """Test do not remove valid bios UUID."""
+        host = {
+            'fqdn': 'virt-who.example.com',
+            'bios_uuid': '123e4567-e89b-12d3-a456-426614174000'
+        }
+        new_host = self.processor._remove_invalid_bios_uuid(host)
+        self.assertEqual(new_host, host)
+
+    def test_bios_uuid_validation_should_be_case_insensitive(self):
+        """Test bios UUID validation should be case insensitive."""
+        host = {
+            'fqdn': 'virt-who.example.com',
+            'bios_uuid': '801CA199-9402-41CE-98DC-F3AA6E5BC6B3'
+        }
+        new_host = self.processor._remove_invalid_bios_uuid(host)
+        self.assertEqual(new_host, host)
