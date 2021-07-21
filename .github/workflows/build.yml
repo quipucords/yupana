@@ -32,7 +32,7 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: 3.6
-    
+
     - uses: actions/cache@v2
       with:
         path: ~/.cache/pip
@@ -73,13 +73,7 @@ jobs:
       run: |
         npm install swagger-cli
         node_modules/swagger-cli/swagger-cli.js validate yupana/static/openapi.json
-    
+
     - name: Upload coverage reports to Codecov
       run: |
         codecov
-        
-    - name: Slack notification     
-      id: slack
-      uses: slackapi/slack-github-action@v1.14.0   
-      env:
-        SLACK_BOT_TOKEN: ${{ secrets.SLACK_SECRET }}
