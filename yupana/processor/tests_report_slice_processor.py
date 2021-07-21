@@ -891,3 +891,44 @@ class ReportSliceProcessorTests(TestCase):
         }
         new_host = self.processor._remove_invalid_bios_uuid(host)
         self.assertEqual(new_host, host)
+
+    def test_transform_tags_value_to_string(self):
+        """Test tags transformation for host."""
+        host = {'tags': [
+            {
+                'namespace': 'satellite_parameter',
+                'key': 'host_registration_insights',
+                'value': True
+            },
+            {
+                'namespace': 'satellite_parameter',
+                'key': 'host_registration_remote_execution',
+                'value': False
+            },
+            {
+                'namespace': 'satellite',
+                'key': 'organization_id',
+                'value': 1
+            }
+        ]}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(
+            host,
+            {'tags': [
+                {
+                    'namespace': 'satellite_parameter',
+                    'key': 'host_registration_insights',
+                    'value': 'true'
+                },
+                {
+                    'namespace': 'satellite_parameter',
+                    'key': 'host_registration_remote_execution',
+                    'value': 'false'
+                },
+                {
+                    'namespace': 'satellite',
+                    'key': 'organization_id',
+                    'value': '1'
+                }
+            ]}
+        )

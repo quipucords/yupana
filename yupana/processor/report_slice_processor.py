@@ -199,6 +199,34 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                       for key in host.keys() if key not in ['cause', 'status_code']}
         return candidates
 
+    def _transform_tags(self, host: dict):
+        """Convert tag's value into string."""
+        tags = host.get('tags')
+        if tags is None:
+            return host
+
+        for tag in tags:
+            if tag['value'] is None or isinstance(tag['value'], str):
+                continue
+
+            if tag['value'] is True:
+                tag['value'] = 'true'
+            elif tag['value'] is False:
+                tag['value'] = 'false'
+            else:
+                tag['value'] = str(tag['value'])
+            LOG.info(
+                format_message(
+                    self.prefix,
+                    "Converted tags of host with FQDN '%s'"
+                    % (host.get('fqdn', '')),
+                    account_number=self.account_number,
+                    report_platform_id=self.report_platform_id
+                ))
+
+            host['tags'] = tags
+        return host
+
     def _remove_display_name(self, host: dict):
         """Remove 'display_name' field."""
         display_name = host.get('display_name')
@@ -426,6 +454,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         host = self._remove_empty_mac_addresses(host)
         host = self._remove_display_name(host)
         host = self._remove_invalid_bios_uuid(host)
+        host = self._transform_tags(host)
         return host
 
     # pylint:disable=too-many-locals
