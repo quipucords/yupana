@@ -215,16 +215,17 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 tag['value'] = 'false'
             else:
                 tag['value'] = str(tag['value'])
-            LOG.info(
-                format_message(
-                    self.prefix,
-                    "Converted tags of host with FQDN '%s'"
-                    % (host.get('fqdn', '')),
-                    account_number=self.account_number,
-                    report_platform_id=self.report_platform_id
-                ))
 
-            host['tags'] = tags
+        LOG.info(
+            format_message(
+                self.prefix,
+                "Converted tags of host with FQDN '%s'"
+                % (host.get('fqdn', '')),
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id
+            ))
+
+        host['tags'] = tags
         return host
 
     def _remove_display_name(self, host: dict):
