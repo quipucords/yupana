@@ -592,14 +592,14 @@ class ReportSliceProcessorTests(TestCase):
         self.check_variables_are_reset()
 
     def test_get_stale_time(self):
-        """Test the get stale date method."""
+        """Test the get stale time method."""
         self.processor.report_or_slice = self.report_record
         self.processor.report_or_slice.source = 'satellite'
         self.processor.report_or_slice.save()
         current_time = datetime.utcnow()
-        stale_time = current_time + timedelta(days=int(SATELLITE_HOST_TTL))
+        stale_time = current_time + timedelta(hours=int(SATELLITE_HOST_TTL))
         expected = stale_time.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
-        actual = self.processor.get_stale_date()
+        actual = self.processor.get_stale_time()
         # the format looks like this: 2019-11-14T19:58:13.037Z
         # by cutting off the last 13 i am comparing 2019-11-14T
         # which is the year/month/day
