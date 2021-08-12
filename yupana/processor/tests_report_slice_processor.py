@@ -865,6 +865,24 @@ class ReportSliceProcessorTests(TestCase):
         host = self.processor._remove_invalid_bios_uuid(host)
         self.assertEqual(host, {'fqdn': 'virt-who.example.com'})
 
+    def test_remove_invalid_bios_uuid_of_boolean_type(self):
+        """Test remove invalid bios UUID of boolean type."""
+        host = {
+            'fqdn': 'virt-who.example.com',
+            'bios_uuid': True
+        }
+        host = self.processor._remove_invalid_bios_uuid(host)
+        self.assertEqual(host, {'fqdn': 'virt-who.example.com'})
+
+    def test_remove_invalid_bios_uuid_of_number_type(self):
+        """Test remove invalid bios UUID of number type."""
+        host = {
+            'fqdn': 'virt-who.example.com',
+            'bios_uuid': 100
+        }
+        host = self.processor._remove_invalid_bios_uuid(host)
+        self.assertEqual(host, {'fqdn': 'virt-who.example.com'})
+
     def test_remove_empty_bios_uuid(self):
         """Test remove empty bios UUID field."""
         host = {
