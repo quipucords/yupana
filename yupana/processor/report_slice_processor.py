@@ -205,6 +205,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         if tags is None:
             return host
 
+        tags_modified = False
         for tag in tags:
             if tag['value'] is None or isinstance(tag['value'], str):
                 continue
@@ -216,14 +217,17 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             else:
                 tag['value'] = str(tag['value'])
 
-        LOG.info(
-            format_message(
-                self.prefix,
-                "Converted tags of host with FQDN '%s'"
-                % (host.get('fqdn', '')),
-                account_number=self.account_number,
-                report_platform_id=self.report_platform_id
-            ))
+            tags_modified = True
+
+        if tags_modified:
+            LOG.info(
+                format_message(
+                    self.prefix,
+                    "Converted tags of host with FQDN '%s'"
+                    % (host.get('fqdn', '')),
+                    account_number=self.account_number,
+                    report_platform_id=self.report_platform_id
+                ))
 
         host['tags'] = tags
         return host
