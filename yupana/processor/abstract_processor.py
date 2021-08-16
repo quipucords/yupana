@@ -749,7 +749,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                                          'report_slice_id': str(report_slice_id),
                                          'account': self.account_number,
                                          'source': self.report_or_slice.source}})
-            host['stale_timestamp'] = self.get_stale_date()
+            host['stale_timestamp'] = self.get_stale_time()
             host['reporter'] = 'yupana'
             host['facts'] = host_facts
             found_facts = False
@@ -777,11 +777,11 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
 
         return candidate_hosts, hosts_without_facts
 
-    def get_stale_date(self):
+    def get_stale_time(self):
         """Compute the stale date based on the host source."""
         ttl = int(DISCOVERY_HOST_TTL)
         if self.report_or_slice.source == 'satellite':
             ttl = int(SATELLITE_HOST_TTL)
         current_time = datetime.utcnow()
-        stale_time = current_time + timedelta(days=ttl)
+        stale_time = current_time + timedelta(hours=ttl)
         return stale_time.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
