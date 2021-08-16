@@ -16,7 +16,7 @@ if (env.CHANGE_ID) {
         // the service sets to deploy into the test environment
         ocDeployerServiceSets: "ingress,inventory,platform-mq,subscriptions",
         // the iqe plugins to install for the test
-        iqePlugins: ["foreman-rh-cloud"],
+        iqePlugins: ["foreman_rh_cloud"],
         // the pytest marker to use when calling `iqe tests all`
         pytestMarker: "core",
         // optional id for an IQE configuration file stored as a secret in Jenkins
