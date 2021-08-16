@@ -283,7 +283,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
     def is_valid_uuid(uuid):
         """Validate a UUID string."""
         try:
-            uuid_obj = UUID(uuid)
+            uuid_obj = UUID(str(uuid))
         except ValueError:
             return False
 
@@ -292,7 +292,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
     def _remove_invalid_bios_uuid(self, host):
         """Remove invalid bios UUID."""
         uuid = host.get('bios_uuid')
-        if not isinstance(uuid, str):
+        if uuid is None:
             return host
 
         if not self.is_valid_uuid(uuid):
