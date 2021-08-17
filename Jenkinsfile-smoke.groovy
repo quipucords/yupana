@@ -14,7 +14,7 @@ if (env.CHANGE_ID) {
         // the service-set/component for this app in e2e-deploy "templates"
         ocDeployerComponentPath: "subscriptions",
         // the service sets to deploy into the test environment
-        ocDeployerServiceSets: "ingress,inventory,platform-mq,subscriptions",
+        ocDeployerServiceSets: "ingress,inventory,platform-mq,rbac,subscriptions",
         // the iqe plugins to install for the test
         iqePlugins: ["foreman_rh_cloud"],
         // the pytest marker to use when calling `iqe tests all`
