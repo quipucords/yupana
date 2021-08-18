@@ -346,6 +346,6 @@ KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE = os.getenv(
 )
 
 # Culling variables to compute the stale date
-# the time to live in number of days (the time from insertion into HBI until the stale date)
-DISCOVERY_HOST_TTL = os.getenv('DISCOVERY_HOST_TTL', '30')
-SATELLITE_HOST_TTL = os.getenv('SATELLITE_HOST_TTL', '30')
+# the time to live in number of hours (the time from insertion into HBI until the stale date)
+DISCOVERY_HOST_TTL = os.getenv('DISCOVERY_HOST_TTL', '29')
+SATELLITE_HOST_TTL = os.getenv('SATELLITE_HOST_TTL', '29')

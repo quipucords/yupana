@@ -22,6 +22,7 @@ import json
 import logging
 import re
 import threading
+from uuid import UUID
 
 from aiokafka import AIOKafkaProducer
 from kafka.errors import KafkaConnectionError
@@ -198,6 +199,39 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                       for key in host.keys() if key not in ['cause', 'status_code']}
         return candidates
 
+    def _transform_tags(self, host: dict):
+        """Convert tag's value into string."""
+        tags = host.get('tags')
+        if tags is None:
+            return host
+
+        tags_modified = False
+        for tag in tags:
+            if tag['value'] is None or isinstance(tag['value'], str):
+                continue
+
+            if tag['value'] is True:
+                tag['value'] = 'true'
+            elif tag['value'] is False:
+                tag['value'] = 'false'
+            else:
+                tag['value'] = str(tag['value'])
+
+            tags_modified = True
+
+        if tags_modified:
+            LOG.info(
+                format_message(
+                    self.prefix,
+                    "Converted tags of host with FQDN '%s'"
+                    % (host.get('fqdn', '')),
+                    account_number=self.account_number,
+                    report_platform_id=self.report_platform_id
+                ))
+
+        host['tags'] = tags
+        return host
+
     def _remove_display_name(self, host: dict):
         """Remove 'display_name' field."""
         display_name = host.get('display_name')
@@ -247,6 +281,31 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 account_number=self.account_number,
                 report_platform_id=self.report_platform_id
             ))
+        return host
+
+    @staticmethod
+    def is_valid_uuid(uuid):
+        """Validate a UUID string."""
+        try:
+            uuid_obj = UUID(str(uuid))
+        except ValueError:
+            return False
+
+        return str(uuid_obj) == uuid.lower()
+
+    def _remove_invalid_bios_uuid(self, host):
+        """Remove invalid bios UUID."""
+        uuid = host.get('bios_uuid')
+        if uuid is None:
+            return host
+
+        if not self.is_valid_uuid(uuid):
+            LOG.error(format_message(
+                self.prefix,
+                "Invalid uuid: %s for host with FQDN '%s'"
+                % (uuid, host.get('fqdn', ''))))
+            del host['bios_uuid']
+
         return host
 
     def _match_regex_and_find_os_details(self, os_release):
@@ -399,6 +458,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         host = self._remove_empty_ip_addresses(host)
         host = self._remove_empty_mac_addresses(host)
         host = self._remove_display_name(host)
+        host = self._remove_invalid_bios_uuid(host)
+        host = self._transform_tags(host)
         return host
 
     # pylint:disable=too-many-locals
