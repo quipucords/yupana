@@ -650,10 +650,17 @@ class ReportSliceProcessorTests(TestCase):
 
     def test_transform_os_release_when_non_rhel_os(self):
         """Test transform host os_release when non rhel."""
+        host = {'system_profile': {'os_release': 'openSUSE Leap 15.3'}}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(host, {'system_profile': {'operating_system': {
+            'major': '15', 'minor': '3'}, 'os_release': '15.3'}})
+
+    def test_transform_os_release_when_centos(self):
+        """Test transform host os_release when centOS."""
         host = {'system_profile': {'os_release': 'CentOS Linux 7 (Core)'}}
         host = self.processor._transform_single_host(host)
         self.assertEqual(host, {'system_profile': {'operating_system': {
-            'major': '7', 'minor': '0'}, 'os_release': '7'}})
+            'name': 'CentOS', 'major': '7', 'minor': '0'}, 'os_release': '7'}})
 
     def test_transform_os_fields(self):
         """Test transform os fields."""

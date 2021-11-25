@@ -331,6 +331,16 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 report_platform_id=self.report_platform_id))
         return os_details
 
+    @staticmethod
+    def set_os_enum(os_name, operating_system):
+        """Return OS value after setting OS enum."""
+        if 'Red Hat' in os_name:
+            operating_system['name'] = 'RHEL'
+        if 'CentOS' in os_name:
+            operating_system['name'] = 'CentOS'
+
+        return operating_system
+
     def _transform_os_release(self, host: dict):
         """Transform 'system_profile.os_release' label."""
         system_profile = host.get('system_profile', {})
@@ -354,8 +364,9 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             'minor': os_details['minor']
         }
 
-        if 'Red Hat' in os_details['name']:
-            host['system_profile']['operating_system']['name'] = 'RHEL'
+        host['system_profile']['operating_system'] = self.set_os_enum(
+            os_details['name'], host['system_profile']['operating_system']
+        )
 
         if os_release == os_details['version']:
             return host
