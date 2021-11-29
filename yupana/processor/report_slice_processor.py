@@ -57,6 +57,7 @@ OS_RELEASE_PATTERN = re.compile(
     r'(?P<name>[a-zA-Z\s]*)?\s*((?P<major>\d*)(\.?(?P<minor>\d*)(\.?(?P<patch>\d*))?)?)\s*'
     r'(\((?P<code>\S*)\))?'
 )
+OS_VS_ENUM = {'Red Hat': 'RHEL', 'CentOS': 'CentOS'}
 PROCESSOR_NAME = 'report_slice_processor'
 
 
@@ -331,16 +332,6 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 report_platform_id=self.report_platform_id))
         return os_details
 
-    @staticmethod
-    def set_os_enum(os_name, operating_system):
-        """Return OS value after setting OS enum."""
-        if 'Red Hat' in os_name:
-            operating_system['name'] = 'RHEL'
-        if 'CentOS' in os_name:
-            operating_system['name'] = 'CentOS'
-
-        return operating_system
-
     def _transform_os_release(self, host: dict):
         """Transform 'system_profile.os_release' label."""
         system_profile = host.get('system_profile', {})
@@ -359,14 +350,23 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             return host
 
         host['system_profile']['os_release'] = os_details['version']
-        host['system_profile']['operating_system'] = {
-            'major': os_details['major'],
-            'minor': os_details['minor']
-        }
 
-        host['system_profile']['operating_system'] = self.set_os_enum(
-            os_details['name'], host['system_profile']['operating_system']
-        )
+        os_enum = next((
+            value for key, value in OS_VS_ENUM.items()
+            if key.lower() in os_details['name'].lower()), None)
+        if os_enum:
+            host['system_profile']['operating_system'] = {
+                'major': os_details['major'],
+                'minor': os_details['minor'],
+                'name': os_enum
+            }
+        else:
+            LOG.info(format_message(
+                self.prefix,
+                "Omitting operating system info for os release '%s'"
+                % (os_release),
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id))
 
         if os_release == os_details['version']:
             return host
