@@ -1,0 +1,101 @@
+---
+apiVersion: v1
+kind: Template
+metadata:
+  name: yupana
+objects:
+- apiVersion: cloud.redhat.com/v1alpha1
+  kind: ClowdApp
+  metadata:
+    name: yupana
+  spec:
+    envName: ${ENV_NAME}
+    dependencies:
+    - ingress
+    deployments:
+    - name: yupana
+      webServices:
+        public:
+          enabled: true
+      podSpec:
+        image: ${IMAGE}:${IMAGE_TAG}
+        minReplicas: ${{MIN_REPLICAS}}
+        resources:
+          requests:
+            cpu: ${CPU_REQUEST}
+            memory: ${MEMORY_REQUEST}
+          limits:
+            cpu: ${CPU_LIMIT}
+            memory: ${MEMORY_LIMIT}
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /api/subscriptions/v1/status/
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /api/subscriptions/v1/status/
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 3
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+          timeoutSeconds: 3
+        env:
+          - name: PATH_PREFIX
+            value: /api
+          - name: CLOWDER_ENABLED
+            value: ${CLOWDER_ENABLED}
+    database: #FIXME
+      name: yupana-db
+      version: 12
+    kafkaTopics:
+      - topicName: #FIXME
+        partitions: 1
+      - topicName: #FIXME
+        partitions: 1
+
+parameters:
+- description : ClowdEnvironment name
+  name: ENV_NAME
+  required: true
+- description: min replicas
+  name: MIN_REPLICAS
+  value: "1"
+- description: Image NAME
+  name: IMAGE
+  required: true
+  value: quay.io/cloudservices/yupana
+- description: Image tag
+  name: IMAGE_TAG
+  required: true
+- description: Initial cpu request.
+  displayName: CPU Request
+  name: CPU_REQUEST
+  required: true
+  value: 500m
+- description: Initial amount of memory the container will request.
+  displayName: Memory Request
+  name: MEMORY_REQUEST
+  required: true
+  value: 1Gi
+- description: Maximum amount of memory the Django container can use.
+  displayName: Memory Limit
+  name: MEMORY_LIMIT
+  required: true
+  value: 1Gi
+- description: Maximum amount of CPU the build container can use.
+  displayName: CPU Limit
+  name: CPU_LIMIT
+  required: true
+  value: '1'
+- description: Is clowder enabled
+  name: CLOWDER_ENABLED
+  value: "True"
+
