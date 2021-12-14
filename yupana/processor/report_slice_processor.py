@@ -524,6 +524,12 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     host = self._transform_single_host(host)
                     if cert_cn and ('system_profile' in host):
                         host['system_profile']['owner_id'] = cert_cn
+                host_request_size = bytes(json.dumps(host), 'utf-8')
+                if host_request_size >= KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE:
+                    if 'installed_packages' in host['system_profile']:
+                        # FIXME log
+                        LOG.info("******Removing Installed Packages as size of kafka msg exceeds max request size******")
+                        del host['system_profile']['installed_packages']
 
                 system_unique_id = unique_id_base + host_id
                 count += 1
