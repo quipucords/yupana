@@ -530,8 +530,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                         LOG.info(
                             format_message(
                                 self.prefix,
-                                "Removing installed packages from host %s as size of Kafka \
-                                message exceeds the maximum request size." %host_id,
+                                'Removing installed packages from host %s as size of Kafka \
+                                message exceeds the maximum request size.' % host_id,
                                 account_number=self.account_number,
                                 report_platform_id=self.report_platform_id))
                         del host['system_profile']['installed_packages']
