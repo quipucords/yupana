@@ -527,9 +527,20 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 host_request_size = bytes(json.dumps(host), 'utf-8')
                 if host_request_size >= KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE:
                     if 'installed_packages' in host['system_profile']:
-                        # FIXME log
-                        LOG.info("******Removing Installed Packages as size of kafka msg exceeds max request size******")
+                        LOG.info(
+                            format_message(
+                                self.prefix,
+                                "Removing installed packages from host %s as size of Kafka \
+                                message exceeds the maximum request size." %host_id,
+                                account_number=self.account_number,
+                                report_platform_id=self.report_platform_id))
                         del host['system_profile']['installed_packages']
+                        installed_pkgs_tag = {
+                            'namespace': 'yupana',  # or satellite
+                            'key': 'installed_packages',
+                            'value': ''  # FIXME
+                        }
+                        host['tags'].append(installed_pkgs_tag)
 
                 system_unique_id = unique_id_base + host_id
                 count += 1
