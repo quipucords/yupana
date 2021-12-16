@@ -525,22 +525,30 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     if cert_cn and ('system_profile' in host):
                         host['system_profile']['owner_id'] = cert_cn
                 host_request_size = bytes(json.dumps(host), 'utf-8')
-                if host_request_size >= KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE:
+                if len(host_request_size) >= KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE:
+                    LOG.info(
+                        format_message(
+                            self.prefix,
+                            'Updating the host %s as size of Kafka \
+                            message exceeds the maximum request size.' % host_id,
+                            account_number=self.account_number,
+                            report_platform_id=self.report_platform_id))
+                    if host['mac_addresses']:
+                        # To save only distinct values for mac_addresses
+                        host['mac_addresses'] = list(set(host['mac_addresses']))
+                        # Delete large list of installed packages
                     if 'installed_packages' in host['system_profile']:
-                        LOG.info(
-                            format_message(
-                                self.prefix,
-                                'Removing installed packages from host %s as size of Kafka \
-                                message exceeds the maximum request size.' % host_id,
-                                account_number=self.account_number,
-                                report_platform_id=self.report_platform_id))
                         del host['system_profile']['installed_packages']
-                        installed_pkgs_tag = {
-                            'namespace': 'yupana',  # or satellite
-                            'key': 'installed_packages',
-                            'value': ''  # FIXME
+                        # To save only distinct network interface objects
+                        host['system_profile']['network_interfaces'] = list({
+                            nic['name']: nic for nic in host['system_profile']['network_interfaces']
+                        }.values())
+                        host_updated_tag = {
+                            'namespace': 'report_slice_preprocessor',
+                            'key': 'installed_packages-mac-nics',
+                            'value': 'true'
                         }
-                        host['tags'].append(installed_pkgs_tag)
+                        host['tags'].append(host_updated_tag)
 
                 system_unique_id = unique_id_base + host_id
                 count += 1
