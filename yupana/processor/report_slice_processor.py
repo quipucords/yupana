@@ -539,13 +539,14 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                         # Delete large list of installed packages
                     if 'installed_packages' in host['system_profile']:
                         del host['system_profile']['installed_packages']
+                    if host['system_profile']['network_interfaces']:
                         # To save only distinct network interface objects
                         host['system_profile']['network_interfaces'] = list({
                             nic['name']: nic for nic in host['system_profile']['network_interfaces']
                         }.values())
                         host_updated_tag = {
                             'namespace': 'report_slice_preprocessor',
-                            'key': 'installed_packages-mac-nics',
+                            'key': 'installed_packages_mac_nics',
                             'value': 'true'
                         }
                         host['tags'].append(host_updated_tag)
