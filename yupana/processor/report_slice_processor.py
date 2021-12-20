@@ -524,8 +524,40 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     host = self._transform_single_host(host)
                     if cert_cn and ('system_profile' in host):
                         host['system_profile']['owner_id'] = cert_cn
+
                 host_request_size = bytes(json.dumps(host), 'utf-8')
-                if len(host_request_size) >= KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE:
+                truncate_count = 0
+                while len(host_request_size) >= KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE:
+                    if truncate_count == 0:
+                        if host['mac_addresses']:
+                            # To save only distinct values for mac_addresses
+                            host['mac_addresses'] = list(set(host['mac_addresses']))
+                            host_request_size = bytes(json.dumps(host), 'utf-8')
+                        truncate_count += 1
+                    elif truncate_count == 1:
+                        if 'network_interfaces' in host['system_profile']:
+                            # To save only distinct network interface objects
+                            nics_list = host['system_profile']['network_interfaces']
+                            host['system_profile']['network_interfaces'] = list({
+                                nic['name']: nic for nic in nics_list
+                            }.values())
+                            host['tags'].append({
+                                'namespace': 'report_slice_preprocessor',
+                                'key': 'nics_list_truncated',
+                                'value': 'True'})
+                            host_request_size = bytes(json.dumps(host), 'utf-8')
+                        truncate_count += 1
+                    elif truncate_count == 2:
+                        if 'installed_packages' in host['system_profile']:
+                            # Delete large list of installed packages
+                            del host['system_profile']['installed_packages']
+                            host['tags'].append({
+                                'namespace': 'report_slice_preprocessor',
+                                'key': 'package_list_truncated',
+                                'value': 'True'})
+                            host_request_size = bytes(json.dumps(host), 'utf-8')
+                        truncate_count += 1
+                if truncate_count > 0:
                     LOG.info(
                         format_message(
                             self.prefix,
@@ -533,23 +565,6 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                             message exceeds the maximum request size.' % host_id,
                             account_number=self.account_number,
                             report_platform_id=self.report_platform_id))
-                    if host['mac_addresses']:
-                        # To save only distinct values for mac_addresses
-                        host['mac_addresses'] = list(set(host['mac_addresses']))
-                        # Delete large list of installed packages
-                    if 'installed_packages' in host['system_profile']:
-                        del host['system_profile']['installed_packages']
-                    if host['system_profile']['network_interfaces']:
-                        # To save only distinct network interface objects
-                        host['system_profile']['network_interfaces'] = list({
-                            nic['name']: nic for nic in host['system_profile']['network_interfaces']
-                        }.values())
-                        host_updated_tag = {
-                            'namespace': 'report_slice_preprocessor',
-                            'key': 'installed_packages_mac_nics',
-                            'value': 'true'
-                        }
-                        host['tags'].append(host_updated_tag)
 
                 system_unique_id = unique_id_base + host_id
                 count += 1
