@@ -459,6 +459,49 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         increment_counts['mtu'] += 1
         return increment_counts, nic
 
+    def _transform_host_size(self, host: dict):
+        truncate_count = 0
+        host_request_size = bytes(json.dumps(host), 'utf-8')
+        while len(host_request_size) >= KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE:
+            if truncate_count == 0:
+                if host['mac_addresses']:
+                    # To save only distinct values for mac_addresses
+                    host['mac_addresses'] = list(set(host['mac_addresses']))
+                    host_request_size = bytes(json.dumps(host), 'utf-8')
+                truncate_count += 1
+            elif truncate_count == 1:
+                if 'network_interfaces' in host['system_profile']:
+                    # To save only distinct network interface objects
+                    nics_list = host['system_profile']['network_interfaces']
+                    host['system_profile']['network_interfaces'] = list({
+                        nic['name']: nic for nic in nics_list
+                    }.values())
+                    host['tags'].append({
+                        'namespace': 'report_slice_preprocessor',
+                        'key': 'nics_list_truncated',
+                        'value': 'True'})
+                    host_request_size = bytes(json.dumps(host), 'utf-8')
+                truncate_count += 1
+            elif truncate_count == 2:
+                if 'installed_packages' in host['system_profile']:
+                    # Delete large list of installed packages
+                    del host['system_profile']['installed_packages']
+                    host['tags'].append({
+                        'namespace': 'report_slice_preprocessor',
+                        'key': 'package_list_truncated',
+                        'value': 'True'})
+                    host_request_size = bytes(json.dumps(host), 'utf-8')
+                truncate_count += 1
+        if truncate_count > 0:
+            LOG.info(
+                format_message(
+                    self.prefix,
+                    'Updating the host with fqdn %s as size of Kafka \
+                    message exceeds the maximum request size.' % host.get('fqdn', ''),
+                    account_number=self.account_number,
+                    report_platform_id=self.report_platform_id))
+        return host
+
     def _transform_single_host(self, host: dict):
         """Transform 'system_profile' fields."""
         if 'system_profile' in host:
@@ -471,6 +514,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         host = self._remove_display_name(host)
         host = self._remove_invalid_bios_uuid(host)
         host = self._transform_tags(host)
+        host = self._transform_host_size(host)
         return host
 
     # pylint:disable=too-many-locals
@@ -524,48 +568,6 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     host = self._transform_single_host(host)
                     if cert_cn and ('system_profile' in host):
                         host['system_profile']['owner_id'] = cert_cn
-
-                host_request_size = bytes(json.dumps(host), 'utf-8')
-                truncate_count = 0
-                while len(host_request_size) >= KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE:
-                    if truncate_count == 0:
-                        if host['mac_addresses']:
-                            # To save only distinct values for mac_addresses
-                            host['mac_addresses'] = list(set(host['mac_addresses']))
-                            host_request_size = bytes(json.dumps(host), 'utf-8')
-                        truncate_count += 1
-                    elif truncate_count == 1:
-                        if 'network_interfaces' in host['system_profile']:
-                            # To save only distinct network interface objects
-                            nics_list = host['system_profile']['network_interfaces']
-                            host['system_profile']['network_interfaces'] = list({
-                                nic['name']: nic for nic in nics_list
-                            }.values())
-                            host['tags'].append({
-                                'namespace': 'report_slice_preprocessor',
-                                'key': 'nics_list_truncated',
-                                'value': 'True'})
-                            host_request_size = bytes(json.dumps(host), 'utf-8')
-                        truncate_count += 1
-                    elif truncate_count == 2:
-                        if 'installed_packages' in host['system_profile']:
-                            # Delete large list of installed packages
-                            del host['system_profile']['installed_packages']
-                            host['tags'].append({
-                                'namespace': 'report_slice_preprocessor',
-                                'key': 'package_list_truncated',
-                                'value': 'True'})
-                            host_request_size = bytes(json.dumps(host), 'utf-8')
-                        truncate_count += 1
-                if truncate_count > 0:
-                    LOG.info(
-                        format_message(
-                            self.prefix,
-                            'Updating the host %s as size of Kafka \
-                            message exceeds the maximum request size.' % host_id,
-                            account_number=self.account_number,
-                            report_platform_id=self.report_platform_id))
-
                 system_unique_id = unique_id_base + host_id
                 count += 1
                 upload_msg = {
