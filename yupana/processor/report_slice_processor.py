@@ -268,12 +268,23 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         return host
 
     def _remove_empty_mac_addresses(self, host: dict):
-        """Remove 'mac_addresses' field."""
+        """Remove empty 'mac_addresses' field."""
         mac_addresses = host.get('mac_addresses')
-        if mac_addresses is None or mac_addresses:
+        if mac_addresses is None:
             return host
-
-        del host['mac_addresses']
+        if mac_addresses:
+            host['mac_addresses'] = list(set(mac_addresses))
+            LOG.info(
+                format_message(
+                    self.prefix,
+                    'Transformed mac_addresses to store unique values for host with FQDN %s'
+                    % (host.get('fqdn', '')),
+                    account_number=self.account_number,
+                    report_platform_id=self.report_platform_id
+                ))
+            return host
+        if not mac_addresses:
+            del host['mac_addresses']
         LOG.info(
             format_message(
                 self.prefix,
@@ -404,15 +415,14 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         """Transform 'system_profile.network_interfaces[]."""
         system_profile = host.get('system_profile', {})
         network_interfaces = system_profile.get('network_interfaces')
-
         if not network_interfaces:
             return host
-
         filtered_nics = list(filter(lambda nic: nic.get('name'), network_interfaces))
         increment_counts = {
             'mtu': 0,
             'ipv6_addresses': 0
         }
+        filtered_nics = list({nic['name']: nic for nic in filtered_nics}.values())
         for nic in filtered_nics:
             increment_counts, nic = self._transform_mtu(
                 nic, increment_counts)
@@ -459,47 +469,21 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         increment_counts['mtu'] += 1
         return increment_counts, nic
 
-    def _transform_host_size(self, host: dict):
-        truncate_count = 0
-        host_request_size = bytes(json.dumps(host), 'utf-8')
-        while len(host_request_size) >= KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE:
-            if truncate_count == 0:
-                if host['mac_addresses']:
-                    # To save only distinct values for mac_addresses
-                    host['mac_addresses'] = list(set(host['mac_addresses']))
-                    host_request_size = bytes(json.dumps(host), 'utf-8')
-                truncate_count += 1
-            elif truncate_count == 1:
-                if 'network_interfaces' in host['system_profile']:
-                    # To save only distinct network interface objects
-                    nics_list = host['system_profile']['network_interfaces']
-                    host['system_profile']['network_interfaces'] = list({
-                        nic['name']: nic for nic in nics_list
-                    }.values())
-                    host['tags'].append({
-                        'namespace': 'report_slice_preprocessor',
-                        'key': 'nics_list_truncated',
-                        'value': 'True'})
-                    host_request_size = bytes(json.dumps(host), 'utf-8')
-                truncate_count += 1
-            elif truncate_count == 2:
-                if 'installed_packages' in host['system_profile']:
-                    # Delete large list of installed packages
-                    del host['system_profile']['installed_packages']
-                    host['tags'].append({
-                        'namespace': 'report_slice_preprocessor',
-                        'key': 'package_list_truncated',
-                        'value': 'True'})
-                    host_request_size = bytes(json.dumps(host), 'utf-8')
-                truncate_count += 1
-        if truncate_count > 0:
-            LOG.info(
-                format_message(
-                    self.prefix,
-                    'Updating the host with fqdn %s as size of Kafka \
-                    message exceeds the maximum request size.' % host.get('fqdn', ''),
-                    account_number=self.account_number,
-                    report_platform_id=self.report_platform_id))
+    def _remove_installed_packages(self, host: dict):
+        """Delete list of installed_packages."""
+        if 'installed_packages' in host['system_profile']:
+            del host['system_profile']['installed_packages']
+            host['tags'].append({
+                'namespace': 'report_slice_preprocessor',
+                'key': 'package_list_truncated',
+                'value': 'True'})
+        LOG.info(
+            format_message(
+                self.prefix,
+                'Removing installed_packages from the host with fqdn %s as size of \
+                Kafka message exceeds the maximum request size.' % host.get('fqdn', ''),
+                account_number=self.account_number,
+                report_platform_id=self.report_platform_id))
         return host
 
     def _transform_single_host(self, host: dict):
@@ -514,7 +498,9 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         host = self._remove_display_name(host)
         host = self._remove_invalid_bios_uuid(host)
         host = self._transform_tags(host)
-        host = self._transform_host_size(host)
+        host_request_size = bytes(json.dumps(host), 'utf-8')
+        if len(host_request_size) >= KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE:
+            host = self._remove_installed_packages(host)
         return host
 
     # pylint:disable=too-many-locals
