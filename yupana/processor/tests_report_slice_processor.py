@@ -37,6 +37,7 @@ from api.models import (Report,
                         ReportArchive,
                         ReportSlice,
                         ReportSliceArchive)
+from config.settings.base import KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE
 from config.settings.base import SATELLITE_HOST_TTL
 
 
@@ -710,18 +711,18 @@ class ReportSliceProcessorTests(TestCase):
         host = self.processor._remove_empty_ip_addresses(host)
         self.assertEqual(host, {})
 
-    def test_remove_empty_mac_addresses(self):
-        """Test remove host mac_addresses."""
+    def test_transform_mac_addresses(self):
+        """Test transform mac_addresses."""
         host = {
             'mac_addresses': []}
-        host = self.processor._remove_empty_mac_addresses(host)
+        host = self.processor._transform_mac_addresses(host)
         self.assertEqual(host, {})
 
     def test_remove_both_empty_ip_mac_addresses(self):
         """Test remove both empty ip and mac addresses."""
         host = {}
         host = self.processor._remove_empty_ip_addresses(host)
-        host = self.processor._remove_empty_mac_addresses(host)
+        host = self.processor._transform_mac_addresses(host)
         self.assertEqual(host, {})
 
     def test_do_not_remove_set_ip_addresses(self):
@@ -735,7 +736,7 @@ class ReportSliceProcessorTests(TestCase):
         """Test do not remove set host mac_addresses."""
         host = {
             'mac_addresses': ['aa:bb:00:11:22:33']}
-        host = self.processor._remove_empty_mac_addresses(host)
+        host = self.processor._transform_mac_addresses(host)
         self.assertEqual(host, {'mac_addresses': ['aa:bb:00:11:22:33']})
 
     def test_transform_mtu_to_integer(self):
@@ -950,3 +951,31 @@ class ReportSliceProcessorTests(TestCase):
                 }
             ]}
         )
+
+    def test_remove_installed_packages(self):
+        """Test remove installed_packages when message size exceeds."""
+        host = {
+            'system_profile': {
+                'installed_packages': [
+                    'pkg1', 'pkg2', 'pkg3'
+                ]
+            }
+        }
+        host_request_size = bytes(json.dumps(host), 'utf-8')
+        if len(host_request_size) >= KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE:
+            host = self.processor._remove_installed_packages(host)
+            self.assertEqual(
+                host,
+                {
+                    'system_profile': {}
+                }
+            )
+        else:
+            self.assertEqual(
+                host,
+                {
+                    'system_profile': {
+                        'installed_packages': ['pkg1', 'pkg2', 'pkg3']
+                    }
+                }
+            )

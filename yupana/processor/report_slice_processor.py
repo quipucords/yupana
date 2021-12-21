@@ -267,8 +267,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             ))
         return host
 
-    def _remove_empty_mac_addresses(self, host: dict):
-        """Remove empty 'mac_addresses' field."""
+    def _transform_mac_addresses(self, host: dict):
+        """Make values unique and remove empty 'mac_addresses' field."""
         mac_addresses = host.get('mac_addresses')
         if mac_addresses is None:
             return host
@@ -283,8 +283,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     report_platform_id=self.report_platform_id
                 ))
             return host
-        if not mac_addresses:
-            del host['mac_addresses']
+        del host['mac_addresses']
         LOG.info(
             format_message(
                 self.prefix,
@@ -494,7 +493,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             host = self._transform_network_interfaces(host)
 
         host = self._remove_empty_ip_addresses(host)
-        host = self._remove_empty_mac_addresses(host)
+        host = self._transform_mac_addresses(host)
         host = self._remove_display_name(host)
         host = self._remove_invalid_bios_uuid(host)
         host = self._transform_tags(host)
