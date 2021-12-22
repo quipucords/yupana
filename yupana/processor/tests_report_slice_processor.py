@@ -37,6 +37,7 @@ from api.models import (Report,
                         ReportArchive,
                         ReportSlice,
                         ReportSliceArchive)
+from config.settings.base import KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE
 from config.settings.base import SATELLITE_HOST_TTL
 
 
@@ -618,9 +619,7 @@ class ReportSliceProcessorTests(TestCase):
         """Test do not transform os_release when only version."""
         host = {'system_profile': {'os_release': '7'}}
         host = self.processor._transform_single_host(host)
-        self.assertEqual(host,
-                         {'system_profile': {'os_release': '7',
-                                             'operating_system': {'major': '7', 'minor': '0'}}})
+        self.assertEqual(host, {'system_profile': {'os_release': '7'}})
 
     def test_remove_os_release_when_no_version(self):
         """Test remove host os_release."""
@@ -650,10 +649,16 @@ class ReportSliceProcessorTests(TestCase):
 
     def test_transform_os_release_when_non_rhel_os(self):
         """Test transform host os_release when non rhel."""
+        host = {'system_profile': {'os_release': 'openSUSE Leap 15.3'}}
+        host = self.processor._transform_single_host(host)
+        self.assertEqual(host, {'system_profile': {'os_release': '15.3'}})
+
+    def test_transform_os_release_when_centos(self):
+        """Test transform host os_release when centos."""
         host = {'system_profile': {'os_release': 'CentOS Linux 7 (Core)'}}
         host = self.processor._transform_single_host(host)
         self.assertEqual(host, {'system_profile': {'operating_system': {
-            'major': '7', 'minor': '0'}, 'os_release': '7'}})
+            'major': '7', 'minor': '0', 'name': 'CentOS'}, 'os_release': '7'}})
 
     def test_transform_os_fields(self):
         """Test transform os fields."""
@@ -664,8 +669,7 @@ class ReportSliceProcessorTests(TestCase):
         self.assertEqual(
             host,
             {'system_profile': {
-                'os_release': '7', 'os_kernel_version': '3.10.0',
-                'operating_system': {'major': '7', 'minor': '0'}}})
+                'os_release': '7', 'os_kernel_version': '3.10.0'}})
 
     def test_do_not_tranform_os_fields(self):
         """Test do not transform os fields when already in format."""
@@ -673,11 +677,8 @@ class ReportSliceProcessorTests(TestCase):
             'os_release': '7', 'os_kernel_version': '2.6.32'}}
         host = self.processor._transform_single_host(host)
         self.assertEqual(
-            host,
-            {'system_profile': {
-                'os_release': '7', 'os_kernel_version': '2.6.32',
-                'operating_system': {'major': '7', 'minor': '0'}}}
-        )
+            host, {'system_profile': {
+                'os_release': '7', 'os_kernel_version': '2.6.32'}})
 
     def test_do_not_tranform_os_release_with_number_field(self):
         """Test do not transform os release when passed as number."""
@@ -710,18 +711,18 @@ class ReportSliceProcessorTests(TestCase):
         host = self.processor._remove_empty_ip_addresses(host)
         self.assertEqual(host, {})
 
-    def test_remove_empty_mac_addresses(self):
-        """Test remove host mac_addresses."""
+    def test_transform_mac_addresses(self):
+        """Test transform mac_addresses."""
         host = {
             'mac_addresses': []}
-        host = self.processor._remove_empty_mac_addresses(host)
+        host = self.processor._transform_mac_addresses(host)
         self.assertEqual(host, {})
 
     def test_remove_both_empty_ip_mac_addresses(self):
         """Test remove both empty ip and mac addresses."""
         host = {}
         host = self.processor._remove_empty_ip_addresses(host)
-        host = self.processor._remove_empty_mac_addresses(host)
+        host = self.processor._transform_mac_addresses(host)
         self.assertEqual(host, {})
 
     def test_do_not_remove_set_ip_addresses(self):
@@ -735,7 +736,7 @@ class ReportSliceProcessorTests(TestCase):
         """Test do not remove set host mac_addresses."""
         host = {
             'mac_addresses': ['aa:bb:00:11:22:33']}
-        host = self.processor._remove_empty_mac_addresses(host)
+        host = self.processor._transform_mac_addresses(host)
         self.assertEqual(host, {'mac_addresses': ['aa:bb:00:11:22:33']})
 
     def test_transform_mtu_to_integer(self):
@@ -950,3 +951,31 @@ class ReportSliceProcessorTests(TestCase):
                 }
             ]}
         )
+
+    def test_remove_installed_packages(self):
+        """Test remove installed_packages when message size exceeds."""
+        host = {
+            'system_profile': {
+                'installed_packages': [
+                    'pkg1', 'pkg2', 'pkg3'
+                ]
+            }
+        }
+        host_request_size = bytes(json.dumps(host), 'utf-8')
+        if len(host_request_size) >= KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE:
+            host = self.processor._remove_installed_packages(host)
+            self.assertEqual(
+                host,
+                {
+                    'system_profile': {}
+                }
+            )
+        else:
+            self.assertEqual(
+                host,
+                {
+                    'system_profile': {
+                        'installed_packages': ['pkg1', 'pkg2', 'pkg3']
+                    }
+                }
+            )
