@@ -158,7 +158,7 @@ custom-data:
 	rm -rf old_reports_temp
 
 upload-data:
-	curl -vvvv -H "x-rh-identity: $(shell echo '{"identity": {"account_number": $(RH_ACCOUNT_NUMBER), "internal": {"org_id": $(RH_ORG_ID)}}}' | base64)" \
+	curl -vvvv -H "x-rh-identity: $(shell echo '{"identity": {"account_number": "$(RH_ACCOUNT_NUMBER)", "internal": {"org_id": "$(RH_ORG_ID)"}}}' | base64)" \
 		-F "file=@$(file);type=application/vnd.redhat.qpc.tar+tgz" \
 		-H "x-rh-insights-request-id: 52df9f748eabcfea" \
 		$(INGRESS_URL) \
