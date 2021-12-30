@@ -52,6 +52,11 @@ class GarbageCollector():
         Later, if we find that we want to stop looping, we can
         manipulate the class variable should_run.
         """
+        LOG.info(format_message(
+            self.prefix,
+            'should_run value: %s and GARBAGE_COLLECTION_INTERVAL: %s'
+            % (self.should_run, GARBAGE_COLLECTION_INTERVAL)
+        ))
         while self.should_run:
             self.remove_outdated_archives()
             LOG.info(
@@ -62,31 +67,38 @@ class GarbageCollector():
                     % int(GARBAGE_COLLECTION_INTERVAL)))
             await asyncio.sleep(GARBAGE_COLLECTION_INTERVAL)
 
-    @DB_ERRORS.count_exceptions()
     def remove_outdated_archives(self):
         """Query for archived reports and delete them if they have come of age."""
-        current_time = datetime.now(pytz.utc)
-        created_time_limit = current_time - timedelta(seconds=ARCHIVE_RECORD_RETENTION_PERIOD)
-        # we only have to delete the archived reports because deleting an archived report deletes
-        # all of the associated archived report slices
-        outdated_report_archives = ReportArchive.objects.filter(
-            processing_end_time__lte=created_time_limit)
-        if outdated_report_archives:
-            _, deleted_info = outdated_report_archives.delete()
-            report_total = deleted_info.get('api.ReportArchive')
-            report_slice_total = deleted_info.get('api.ReportSliceArchive')
-            LOG.info(format_message(
-                self.prefix,
-                'Deleted %s archived report(s) & '
-                '%s archived report slice(s) older than %s seconds.' %
-                (report_total, report_slice_total, int(ARCHIVE_RECORD_RETENTION_PERIOD))))
-        else:
-            LOG.info(
+        try:
+            current_time = datetime.now(pytz.utc)
+            created_time_limit = current_time - timedelta(seconds=ARCHIVE_RECORD_RETENTION_PERIOD)
+            # we only have to delete the archived reports because deleting an archived report
+            # deletes all of the associated archived report slices
+            outdated_report_archives = ReportArchive.objects.filter(
+                processing_end_time__lte=created_time_limit)
+            if outdated_report_archives:
+                _, deleted_info = outdated_report_archives.delete()
+                report_total = deleted_info.get('api.ReportArchive')
+                report_slice_total = deleted_info.get('api.ReportSliceArchive')
+                LOG.info(format_message(
+                    self.prefix,
+                    'Deleted %s archived report(s) & '
+                    '%s archived report slice(s) older than %s seconds.' %
+                    (report_total, report_slice_total, int(ARCHIVE_RECORD_RETENTION_PERIOD))))
+            else:
+                LOG.info(
+                    format_message(
+                        self.prefix,
+                        'No archived reports to delete.'
+                    )
+                )
+        except Exception as error:  # pylint: disable=broad-except
+            DB_ERRORS.inc()
+            LOG.error(
                 format_message(
                     self.prefix,
-                    'No archived reports to delete.'
-                )
-            )
+                    'Could not remove outdated archives '
+                    'due to the following error %s.' % str(error)))
 
 
 def asyncio_garbage_collection_thread(loop):  # pragma: no cover
