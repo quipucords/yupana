@@ -56,9 +56,11 @@ objects:
       name: yupana-db
       version: 12
     kafkaTopics:
-      - topicName: #FIXME
+      - topicName: platform.upload.qpc
         partitions: 1
-      - topicName: #FIXME
+      - topicName: platform.inventory.host-ingress
+        partitions: 1
+      - topicName: platform.upload.validation
         partitions: 1
 
 parameters:
