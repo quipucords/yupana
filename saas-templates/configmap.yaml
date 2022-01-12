@@ -1,0 +1,190 @@
+apiVersion: v1
+kind: Template
+labels:
+  app: yupana
+  template: yupana-configmap
+metadata:
+  annotations:
+    description: Subscription Insights powered by Django+PostgreSQL
+    iconClass: icon-python
+    openshift.io/display-name: Yupana
+    openshift.io/documentation-url: https://yupana.readthedocs.io/en/latest/
+    openshift.io/long-description: This template defines resources needed to deploy
+      and run the Yupana service application.
+    openshift.io/provider-display-name: Red Hat, Inc.
+    tags: quickstart,python,django,postgresql
+  name: yupana-configmap-template
+objects:
+- apiVersion: v1
+  data:
+    database-engine: ${DATABASE_ENGINE}
+    database-service-name: ${DATABASE_SERVICE_NAME}
+    postgres-sql-service-host: ${POSTGRES_SQL_SERVICE_HOST}
+    postgres-sql-service-port: '5432'
+  kind: ConfigMap
+  metadata:
+    labels:
+      name: yupana
+    name: yupana-db
+- apiVersion: v1
+  data:
+    app-config: ${APP_CONFIG}
+    app-domain: ${APP_DOMAIN}
+    app-home: ${APP_HOME}
+    app-module: ${APP_MODULE}
+    app-namespace: ${NAMESPACE}
+    build-version: ${BUILD_VERSION}
+  kind: ConfigMap
+  metadata:
+    labels:
+      name: yupana
+    name: yupana-app
+- apiVersion: v1
+  data:
+    insights-kafka-server-host: ${KAFKA_BOOTSTRAP_HOST}
+    insights-kafka-server-port: ${KAFKA_BOOTSTRAP_PORT}
+  kind: ConfigMap
+  metadata:
+    labels:
+      name: yupana
+    name: yupana-messaging
+- apiVersion: v1
+  data:
+    archive-record-retention-period: ${ARCHIVE_RECORD_RETENTION_PERIOD}
+    discovery-host-ttl: ${DISCOVERY_HOST_TTL}
+    garbage-collection-interval: ${GARBAGE_COLLECTION_INTERVAL}
+    hosts-transformation-enabled: ${HOSTS_TRANSFORMATION_ENABLED}
+    hosts-upload-futures-count: ${HOSTS_UPLOAD_FUTURES_COUNT}
+    hosts-upload-timeout: ${HOSTS_UPLOAD_TIMEOUT}
+    log-level: INFO
+    max-hosts-per-rep: ${MAX_HOSTS_PER_REP}
+    maximum-replicas: ${MAXIMUM_REPLICAS}
+    minimum-replicas: ${MINIMUM_REPLICAS}
+    new-report-query-interval: ${NEW_REPORT_QUERY_INTERVAL}
+    pause-kafka-for-file-upload-service: ${PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE}
+    retries-allowed: ${RETRIES_ALLOWED}
+    retry-time: ${RETRY_TIME}
+    satellite-host-ttl: ${SATELLITE_HOST_TTL}
+    target-cpu-utilization: ${TARGET_CPU_UTILIZATION}
+  kind: ConfigMap
+  metadata:
+    labels:
+      name: yupana
+    name: yupana-env
+parameters:
+- description: Insights Upload Server address
+  displayName: Kafka server address
+  name: KAFKA_BOOTSTRAP_HOST
+  required: true
+  value: mq-kafka
+- description: Insights Upload Server port
+  displayName: Kafka server port
+  name: KAFKA_BOOTSTRAP_PORT
+  required: true
+  value: '29092'
+- description: 'Database engine: postgresql, mysql or sqlite (default).'
+  displayName: Database Engine
+  name: DATABASE_ENGINE
+  required: true
+  value: postgresql
+- displayName: Database Host
+  name: POSTGRES_SQL_SERVICE_HOST
+  required: true
+  value: yupana-db
+- description: Absolute path to application install location (optional).
+  displayName: Application Home Directory
+  name: APP_HOME
+  value: /opt/app-root/src/yupana
+- description: Python module name of the application (optional).
+  displayName: Application Module Name
+  name: APP_MODULE
+  value: config.wsgi
+- displayName: User Interface Domain
+  name: APP_DOMAIN
+  value: project-yupana.com
+- description: Absolute path to Gunicorn configuration file (optional).
+  displayName: Application Configuration File Path
+  name: APP_CONFIG
+  value: /opt/app-root/src/yupana/gunicorn.py
+- description: The build version
+  displayName: Build Version
+  name: BUILD_VERSION
+  required: false
+- description: Retry time in minutes
+  displayName: Retry time
+  name: RETRY_TIME
+  required: false
+  value: '60'
+- description: Timeout for each host upload
+  displayName: Hosts Upload Timeout
+  name: HOSTS_UPLOAD_TIMEOUT
+  required: false
+  value: '120'
+- description: The hosts upload future count to wait for at one time
+  displayName: Hosts Upload Futures Count
+  name: HOSTS_UPLOAD_FUTURES_COUNT
+  required: false
+  value: '100'
+- description: Enable hosts data transformation
+  displayName: Enable hosts data transformation
+  name: HOSTS_TRANSFORMATION_ENABLED
+  required: false
+  value: 'true'
+- description: Number of retries allowed
+  displayName: Retries allowed
+  name: RETRIES_ALLOWED
+  required: false
+  value: '1'
+- description: Maximum number of hosts per report slice
+  displayName: Max hosts per report slice
+  name: MAX_HOSTS_PER_REP
+  required: false
+  value: '10000'
+- description: Minimum Replicas for Autoscaling
+  displayName: Minimum Replicas
+  name: MINIMUM_REPLICAS
+  required: true
+  value: '1'
+- description: Maximum Replicas for Autoscaling
+  displayName: Maximum Replicas
+  name: MAXIMUM_REPLICAS
+  required: true
+  value: '10'
+- description: Target CPU Utilization Percentage
+  displayName: Target CPU Utilization
+  name: TARGET_CPU_UTILIZATION
+  required: true
+  value: '75'
+- description: Pause the Kafka consumer for file upload
+  displayName: Pause Kafka for file upload
+  name: PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE
+  required: false
+- description: Time to sleep between looking for reports
+  displayName: Time in between db queries for reports and slices
+  name: NEW_REPORT_QUERY_INTERVAL
+  required: false
+  value: '60'
+- displayName: Database Service Name
+  name: DATABASE_SERVICE_NAME
+  required: true
+  value: yupana-db
+- description: The time to live for discovery hosts before stale date (in days)
+  displayName: Discovery host time to live
+  name: DISCOVERY_HOST_TTL
+  required: true
+  value: '30'
+- description: The time to live for satellite hosts before stale date (in days)
+  displayName: Satellite host time to live
+  name: SATELLITE_HOST_TTL
+  required: true
+  value: '30'
+- description: The interval at which garbage collection should run (in seconds)
+  displayName: Garbage collection interval
+  name: GARBAGE_COLLECTION_INTERVAL
+  required: false
+  value: '604800'
+- description: The retention limit of the report & slice archives (in seconds)
+  displayName: Archive record retention period
+  name: ARCHIVE_RECORD_RETENTION_PERIOD
+  required: false
+  value: '2419200'

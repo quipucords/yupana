@@ -1,0 +1,201 @@
+apiVersion: v1
+kind: Template
+labels:
+  app: yupana
+  template: yupana-db
+metadata:
+  annotations:
+    description: Subscription Insights powered by Django+PostgreSQL
+    iconClass: icon-python
+    openshift.io/display-name: Yupana
+    openshift.io/documentation-url: https://yupana.readthedocs.io/en/latest/
+    openshift.io/long-description: This template defines resources needed to deploy
+      and run the Yupana database.
+    openshift.io/provider-display-name: Red Hat, Inc.
+    tags: quickstart,python,django,postgresql
+  name: yupana-database-template
+objects:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: yupana
+      template: yupana-template
+    name: yupana-db
+  spec:
+    minReadySeconds: 15
+    progressDeadlineSeconds: 600
+    replicas: ${{DB_REPLICAS}}
+    revisionHistoryLimit: 9
+    selector:
+      matchLabels:
+        name: yupana-db
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          app: yupana
+          name: yupana-db
+          template: yupana-template
+        name: yupana-db
+      spec:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                    - yupana
+                  - key: template
+                    operator: In
+                    values:
+                    - yupana-template
+                topologyKey: failure-domain.beta.kubernetes.io/zone
+              weight: 100
+            - podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                    - yupana
+                  - key: template
+                    operator: In
+                    values:
+                    - yupana-template
+                topologyKey: kubernetes.io/hostname
+              weight: 99
+        containers:
+        - env:
+          - name: POSTGRESQL_USER
+            valueFrom:
+              secretKeyRef:
+                key: database-user
+                name: ${NAME}-db
+          - name: POSTGRESQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: database-password
+                name: ${NAME}-db
+          - name: POSTGRESQL_ADMIN_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: database-admin-password
+                name: ${NAME}-db
+          - name: POSTGRESQL_DATABASE
+            value: ${DATABASE_NAME}
+          image: centos/postgresql-96-centos7
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            exec:
+              command:
+              - /usr/libexec/check-container
+              - --live
+            failureThreshold: 3
+            initialDelaySeconds: 120
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 10
+          name: yupana-db
+          ports:
+          - containerPort: 5432
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - /usr/libexec/check-container
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: ${POSTGRESQL_CPU_LIMIT}
+              memory: ${POSTGRESQL_MEMORY_LIMIT}
+            requests:
+              cpu: ${POSTGRESQL_CPU_REQUEST}
+              memory: ${POSTGRESQL_MEMORY_REQUEST}
+          volumeMounts:
+          - mountPath: /var/lib/pgsql/data
+            name: yupana-db-data
+        imagePullSecrets:
+        - name: quay-cloudservices-pull
+        - name: rh-registry-pull
+        volumes:
+        - name: yupana-db-data
+          persistentVolumeClaim:
+            claimName: yupana-db
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    labels:
+      app: yupana
+      template: yupana-template
+    name: ${NAME}-db
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: ${VOLUME_CAPACITY}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      description: Exposes the database server
+    labels:
+      app: yupana
+      template: yupana-template
+    name: yupana-db
+  spec:
+    ports:
+    - name: yupana-db
+      port: 5432
+      protocol: TCP
+      targetPort: 5432
+    selector:
+      name: ${NAME}-db
+parameters:
+- description: The Name
+  displayName: Name
+  name: NAME
+  required: true
+  value: yupana
+- description: Initial amount of memory the PostgreSQL container will request.
+  displayName: Memory Request (PostgreSQL)
+  name: POSTGRESQL_MEMORY_REQUEST
+  required: true
+  value: 1Gi
+- description: Maximum amount of memory the PostgreSQL container can use.
+  displayName: Memory Limit (PostgreSQL)
+  name: POSTGRESQL_MEMORY_LIMIT
+  required: true
+  value: 1Gi
+- description: Initial amount of CPU the build container will request.
+  displayName: CPU Request
+  name: POSTGRESQL_CPU_REQUEST
+  required: true
+  value: 500m
+- description: Maximum amount of CPU the build container can use.
+  displayName: CPU Limit
+  name: POSTGRESQL_CPU_LIMIT
+  required: true
+  value: '1'
+- description: Volume space available for data, e.g. 512Mi, 2Gi
+  displayName: Volume Capacity
+  name: VOLUME_CAPACITY
+  required: true
+  value: 10Gi
+- displayName: Database Name
+  name: DATABASE_NAME
+  required: true
+  value: yupana
+- description: The number of replicas to be used by the DB
+  displayName: DB Replicas
+  name: DB_REPLICAS
+  value: '0'
