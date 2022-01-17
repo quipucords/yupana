@@ -1241,7 +1241,7 @@ class ReportProcessorTests(TransactionTestCase):
             'hosts': {self.uuid: {'key': 'value'}}}
         self.processor.report_or_slice = self.report_record
         with self.assertRaises(msg_handler.QPCReportException):
-            _, _ = self.processor._validate_report_details()
+            _, _ = self.processor._validate_report_details()  # pylint: disable=unbalanced-tuple-unpacking
 
     def test_download_contents_raises_error(self):
         """Test to verify downloading contents fails when error is raised."""
