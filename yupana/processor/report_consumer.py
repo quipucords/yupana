@@ -34,12 +34,11 @@ from prometheus_client import Counter
 
 from api.models import Report
 from api.serializers import ReportSerializer
-from config.settings.base import INSIGHTS_KAFKA_ADDRESS
+from config.settings.base import INSIGHTS_KAFKA_ADDRESS, QPC_TOPIC
 
 LOG = logging.getLogger(__name__)
 
 REPORT_PENDING_QUEUE = asyncio.Queue()
-QPC_TOPIC = 'platform.upload.qpc'
 
 MSG_UPLOADS = Counter('yupana_message_uploads',
                       'Number of messages uploaded to qpc topic',

@@ -37,9 +37,17 @@ from .env import ENVIRONMENT
 
 CLOWDER_ENABLED = True if os.getenv("CLOWDER_ENABLED", default="False").lower() in ["true", "t", "yes", "y"] else False
 
+ENGINES = {
+    'sqlite': 'django.db.backends.sqlite3',
+    'postgresql': 'django.db.backends.postgresql',
+    'mysql': 'django.db.backends.mysql',
+}
+
+SERVICE_NAME = ENVIRONMENT.get_value('DATABASE_SERVICE_NAME', default='').upper().replace('-', '_')
+
 if CLOWDER_ENABLED:
     LOG.info("Using Clowder Operator...")
-    from app_common_python import LoadedConfig
+    from app_common_python import LoadedConfig, KafkaTopics
     CW_AWS_ACCESS_KEY_ID = LoadedConfig.logging.cloudwatch.accessKeyId
     CW_AWS_SECRET_ACCESS_KEY = LoadedConfig.logging.cloudwatch.secretAccessKey
     CW_AWS_REGION = LoadedConfig.logging.cloudwatch.region
@@ -50,6 +58,9 @@ if CLOWDER_ENABLED:
     DB_HOST = LoadedConfig.database.hostname
     DB_PORT = LoadedConfig.database.port
     INSIGHTS_KAFKA_ADDRESS = LoadedConfig.kafka.brokers[0].hostname + ":" + str(LoadedConfig.kafka.brokers[0].port)
+    QPC_TOPIC = KafkaTopics["platform.upload.qpc"].name
+    UPLOAD_TOPIC = KafkaTopics["platform.inventory.host-ingress"].name
+    VALIDATION_TOPIC = KafkaTopics["platform.upload.validation"].name
 else:
     CW_AWS_ACCESS_KEY_ID = ENVIRONMENT.get_value('CW_AWS_ACCESS_KEY_ID', default=None)
     CW_AWS_SECRET_ACCESS_KEY = ENVIRONMENT.get_value('CW_AWS_SECRET_ACCESS_KEY', default=None)
@@ -57,12 +68,6 @@ else:
     CW_LOG_GROUP = ENVIRONMENT.get_value('CW_LOG_GROUP', default='platform-dev')
     ROOT_DIR = environ.Path(__file__) - 4
     APPS_DIR = ROOT_DIR.path('yupana')
-    ENGINES = {
-    'sqlite': 'django.db.backends.sqlite3',
-    'postgresql': 'django.db.backends.postgresql',
-    'mysql': 'django.db.backends.mysql',
-    }
-    SERVICE_NAME = ENVIRONMENT.get_value('DATABASE_SERVICE_NAME', default='').upper().replace('-', '_')
     if SERVICE_NAME:
         ENGINE = ENGINES.get(ENVIRONMENT.get_value('DATABASE_ENGINE'), ENGINES['postgresql'])
     else:
@@ -77,6 +82,9 @@ else:
     INSIGHTS_KAFKA_HOST = os.getenv('INSIGHTS_KAFKA_HOST', 'localhost')
     INSIGHTS_KAFKA_PORT = os.getenv('INSIGHTS_KAFKA_PORT', '29092')
     INSIGHTS_KAFKA_ADDRESS = f'{INSIGHTS_KAFKA_HOST}:{INSIGHTS_KAFKA_PORT}'
+    QPC_TOPIC = os.getenv('QPC_TOPIC', 'platform.upload.qpc')
+    UPLOAD_TOPIC = os.getenv('UPLOAD_TOPIC', 'platform.inventory.host-ingress')
+    VALIDATION_TOPIC = os.getenv('VALIDATION_TOPIC', 'platform.upload.validation')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
@@ -269,13 +277,14 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
 
 DATABASES = {
-    'ENGINE': ENGINE,
     'NAME': DB_NAME,
     'USER': DB_USER,
     'PASSWORD': DB_PASSWORD,
     'HOST': DB_HOST,
     'PORT': DB_PORT,
 }
+if not CLOWDER_ENABLED:
+    DATABASES['ENGINE'] = ENGINE
 
 # add ssl cert if specified
 DATABASE_CERT = ENVIRONMENT.get_value('DATABASE_SERVICE_CERT', default=None)
