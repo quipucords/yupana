@@ -1,0 +1,373 @@
+apiVersion: v1
+kind: Template
+labels:
+  app: yupana
+  template: yupana-template
+metadata:
+  annotations:
+    description: Subscription Services Project powered by Django+PostgreSQL
+    iconClass: icon-python
+    openshift.io/display-name: Yupana
+    openshift.io/documentation-url: https://yupana.readthedocs.io/en/latest/
+    openshift.io/long-description: This template defines resources needed to run and
+      deploy and run the Yupana service application.
+    openshift.io/provider-display-name: Red Hat, Inc.
+    tags: quickstart,python,django,postgresql
+  name: yupana-template
+objects:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      description: Exposes and load balances the application pods
+      prometheus.io/path: /metrics
+      prometheus.io/port: '8080'
+      prometheus.io/scrape: 'true'
+      service.alpha.openshift.io/dependencies: '[{"name": "${DATABASE_SERVICE_NAME}",
+        "kind": "Service"}]'
+    name: yupana
+  spec:
+    ports:
+    - name: 8080-tcp
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      name: yupana
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels: {}
+    name: yupana
+  spec:
+    minReadySeconds: 15
+    progressDeadlineSeconds: 600
+    replicas: ${{MINIMUM_REPLICAS}}
+    revisionHistoryLimit: 9
+    selector:
+      matchLabels:
+        name: yupana
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          name: yupana
+        name: yupana
+      spec:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                  - key: name
+                    operator: In
+                    values:
+                    - yupana
+                topologyKey: failure-domain.beta.kubernetes.io/zone
+              weight: 100
+            - podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                  - key: name
+                    operator: In
+                    values:
+                    - yupana
+                topologyKey: kubernetes.io/hostname
+              weight: 99
+        containers:
+        - env:
+          - name: DATABASE_USER
+            valueFrom:
+              secretKeyRef:
+                key: db.user
+                name: yupana-db
+          - name: DATABASE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: db.password
+                name: yupana-db
+          - name: DJANGO_SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                key: django-secret-key
+                name: yupana-secret
+                optional: false
+          - name: DATABASE_SERVICE_CERT
+            valueFrom:
+              secretKeyRef:
+                key: rds-cacert
+                name: rds-client-ca
+                optional: true
+          - name: DATABASE_ENGINE
+            valueFrom:
+              configMapKeyRef:
+                key: database-engine
+                name: yupana-db
+                optional: false
+          - name: DATABASE_NAME
+            valueFrom:
+              secretKeyRef:
+                key: db.name
+                name: yupana-db
+                optional: false
+          - name: DATABASE_SERVICE_NAME
+            valueFrom:
+              configMapKeyRef:
+                key: database-service-name
+                name: yupana-db
+                optional: false
+          - name: POSTGRES_SQL_SERVICE_HOST
+            valueFrom:
+              secretKeyRef:
+                key: db.host
+                name: yupana-db
+                optional: false
+          - name: POSTGRES_SQL_SERVICE_PORT
+            valueFrom:
+              secretKeyRef:
+                key: db.port
+                name: yupana-db
+                optional: false
+          - name: APP_NAMESPACE
+            valueFrom:
+              configMapKeyRef:
+                key: app-namespace
+                name: yupana-app
+                optional: true
+          - name: APP_DOMAIN
+            valueFrom:
+              configMapKeyRef:
+                key: app-domain
+                name: yupana-app
+                optional: true
+          - name: BUILD_VERSION
+            valueFrom:
+              configMapKeyRef:
+                key: build-version
+                name: yupana-app
+                optional: true
+          - name: INSIGHTS_KAFKA_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: insights-kafka-server-host
+                name: yupana-messaging
+                optional: false
+          - name: INSIGHTS_KAFKA_PORT
+            valueFrom:
+              configMapKeyRef:
+                key: insights-kafka-server-port
+                name: yupana-messaging
+                optional: false
+          - name: RETRIES_ALLOWED
+            valueFrom:
+              configMapKeyRef:
+                key: retries-allowed
+                name: yupana-env
+                optional: true
+          - name: RETRY_TIME
+            valueFrom:
+              configMapKeyRef:
+                key: retry-time
+                name: yupana-env
+                optional: true
+          - name: HOSTS_UPLOAD_TIMEOUT
+            valueFrom:
+              configMapKeyRef:
+                key: hosts-upload-timeout
+                name: yupana-env
+                optional: true
+          - name: HOSTS_UPLOAD_FUTURES_COUNT
+            valueFrom:
+              configMapKeyRef:
+                key: hosts-upload-futures-count
+                name: yupana-env
+                optional: true
+          - name: MAX_HOSTS_PER_REP
+            valueFrom:
+              configMapKeyRef:
+                key: max-hosts-per-rep
+                name: yupana-env
+                optional: true
+          - name: MINIMUM_REPLICAS
+            valueFrom:
+              configMapKeyRef:
+                key: minimum-replicas
+                name: yupana-env
+                optional: false
+          - name: MAXIMUM_REPLICAS
+            valueFrom:
+              configMapKeyRef:
+                key: maximum-replicas
+                name: yupana-env
+                optional: false
+          - name: TARGET_CPU_UTILIZATION
+            valueFrom:
+              configMapKeyRef:
+                key: target-cpu-utilization
+                name: yupana-env
+                optional: false
+          - name: PAUSE_KAFKA_FOR_FILE_UPLOAD_SERVICE
+            valueFrom:
+              configMapKeyRef:
+                key: pause-kafka-for-file-upload-service
+                name: yupana-env
+                optional: true
+          - name: NEW_REPORT_QUERY_INTERVAL
+            valueFrom:
+              configMapKeyRef:
+                key: new-report-query-interval
+                name: yupana-env
+                optional: true
+          - name: CW_AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                key: aws_access_key_id
+                name: cloudwatch
+                optional: true
+          - name: CW_AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                key: aws_secret_access_key
+                name: cloudwatch
+                optional: true
+          - name: CW_AWS_REGION
+            valueFrom:
+              secretKeyRef:
+                key: aws_region
+                name: cloudwatch
+          - name: CW_LOG_GROUP
+            valueFrom:
+              secretKeyRef:
+                key: log_group_name
+                name: cloudwatch
+          - name: DISCOVERY_HOST_TTL
+            valueFrom:
+              configMapKeyRef:
+                key: discovery-host-ttl
+                name: yupana-env
+                optional: false
+          - name: SATELLITE_HOST_TTL
+            valueFrom:
+              configMapKeyRef:
+                key: satellite-host-ttl
+                name: yupana-env
+                optional: false
+          - name: GARBAGE_COLLECTION_INTERVAL
+            valueFrom:
+              configMapKeyRef:
+                key: garbage-collection-interval
+                name: yupana-env
+                optional: true
+          - name: ARCHIVE_RECORD_RETENTION_PERIOD
+            valueFrom:
+              configMapKeyRef:
+                key: archive-record-retention-period
+                name: yupana-env
+                optional: true
+          image: quay.io/cloudservices/yupana:${IMAGE_TAG}
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /api/subscriptions/v1/status/
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 3
+          name: yupana
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /api/subscriptions/v1/status/
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 3
+          resources:
+            limits:
+              cpu: ${CPU_LIMIT}
+              memory: ${MEMORY_LIMIT}
+            requests:
+              cpu: ${CPU_REQUEST}
+              memory: ${MEMORY_REQUEST}
+          volumeMounts:
+          - mountPath: /etc/ssl/certs
+            name: ssl-cert
+            readOnly: true
+        imagePullSecrets:
+        - name: quay-cloudservices-pull
+        - name: rh-registry-pull
+        volumes:
+        - name: ssl-cert
+          projected:
+            sources:
+            - secret:
+                items:
+                - key: rds-cacert
+                  path: server.pem
+                name: rds-client-ca
+- apiVersion: autoscaling/v1
+  kind: HorizontalPodAutoscaler
+  metadata:
+    labels:
+      app: yupana
+    name: yupana
+  spec:
+    maxReplicas: ${{MAXIMUM_REPLICAS}}
+    minReplicas: ${{MINIMUM_REPLICAS}}
+    scaleTargetRef:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: yupana
+    targetCPUUtilizationPercentage: ${{TARGET_CPU_UTILIZATION}}
+parameters:
+- description: Initial amount of memory the Django container will request.
+  displayName: Memory Request
+  name: MEMORY_REQUEST
+  required: true
+  value: 1Gi
+- description: Maximum amount of memory the Django container can use.
+  displayName: Memory Limit
+  name: MEMORY_LIMIT
+  required: true
+  value: 1Gi
+- description: Initial cpu request.
+  displayName: CPU Request
+  name: CPU_REQUEST
+  required: true
+  value: 500m
+- description: Maximum amount of CPU the build container can use.
+  displayName: CPU Limit
+  name: CPU_LIMIT
+  required: true
+  value: '1'
+- description: Minimum Replicas for Autoscaling
+  displayName: Minimum Replicas
+  name: MINIMUM_REPLICAS
+  required: true
+  value: '1'
+- description: Maximum Replicas for Autoscaling
+  displayName: Maximum Replicas
+  name: MAXIMUM_REPLICAS
+  required: true
+  value: '1'
+- description: Target CPU Utilization Percentage
+  displayName: Target CPU Utilization
+  name: TARGET_CPU_UTILIZATION
+  required: true
+  value: '75'
+- displayName: Database Service Name
+  name: DATABASE_SERVICE_NAME
+  required: true
+  value: yupana-db
+- description: Image tag
+  name: IMAGE_TAG
+  required: true

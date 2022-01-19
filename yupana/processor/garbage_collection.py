@@ -28,6 +28,7 @@ from processor.report_consumer import DB_ERRORS
 
 from api.models import ReportArchive
 from config.settings.base import (ARCHIVE_RECORD_RETENTION_PERIOD,
+                                  CHUNK_SIZE_FOR_REPORTS,
                                   GARBAGE_COLLECTION_INTERVAL)
 
 LOG = logging.getLogger(__name__)
@@ -77,9 +78,14 @@ class GarbageCollector():
             outdated_report_archives = ReportArchive.objects.filter(
                 processing_end_time__lte=created_time_limit)
             if outdated_report_archives:
-                _, deleted_info = outdated_report_archives.delete()
-                report_total = deleted_info.get('api.ReportArchive')
-                report_slice_total = deleted_info.get('api.ReportSliceArchive')
+                report_total = 0
+                report_slice_total = 0
+                for outdated_report in outdated_report_archives.iterator(
+                        chunk_size=CHUNK_SIZE_FOR_REPORTS):
+                    _, deleted_info = outdated_report.delete()
+                    report_total += deleted_info.get('api.ReportArchive')
+                    report_slice_total += deleted_info.get('api.ReportSliceArchive')
+
                 LOG.info(format_message(
                     self.prefix,
                     'Deleted %s archived report(s) & '
