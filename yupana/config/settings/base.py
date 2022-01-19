@@ -78,6 +78,12 @@ ARCHIVE_RECORD_RETENTION_PERIOD = ENVIRONMENT.get_value(
 GARBAGE_COLLECTION_INTERVAL = ENVIRONMENT.get_value(
     'GARBAGE_COLLECTION_INTERVAL', default=604800)
 
+# this is the chunk size used while iterating reports records while GC job run
+# the default is set to 2000
+CHUNK_SIZE_FOR_REPORTS = ENVIRONMENT.get_value(
+    'CHUNK_SIZE_FOR_REPORTS', default=2000)
+
+
 # this is the sleep period when an event loop error occurred (in seconds)
 # so that it will do retry
 # the default is set to 10 secs
