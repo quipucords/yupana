@@ -28,8 +28,8 @@ from processor.report_consumer import DB_ERRORS
 
 from api.models import ReportArchive
 from config.settings.base import (ARCHIVE_RECORD_RETENTION_PERIOD,
-                                  GARBAGE_COLLECTION_INTERVAL,
-                                  CHUNK_SIZE_FOR_REPORTS)
+                                  CHUNK_SIZE_FOR_REPORTS,
+                                  GARBAGE_COLLECTION_INTERVAL)
 
 LOG = logging.getLogger(__name__)
 # this is how often we want garbage collection to run
