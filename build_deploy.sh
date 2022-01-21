@@ -27,4 +27,3 @@ for ADDITIONAL_TAG in $ADDITIONAL_TAGS; do
     docker --config="$DOCKER_CONF" tag "${IMAGE_NAME}:${IMAGE_TAG}" "${IMAGE_NAME}:${ADDITIONAL_TAG}"
     docker --config="$DOCKER_CONF" push "${IMAGE_NAME}:${ADDITIONAL_TAG}"
 done
-
