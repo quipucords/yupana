@@ -61,6 +61,7 @@ class ReportSliceProcessorTests(TestCase):
         self.report_consumer = msg_handler.ReportConsumer()
         self.msg = self.report_consumer.unpack_consumer_record(self.fake_record)
         self.report_json = {
+            'request_id': '234332',
             'report_id': 1,
             'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
@@ -69,6 +70,7 @@ class ReportSliceProcessorTests(TestCase):
             'hosts': [{'bios_uuid': 'value'},
                       {'invalid': 'value'}]}
         self.report_record = Report(
+            request_id='234332',
             upload_srv_kafka_msg=json.dumps(self.msg),
             account='1234',
             state=Report.NEW,
@@ -172,6 +174,7 @@ class ReportSliceProcessorTests(TestCase):
         self.report_slice.failed_hosts = json.dumps([])
         self.report_slice.save()
         report_json = {
+            'request_id': '234332',
             'report_id': 1,
             'report_type': 'deployments',
             'report_version': '1.0.0.1b025b8',
@@ -209,6 +212,7 @@ class ReportSliceProcessorTests(TestCase):
         """Test that when a general exception is raised, we don't pass validation."""
         self.report_slice.state = ReportSlice.RETRY_VALIDATION
         report_json = {
+            'request_id': '234332',
             'report_slice_id': '384794738',
             'hosts': [{'ip_addresses': 'value'}]}
         self.report_slice.report_json = json.dumps(report_json)
@@ -222,6 +226,7 @@ class ReportSliceProcessorTests(TestCase):
         """Test report missing slice id."""
         self.report_slice.state = ReportSlice.RETRY_VALIDATION
         report_json = {
+            'request_id': '234332',
             'report_id': 1,
             'report_type': 'insights',
             'report_version': '1.0.0.1b025b8',
@@ -611,14 +616,14 @@ class ReportSliceProcessorTests(TestCase):
         host = {'system_profile': {
             'os_release': 'Red Hat Enterprise Linux Server 6.10 (Santiago)'
         }}
-        host = self.processor._transform_single_host(host)
+        host, _ = self.processor._transform_single_host(host)
         self.assertEqual(host, {'system_profile': {'operating_system': {
             'major': '6', 'minor': '10', 'name': 'RHEL'}, 'os_release': '6.10'}})
 
     def test_do_not_transform_when_only_version(self):
         """Test do not transform os_release when only version."""
         host = {'system_profile': {'os_release': '7'}}
-        host = self.processor._transform_single_host(host)
+        host, _ = self.processor._transform_single_host(host)
         self.assertEqual(host, {'system_profile': {'os_release': '7'}})
 
     def test_remove_os_release_when_no_version(self):
@@ -626,37 +631,37 @@ class ReportSliceProcessorTests(TestCase):
         host = {
             'system_profile': {
                 'os_release': 'Red Hat Enterprise Linux Server'}}
-        host = self.processor._transform_single_host(host)
+        host, _ = self.processor._transform_single_host(host)
         self.assertEqual(host, {'system_profile': {}})
 
     def test_remove_os_release_when_no_version_with_parentheses(self):
         """Test remove host os_release when include empty parentheses."""
         host = {'system_profile': {'os_release': '  ()'}}
-        host = self.processor._transform_single_host(host)
+        host, _ = self.processor._transform_single_host(host)
         self.assertEqual(host, {'system_profile': {}})
 
     def test_remove_os_release_when_only_string_in_parentheses(self):
         """Test remove host os_release when only string in parentheses."""
         host = {'system_profile': {'os_release': '  (Core)'}}
-        host = self.processor._transform_single_host(host)
+        host, _ = self.processor._transform_single_host(host)
         self.assertEqual(host, {'system_profile': {}})
 
     def test_remove_os_release_when_empty_string(self):
         """Test remove host os_release when empty string."""
         host = {'system_profile': {'os_release': ''}}
-        host = self.processor._transform_single_host(host)
+        host, _ = self.processor._transform_single_host(host)
         self.assertEqual(host, {'system_profile': {}})
 
     def test_transform_os_release_when_non_rhel_os(self):
         """Test transform host os_release when non rhel."""
         host = {'system_profile': {'os_release': 'openSUSE Leap 15.3'}}
-        host = self.processor._transform_single_host(host)
+        host, _ = self.processor._transform_single_host(host)
         self.assertEqual(host, {'system_profile': {'os_release': '15.3'}})
 
     def test_transform_os_release_when_centos(self):
         """Test transform host os_release when centos."""
         host = {'system_profile': {'os_release': 'CentOS Linux 7 (Core)'}}
-        host = self.processor._transform_single_host(host)
+        host, _ = self.processor._transform_single_host(host)
         self.assertEqual(host, {'system_profile': {'operating_system': {
             'major': '7', 'minor': '0', 'name': 'CentOS'}, 'os_release': '7'}})
 
@@ -665,7 +670,7 @@ class ReportSliceProcessorTests(TestCase):
         host = {'system_profile': {
             'os_release': '7', 'os_kernel_version': '3.10.0-1127.el7.x86_64'
         }}
-        host = self.processor._transform_single_host(host)
+        host, _ = self.processor._transform_single_host(host)
         self.assertEqual(
             host,
             {'system_profile': {
@@ -675,7 +680,7 @@ class ReportSliceProcessorTests(TestCase):
         """Test do not transform os fields when already in format."""
         host = {'system_profile': {
             'os_release': '7', 'os_kernel_version': '2.6.32'}}
-        host = self.processor._transform_single_host(host)
+        host, _ = self.processor._transform_single_host(host)
         self.assertEqual(
             host, {'system_profile': {
                 'os_release': '7', 'os_kernel_version': '2.6.32'}})
@@ -683,7 +688,7 @@ class ReportSliceProcessorTests(TestCase):
     def test_do_not_tranform_os_release_with_number_field(self):
         """Test do not transform os release when passed as number."""
         host = {'system_profile': {'os_release': 7}}
-        host = self.processor._transform_single_host(host)
+        host, _ = self.processor._transform_single_host(host)
         self.assertEqual(
             host,
             {'system_profile': {'os_release': 7}}
@@ -701,42 +706,42 @@ class ReportSliceProcessorTests(TestCase):
     def test_remove_display_name(self):
         """Test remove host display_name."""
         host = {'display_name': 'test.example.com'}
-        host = self.processor._remove_display_name(host)
+        host, _ = self.processor._remove_display_name(host)
         self.assertEqual(host, {})
 
     def test_remove_empty_ip_addresses(self):
         """Test remove host ip_addresses."""
         host = {
             'ip_addresses': []}
-        host = self.processor._remove_empty_ip_addresses(host)
+        host, _ = self.processor._remove_empty_ip_addresses(host)
         self.assertEqual(host, {})
 
     def test_transform_mac_addresses(self):
         """Test transform mac_addresses."""
         host = {
             'mac_addresses': []}
-        host = self.processor._transform_mac_addresses(host)
+        host, _ = self.processor._transform_mac_addresses(host)
         self.assertEqual(host, {})
 
     def test_remove_both_empty_ip_mac_addresses(self):
         """Test remove both empty ip and mac addresses."""
         host = {}
-        host = self.processor._remove_empty_ip_addresses(host)
-        host = self.processor._transform_mac_addresses(host)
+        host, _ = self.processor._remove_empty_ip_addresses(host)
+        host, _ = self.processor._transform_mac_addresses(host)
         self.assertEqual(host, {})
 
     def test_do_not_remove_set_ip_addresses(self):
         """Test do not remove set host ip_addresses."""
         host = {
             'ip_addresses': ['192.168.10.10']}
-        host = self.processor._remove_empty_ip_addresses(host)
+        host, _ = self.processor._remove_empty_ip_addresses(host)
         self.assertEqual(host, {'ip_addresses': ['192.168.10.10']})
 
     def test_do_not_remove_set_mac_addresses(self):
         """Test do not remove set host mac_addresses."""
         host = {
             'mac_addresses': ['aa:bb:00:11:22:33']}
-        host = self.processor._transform_mac_addresses(host)
+        host, _ = self.processor._transform_mac_addresses(host)
         self.assertEqual(host, {'mac_addresses': ['aa:bb:00:11:22:33']})
 
     def test_transform_mtu_to_integer(self):
@@ -749,7 +754,7 @@ class ReportSliceProcessorTests(TestCase):
                     {'ipv4_addresses': [], 'ipv6_addresses': [],
                      'mtu': '1500', 'name': 'eth1'}]
             }}
-        host = self.processor._transform_single_host(host)
+        host, _ = self.processor._transform_single_host(host)
         self.assertEqual(
             host,
             {
@@ -771,7 +776,7 @@ class ReportSliceProcessorTests(TestCase):
                      'mtu': None, 'name': 'eth0'}]
             }}
 
-        host = self.processor._transform_single_host(host)
+        host, _ = self.processor._transform_single_host(host)
         self.assertEqual(
             host,
             {
@@ -791,7 +796,7 @@ class ReportSliceProcessorTests(TestCase):
                      'name': 'eth0'}]
             }}
 
-        host = self.processor._transform_single_host(host)
+        host, _ = self.processor._transform_single_host(host)
         self.assertEqual(
             host,
             {
@@ -814,7 +819,7 @@ class ReportSliceProcessorTests(TestCase):
                 ]
             }}
 
-        host = self.processor._transform_single_host(host)
+        host, _ = self.processor._transform_single_host(host)
         self.assertEqual(
             host,
             {
@@ -838,7 +843,7 @@ class ReportSliceProcessorTests(TestCase):
                      'ipv6_addresses': [''], 'name':'eth1'}]
             }}
 
-        host = self.processor._transform_single_host(host)
+        host, _ = self.processor._transform_single_host(host)
         self.assertEqual(
             host,
             {
@@ -863,7 +868,7 @@ class ReportSliceProcessorTests(TestCase):
             'fqdn': 'virt-who.example.com',
             'bios_uuid': '45AA7104-5CB0-4A75-945D-7173C8DC5744443'
         }
-        host = self.processor._remove_invalid_bios_uuid(host)
+        host, _ = self.processor._remove_invalid_bios_uuid(host)
         self.assertEqual(host, {'fqdn': 'virt-who.example.com'})
 
     def test_remove_invalid_bios_uuid_of_boolean_type(self):
@@ -872,7 +877,7 @@ class ReportSliceProcessorTests(TestCase):
             'fqdn': 'virt-who.example.com',
             'bios_uuid': True
         }
-        host = self.processor._remove_invalid_bios_uuid(host)
+        host, _ = self.processor._remove_invalid_bios_uuid(host)
         self.assertEqual(host, {'fqdn': 'virt-who.example.com'})
 
     def test_remove_invalid_bios_uuid_of_number_type(self):
@@ -881,7 +886,7 @@ class ReportSliceProcessorTests(TestCase):
             'fqdn': 'virt-who.example.com',
             'bios_uuid': 100
         }
-        host = self.processor._remove_invalid_bios_uuid(host)
+        host, _ = self.processor._remove_invalid_bios_uuid(host)
         self.assertEqual(host, {'fqdn': 'virt-who.example.com'})
 
     def test_remove_empty_bios_uuid(self):
@@ -890,7 +895,7 @@ class ReportSliceProcessorTests(TestCase):
             'fqdn': 'virt-who.example.com',
             'bios_uuid': ''
         }
-        host = self.processor._remove_invalid_bios_uuid(host)
+        host, _ = self.processor._remove_invalid_bios_uuid(host)
         self.assertEqual(host, {'fqdn': 'virt-who.example.com'})
 
     def test_do_not_remove_valid_bios_uuid(self):
@@ -899,7 +904,7 @@ class ReportSliceProcessorTests(TestCase):
             'fqdn': 'virt-who.example.com',
             'bios_uuid': '123e4567-e89b-12d3-a456-426614174000'
         }
-        new_host = self.processor._remove_invalid_bios_uuid(host)
+        new_host, _ = self.processor._remove_invalid_bios_uuid(host)
         self.assertEqual(new_host, host)
 
     def test_bios_uuid_validation_should_be_case_insensitive(self):
@@ -908,7 +913,7 @@ class ReportSliceProcessorTests(TestCase):
             'fqdn': 'virt-who.example.com',
             'bios_uuid': '801CA199-9402-41CE-98DC-F3AA6E5BC6B3'
         }
-        new_host = self.processor._remove_invalid_bios_uuid(host)
+        new_host, _ = self.processor._remove_invalid_bios_uuid(host)
         self.assertEqual(new_host, host)
 
     def test_transform_tags_value_to_string(self):
@@ -930,7 +935,7 @@ class ReportSliceProcessorTests(TestCase):
                 'value': 1
             }
         ]}
-        host = self.processor._transform_single_host(host)
+        host, _ = self.processor._transform_single_host(host)
         self.assertEqual(
             host,
             {'tags': [
@@ -963,7 +968,7 @@ class ReportSliceProcessorTests(TestCase):
         }
         host_request_size = bytes(json.dumps(host), 'utf-8')
         if len(host_request_size) >= KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE:
-            host = self.processor._remove_installed_packages(host)
+            host, _ = self.processor._remove_installed_packages(host)
             self.assertEqual(
                 host,
                 {
