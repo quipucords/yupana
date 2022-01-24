@@ -43,7 +43,8 @@ from config.settings.base import (HOSTS_TRANSFORMATION_ENABLED,
                                   INSIGHTS_KAFKA_ADDRESS,
                                   KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE,
                                   RETRIES_ALLOWED,
-                                  RETRY_TIME)
+                                  RETRY_TIME,
+                                  UPLOAD_TOPIC)
 
 LOG = logging.getLogger(__name__)
 
@@ -52,7 +53,6 @@ HOSTS_UPLOAD_TIMEOUT = int(HOSTS_UPLOAD_TIMEOUT)
 FAILED_UPLOAD = 'UPLOAD'
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
 RETRY_TIME = int(RETRY_TIME)
-UPLOAD_TOPIC = 'platform.inventory.host-ingress'  # placeholder topic
 OS_RELEASE_PATTERN = re.compile(
     r'(?P<name>[a-zA-Z\s]*)?\s*((?P<major>\d*)(\.?(?P<minor>\d*)(\.?(?P<patch>\d*))?)?)\s*'
     r'(\((?P<code>\S*)\))?'

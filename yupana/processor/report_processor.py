@@ -47,10 +47,10 @@ from api.serializers import ReportSerializer, ReportSliceSerializer
 from config.settings.base import (INSIGHTS_KAFKA_ADDRESS,
                                   MAX_HOSTS_PER_REP,
                                   RETRIES_ALLOWED,
-                                  RETRY_TIME)
+                                  RETRY_TIME,
+                                  VALIDATION_TOPIC)
 
 LOG = logging.getLogger(__name__)
-VALIDATION_TOPIC = 'platform.upload.validation'
 SUCCESS_CONFIRM_STATUS = 'success'
 FAILURE_CONFIRM_STATUS = 'failure'
 RETRIES_ALLOWED = int(RETRIES_ALLOWED)
