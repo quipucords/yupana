@@ -28,6 +28,7 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
 import os
+import logging
 
 import environ
 
@@ -35,6 +36,14 @@ from boto3.session import Session
 from botocore.exceptions import ClientError
 from .env import ENVIRONMENT
 
+def get_logger(name):
+    logging.basicConfig(
+        level='INFO',
+        format='%(asctime)s - %(levelname)s  - %(funcName)s - %(message)s'
+    )
+    return logging.getLogger(name)
+
+LOG = logging.getLogger(__name__)
 CLOWDER_ENABLED = True if os.getenv("CLOWDER_ENABLED", default="False").lower() in ["true", "t", "yes", "y"] else False
 
 ENGINES = {
