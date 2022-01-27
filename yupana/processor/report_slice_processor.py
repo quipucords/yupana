@@ -356,7 +356,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 'name': os_enum
             }
         else:
-            transformed_obj['omited'].append(
+            transformed_obj['missing_data'].append(
                 "operating system info for os release '%s'" % os_release
             )
 
@@ -462,9 +462,9 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
     @staticmethod
     def transformed_dict():
         """Return dict object with default values."""
-        return dict({'removed': [], 'modified': [], 'omited': []})
+        return dict({'removed': [], 'modified': [], 'missing_data': []})
 
-    def _transform_single_host(self, host: dict):
+    def _transform_single_host(self, request_id, host_id, host: dict):
         """Transform 'system_profile' fields."""
         transformed_obj = self.transformed_dict()
         if 'system_profile' in host:
@@ -489,7 +489,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             host, transformed_obj = self._remove_installed_packages(
                 host, transformed_obj)
 
-        return [host, transformed_obj]
+        self._print_transformed_info(request_id, host_id, transformed_obj)
+        return host
 
     def _print_transformed_info(self, request_id, host_id, transformed_obj):
         """Print transformed logs."""
@@ -564,9 +565,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         try:  # pylint: disable=too-many-nested-blocks
             for host_id, host in hosts.items():
                 if HOSTS_TRANSFORMATION_ENABLED:
-                    host, transformed_obj = self._transform_single_host(host)
-                    self._print_transformed_info(
-                        report.request_id, host_id, transformed_obj)
+                    host = self._transform_single_host(
+                        report.request_id, host_id, host)
                     if cert_cn and ('system_profile' in host):
                         host['system_profile']['owner_id'] = cert_cn
                 system_unique_id = unique_id_base + host_id

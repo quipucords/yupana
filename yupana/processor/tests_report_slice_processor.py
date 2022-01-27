@@ -616,14 +616,18 @@ class ReportSliceProcessorTests(TestCase):
         host = {'system_profile': {
             'os_release': 'Red Hat Enterprise Linux Server 6.10 (Santiago)'
         }}
-        host, _ = self.processor._transform_single_host(host)
+        host = self.processor._transform_single_host(
+            self.report_record.request_id, '123', host
+        )
         self.assertEqual(host, {'system_profile': {'operating_system': {
             'major': '6', 'minor': '10', 'name': 'RHEL'}, 'os_release': '6.10'}})
 
     def test_do_not_transform_when_only_version(self):
         """Test do not transform os_release when only version."""
         host = {'system_profile': {'os_release': '7'}}
-        host, _ = self.processor._transform_single_host(host)
+        host = self.processor._transform_single_host(
+            self.report_record.request_id, '123', host
+        )
         self.assertEqual(host, {'system_profile': {'os_release': '7'}})
 
     def test_remove_os_release_when_no_version(self):
@@ -631,37 +635,49 @@ class ReportSliceProcessorTests(TestCase):
         host = {
             'system_profile': {
                 'os_release': 'Red Hat Enterprise Linux Server'}}
-        host, _ = self.processor._transform_single_host(host)
+        host = self.processor._transform_single_host(
+            self.report_record.request_id, '123', host
+        )
         self.assertEqual(host, {'system_profile': {}})
 
     def test_remove_os_release_when_no_version_with_parentheses(self):
         """Test remove host os_release when include empty parentheses."""
         host = {'system_profile': {'os_release': '  ()'}}
-        host, _ = self.processor._transform_single_host(host)
+        host = self.processor._transform_single_host(
+            self.report_record.request_id, '123', host
+        )
         self.assertEqual(host, {'system_profile': {}})
 
     def test_remove_os_release_when_only_string_in_parentheses(self):
         """Test remove host os_release when only string in parentheses."""
         host = {'system_profile': {'os_release': '  (Core)'}}
-        host, _ = self.processor._transform_single_host(host)
+        host = self.processor._transform_single_host(
+            self.report_record.request_id, '123', host
+        )
         self.assertEqual(host, {'system_profile': {}})
 
     def test_remove_os_release_when_empty_string(self):
         """Test remove host os_release when empty string."""
         host = {'system_profile': {'os_release': ''}}
-        host, _ = self.processor._transform_single_host(host)
+        host = self.processor._transform_single_host(
+            self.report_record.request_id, '123', host
+        )
         self.assertEqual(host, {'system_profile': {}})
 
     def test_transform_os_release_when_non_rhel_os(self):
         """Test transform host os_release when non rhel."""
         host = {'system_profile': {'os_release': 'openSUSE Leap 15.3'}}
-        host, _ = self.processor._transform_single_host(host)
+        host = self.processor._transform_single_host(
+            self.report_record.request_id, '123', host
+        )
         self.assertEqual(host, {'system_profile': {'os_release': '15.3'}})
 
     def test_transform_os_release_when_centos(self):
         """Test transform host os_release when centos."""
         host = {'system_profile': {'os_release': 'CentOS Linux 7 (Core)'}}
-        host, _ = self.processor._transform_single_host(host)
+        host = self.processor._transform_single_host(
+            self.report_record.request_id, '123', host
+        )
         self.assertEqual(host, {'system_profile': {'operating_system': {
             'major': '7', 'minor': '0', 'name': 'CentOS'}, 'os_release': '7'}})
 
@@ -670,7 +686,9 @@ class ReportSliceProcessorTests(TestCase):
         host = {'system_profile': {
             'os_release': '7', 'os_kernel_version': '3.10.0-1127.el7.x86_64'
         }}
-        host, _ = self.processor._transform_single_host(host)
+        host = self.processor._transform_single_host(
+            self.report_record.request_id, '123', host
+        )
         self.assertEqual(
             host,
             {'system_profile': {
@@ -680,7 +698,9 @@ class ReportSliceProcessorTests(TestCase):
         """Test do not transform os fields when already in format."""
         host = {'system_profile': {
             'os_release': '7', 'os_kernel_version': '2.6.32'}}
-        host, _ = self.processor._transform_single_host(host)
+        host = self.processor._transform_single_host(
+            self.report_record.request_id, '123', host
+        )
         self.assertEqual(
             host, {'system_profile': {
                 'os_release': '7', 'os_kernel_version': '2.6.32'}})
@@ -688,7 +708,9 @@ class ReportSliceProcessorTests(TestCase):
     def test_do_not_tranform_os_release_with_number_field(self):
         """Test do not transform os release when passed as number."""
         host = {'system_profile': {'os_release': 7}}
-        host, _ = self.processor._transform_single_host(host)
+        host = self.processor._transform_single_host(
+            self.report_record.request_id, '123', host
+        )
         self.assertEqual(
             host,
             {'system_profile': {'os_release': 7}}
@@ -754,7 +776,9 @@ class ReportSliceProcessorTests(TestCase):
                     {'ipv4_addresses': [], 'ipv6_addresses': [],
                      'mtu': '1500', 'name': 'eth1'}]
             }}
-        host, _ = self.processor._transform_single_host(host)
+        host = self.processor._transform_single_host(
+            self.report_record.request_id, '123', host
+        )
         self.assertEqual(
             host,
             {
@@ -776,7 +800,9 @@ class ReportSliceProcessorTests(TestCase):
                      'mtu': None, 'name': 'eth0'}]
             }}
 
-        host, _ = self.processor._transform_single_host(host)
+        host = self.processor._transform_single_host(
+            self.report_record.request_id, '123', host
+        )
         self.assertEqual(
             host,
             {
@@ -796,7 +822,9 @@ class ReportSliceProcessorTests(TestCase):
                      'name': 'eth0'}]
             }}
 
-        host, _ = self.processor._transform_single_host(host)
+        host = self.processor._transform_single_host(
+            self.report_record.request_id, '123', host
+        )
         self.assertEqual(
             host,
             {
@@ -819,7 +847,9 @@ class ReportSliceProcessorTests(TestCase):
                 ]
             }}
 
-        host, _ = self.processor._transform_single_host(host)
+        host = self.processor._transform_single_host(
+            self.report_record.request_id, '123', host
+        )
         self.assertEqual(
             host,
             {
@@ -843,7 +873,9 @@ class ReportSliceProcessorTests(TestCase):
                      'ipv6_addresses': [''], 'name':'eth1'}]
             }}
 
-        host, _ = self.processor._transform_single_host(host)
+        host = self.processor._transform_single_host(
+            self.report_record.request_id, '123', host
+        )
         self.assertEqual(
             host,
             {
@@ -935,7 +967,9 @@ class ReportSliceProcessorTests(TestCase):
                 'value': 1
             }
         ]}
-        host, _ = self.processor._transform_single_host(host)
+        host = self.processor._transform_single_host(
+            self.report_record.request_id, '123', host
+        )
         self.assertEqual(
             host,
             {'tags': [
