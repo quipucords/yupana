@@ -53,7 +53,7 @@ objects:
           - name: CLOWDER_ENABLED
             value: ${CLOWDER_ENABLED}
     database: #FIXME
-      name: yupana-db
+      name: subscriptions
       version: 12
     kafkaTopics:
       - topicName: platform.upload.qpc
