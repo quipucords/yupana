@@ -1,5 +1,5 @@
 mgmt_services/subscriptions:yupana/python-aiokafka:0.6.0.pipfile
-mgmt_services/subscriptions:yupana/python-app-common-python:0.1.10.pipfile
+mgmt_services/subscriptions:yupana/python-app-common-python:0.2.0.pipfile
 mgmt_services/subscriptions:yupana/python-boto3:1.13.0.pipfile
 mgmt_services/subscriptions:yupana/python-botocore:1.16.26.pipfile
 mgmt_services/subscriptions:yupana/python-certifi:2021.10.8.pipfile
