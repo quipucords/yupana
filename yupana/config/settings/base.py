@@ -53,6 +53,11 @@ ENGINES = {
 }
 
 SERVICE_NAME = ENVIRONMENT.get_value('DATABASE_SERVICE_NAME', default='').upper().replace('-', '_')
+if SERVICE_NAME:
+    ENGINE = ENGINES.get(ENVIRONMENT.get_value('DATABASE_ENGINE'), ENGINES['postgresql'])
+else:
+    ENGINE = ENGINES['sqlite']
+
 ROOT_DIR = environ.Path(__file__) - 4
 APPS_DIR = ROOT_DIR.path('yupana')
 
@@ -77,10 +82,6 @@ else:
     CW_AWS_SECRET_ACCESS_KEY = ENVIRONMENT.get_value('CW_AWS_SECRET_ACCESS_KEY', default=None)
     CW_AWS_REGION = ENVIRONMENT.get_value('CW_AWS_REGION', default='us-east-1')
     CW_LOG_GROUP = ENVIRONMENT.get_value('CW_LOG_GROUP', default='platform-dev')
-    if SERVICE_NAME:
-        ENGINE = ENGINES.get(ENVIRONMENT.get_value('DATABASE_ENGINE'), ENGINES['postgresql'])
-    else:
-        ENGINE = ENGINES['sqlite']
     DB_NAME = ENVIRONMENT.get_value('DATABASE_NAME', default=None)
     if not DB_NAME and ENGINE == ENGINES['sqlite']:
         DB_NAME = os.path.join(APPS_DIR, 'db.sqlite3')
@@ -297,9 +298,8 @@ DATABASES = {
     'PASSWORD': DB_PASSWORD,
     'HOST': DB_HOST,
     'PORT': DB_PORT,
+    'ENGINE': ENGINE,
 }
-if not CLOWDER_ENABLED:
-    DATABASES['ENGINE'] = ENGINE
 
 # add ssl cert if specified
 DATABASE_CERT = ENVIRONMENT.get_value('DATABASE_SERVICE_CERT', default=None)
