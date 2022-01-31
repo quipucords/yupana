@@ -18,6 +18,7 @@
 
 import asyncio
 import base64
+import copy
 import json
 import logging
 import re
@@ -59,6 +60,7 @@ OS_RELEASE_PATTERN = re.compile(
 )
 OS_VS_ENUM = {'Red Hat': 'RHEL', 'CentOS': 'CentOS'}
 PROCESSOR_NAME = 'report_slice_processor'
+TRANSFORMED_DICT = dict({'removed': [], 'modified': [], 'missing_data': []})
 
 
 class RetryUploadTimeException(Exception):
@@ -211,10 +213,10 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                       for key in host.keys() if key not in ['cause', 'status_code']}
         return candidates
 
-    def _transform_tags(self, host: dict, transformed_obj=None):
+    @staticmethod
+    def _transform_tags(
+            host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
         """Convert tag's value into string."""
-        if transformed_obj is None:
-            transformed_obj = self.transformed_dict()
         tags = host.get('tags')
         if tags is None:
             return [host, transformed_obj]
@@ -239,10 +241,10 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         host['tags'] = tags
         return [host, transformed_obj]
 
-    def _remove_display_name(self, host: dict, transformed_obj=None):
+    @staticmethod
+    def _remove_display_name(
+            host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
         """Remove 'display_name' field."""
-        if transformed_obj is None:
-            transformed_obj = self.transformed_dict()
         display_name = host.get('display_name')
         if display_name is None:
             return [host, transformed_obj]
@@ -251,10 +253,10 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         transformed_obj['removed'].append('display_name')
         return [host, transformed_obj]
 
-    def _remove_empty_ip_addresses(self, host: dict, transformed_obj=None):
+    @staticmethod
+    def _remove_empty_ip_addresses(
+            host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
         """Remove 'ip_addresses' field."""
-        if transformed_obj is None:
-            transformed_obj = self.transformed_dict()
         ip_addresses = host.get('ip_addresses')
         if ip_addresses is None or ip_addresses:
             return [host, transformed_obj]
@@ -263,10 +265,10 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         transformed_obj['removed'].append('empty ip_addresses')
         return [host, transformed_obj]
 
-    def _transform_mac_addresses(self, host: dict, transformed_obj=None):
+    @staticmethod
+    def _transform_mac_addresses(
+            host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
         """Make values unique and remove empty 'mac_addresses' field."""
-        if transformed_obj is None:
-            transformed_obj = self.transformed_dict()
         mac_addresses = host.get('mac_addresses')
         if mac_addresses is None:
             return [host, transformed_obj]
@@ -289,10 +291,9 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
         return str(uuid_obj) == uuid.lower()
 
-    def _remove_invalid_bios_uuid(self, host, transformed_obj=None):
+    def _remove_invalid_bios_uuid(
+            self, host, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
         """Remove invalid bios UUID."""
-        if transformed_obj is None:
-            transformed_obj = self.transformed_dict()
         uuid = host.get('bios_uuid')
         if uuid is None:
             return [host, transformed_obj]
@@ -320,10 +321,9 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
         return os_details
 
-    def _transform_os_release(self, host: dict, transformed_obj=None):
+    def _transform_os_release(
+            self, host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
         """Transform 'system_profile.os_release' label."""
-        if transformed_obj is None:
-            transformed_obj = self.transformed_dict()
         system_profile = host.get('system_profile', {})
         os_release = system_profile.get('os_release')
         if not isinstance(os_release, str):
@@ -369,10 +369,10 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
         return [host, transformed_obj]
 
-    def _transform_os_kernel_version(self, host: dict, transformed_obj=None):
+    @staticmethod
+    def _transform_os_kernel_version(
+            host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
         """Transform 'system_profile.os_kernel_version' label."""
-        if transformed_obj is None:
-            transformed_obj = self.transformed_dict()
         system_profile = host.get('system_profile', {})
         os_kernel_version = system_profile.get('os_kernel_version')
 
@@ -387,10 +387,9 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
         return [host, transformed_obj]
 
-    def _transform_network_interfaces(self, host: dict, transformed_obj=None):
+    def _transform_network_interfaces(
+            self, host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
         """Transform 'system_profile.network_interfaces[]."""
-        if transformed_obj is None:
-            transformed_obj = self.transformed_dict()
         system_profile = host.get('system_profile', {})
         network_interfaces = system_profile.get('network_interfaces')
         if not network_interfaces:
@@ -441,14 +440,13 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         increment_counts['mtu'] += 1
         return increment_counts, nic
 
-    def _remove_installed_packages(self, host: dict, transformed_obj=None):
+    @staticmethod
+    def _remove_installed_packages(
+            host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
         """Delete installed_packages.
 
         Kafka message exceeds the maximum request size.
         """
-        if transformed_obj is None:
-            transformed_obj = self.transformed_dict()
-
         if 'installed_packages' in host['system_profile']:
             del host['system_profile']['installed_packages']
             host['tags'].append({
@@ -459,14 +457,9 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
         return [host, transformed_obj]
 
-    @staticmethod
-    def transformed_dict():
-        """Return dict object with default values."""
-        return dict({'removed': [], 'modified': [], 'missing_data': []})
-
     def _transform_single_host(self, request_id, host_id, host: dict):
         """Transform 'system_profile' fields."""
-        transformed_obj = self.transformed_dict()
+        transformed_obj = copy.deepcopy(TRANSFORMED_DICT)
         if 'system_profile' in host:
             host, transformed_obj = self._transform_os_release(
                 host, transformed_obj)
