@@ -78,6 +78,7 @@ if [ -z "$ACG_CONFIG" ]; then
 else
   echo "Found ACG_CONFIG - RUNNING YUPANA ON CLOWDER PORT 8000..."
   PORT=8000
+fi
 
 if should_migrate; then
   if [[ -f "$manage_file" ]]; then
