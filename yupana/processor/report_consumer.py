@@ -154,7 +154,9 @@ class ReportConsumer():
                     report_serializer.save()
                     MSG_UPLOADS.labels(account_number=self.account_number).inc()
                     LOG.info(format_message(
-                        self.prefix, 'Upload service message saved. Ready for processing.'))
+                        self.prefix,
+                        'Upload service message saved with request_id: %s. Ready for processing.'
+                        % request_id))
                     await self.consumer.commit()
                 except Exception as error:  # pylint: disable=broad-except
                     DB_ERRORS.inc()

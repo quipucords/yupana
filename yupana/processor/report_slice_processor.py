@@ -18,6 +18,7 @@
 
 import asyncio
 import base64
+import copy
 import json
 import logging
 import re
@@ -59,6 +60,7 @@ OS_RELEASE_PATTERN = re.compile(
 )
 OS_VS_ENUM = {'Red Hat': 'RHEL', 'CentOS': 'CentOS'}
 PROCESSOR_NAME = 'report_slice_processor'
+TRANSFORMED_DICT = dict({'removed': [], 'modified': [], 'missing_data': []})
 
 
 class RetryUploadTimeException(Exception):
@@ -158,21 +160,32 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             'Uploading hosts to inventory. State is "%s".' %
             (self.report_or_slice.state),
             account_number=self.account_number, report_platform_id=self.report_platform_id))
+        request_id = None
+        if self.report_or_slice.report:
+            request_id = self.report_or_slice.report.request_id
         try:
             if self.candidate_hosts:
                 candidates = self.generate_upload_candidates()
                 await self._upload_to_host_inventory_via_kafka(candidates)
-                LOG.info(format_message(self.prefix, 'All hosts were successfully uploaded.',
-                                        account_number=self.account_number,
-                                        report_platform_id=self.report_platform_id))
+                LOG.info(
+                    format_message(
+                        self.prefix,
+                        'All hosts were successfully uploaded (request_id:%s).'
+                        % request_id,
+                        account_number=self.account_number,
+                        report_platform_id=self.report_platform_id))
                 self.next_state = ReportSlice.HOSTS_UPLOADED
                 options = {'candidate_hosts': [], 'ready_to_archive': True}
                 self.update_object_state(options=options)
             else:
                 # need to not upload, but archive bc no hosts were valid
-                LOG.info(format_message(self.prefix, 'There are no valid hosts to upload',
-                                        account_number=self.account_number,
-                                        report_platform_id=self.report_platform_id))
+                LOG.info(
+                    format_message(
+                        self.prefix,
+                        'There are no valid hosts to upload (request_id:%s)'
+                        % request_id,
+                        account_number=self.account_number,
+                        report_platform_id=self.report_platform_id))
                 self.next_state = ReportSlice.FAILED_VALIDATION
                 options = {'ready_to_archive': True}
                 self.update_object_state(options=options)
@@ -200,11 +213,13 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                       for key in host.keys() if key not in ['cause', 'status_code']}
         return candidates
 
-    def _transform_tags(self, host: dict):
+    @staticmethod
+    def _transform_tags(
+            host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
         """Convert tag's value into string."""
         tags = host.get('tags')
         if tags is None:
-            return host
+            return [host, transformed_obj]
 
         tags_modified = False
         for tag in tags:
@@ -221,78 +236,50 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             tags_modified = True
 
         if tags_modified:
-            LOG.info(
-                format_message(
-                    self.prefix,
-                    "Converted tags of host with FQDN '%s'"
-                    % (host.get('fqdn', '')),
-                    account_number=self.account_number,
-                    report_platform_id=self.report_platform_id
-                ))
+            transformed_obj['modified'].append('tags')
 
         host['tags'] = tags
-        return host
+        return [host, transformed_obj]
 
-    def _remove_display_name(self, host: dict):
+    @staticmethod
+    def _remove_display_name(
+            host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
         """Remove 'display_name' field."""
         display_name = host.get('display_name')
         if display_name is None:
-            return host
+            return [host, transformed_obj]
 
         del host['display_name']
-        LOG.info(
-            format_message(
-                self.prefix,
-                "Removed display_name fact for host with FQDN '%s'"
-                % (host.get('fqdn', '')),
-                account_number=self.account_number,
-                report_platform_id=self.report_platform_id
-            ))
-        return host
+        transformed_obj['removed'].append('display_name')
+        return [host, transformed_obj]
 
-    def _remove_empty_ip_addresses(self, host: dict):
+    @staticmethod
+    def _remove_empty_ip_addresses(
+            host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
         """Remove 'ip_addresses' field."""
         ip_addresses = host.get('ip_addresses')
         if ip_addresses is None or ip_addresses:
-            return host
+            return [host, transformed_obj]
 
         del host['ip_addresses']
-        LOG.info(
-            format_message(
-                self.prefix,
-                "Removed empty ip_addresses fact for host with FQDN '%s'"
-                % (host.get('fqdn', '')),
-                account_number=self.account_number,
-                report_platform_id=self.report_platform_id
-            ))
-        return host
+        transformed_obj['removed'].append('empty ip_addresses')
+        return [host, transformed_obj]
 
-    def _transform_mac_addresses(self, host: dict):
+    @staticmethod
+    def _transform_mac_addresses(
+            host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
         """Make values unique and remove empty 'mac_addresses' field."""
         mac_addresses = host.get('mac_addresses')
         if mac_addresses is None:
-            return host
+            return [host, transformed_obj]
         if mac_addresses:
             host['mac_addresses'] = list(set(mac_addresses))
-            LOG.info(
-                format_message(
-                    self.prefix,
-                    'Transformed mac_addresses to store unique values for host with FQDN %s'
-                    % (host.get('fqdn', '')),
-                    account_number=self.account_number,
-                    report_platform_id=self.report_platform_id
-                ))
-            return host
+            transformed_obj['modified'].append(
+                'transformed mac_addresses to store unique values')
+            return [host, transformed_obj]
         del host['mac_addresses']
-        LOG.info(
-            format_message(
-                self.prefix,
-                "Removed empty mac_addresses fact for host with FQDN '%s'"
-                % (host.get('fqdn', '')),
-                account_number=self.account_number,
-                report_platform_id=self.report_platform_id
-            ))
-        return host
+        transformed_obj['removed'].append('empty mac_addresses')
+        return [host, transformed_obj]
 
     @staticmethod
     def is_valid_uuid(uuid):
@@ -304,22 +291,21 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
         return str(uuid_obj) == uuid.lower()
 
-    def _remove_invalid_bios_uuid(self, host):
+    def _remove_invalid_bios_uuid(
+            self, host, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
         """Remove invalid bios UUID."""
         uuid = host.get('bios_uuid')
         if uuid is None:
-            return host
+            return [host, transformed_obj]
 
         if not self.is_valid_uuid(uuid):
-            LOG.error(format_message(
-                self.prefix,
-                "Invalid uuid: %s for host with FQDN '%s'"
-                % (uuid, host.get('fqdn', ''))))
+            transformed_obj['removed'].append('invalid uuid: %s' % uuid)
             del host['bios_uuid']
 
-        return host
+        return [host, transformed_obj]
 
-    def _match_regex_and_find_os_details(self, os_release):
+    @staticmethod
+    def _match_regex_and_find_os_details(os_release):
         """Match Regex with os_release and return os_details."""
         source_os_release = os_release.strip()
         if not source_os_release:
@@ -333,6 +319,18 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             os_details['version'] = os_details['major']
             os_details['minor'] = '0'
 
+        return os_details
+
+    def _transform_os_release(
+            self, host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
+        """Transform 'system_profile.os_release' label."""
+        system_profile = host.get('system_profile', {})
+        os_release = system_profile.get('os_release')
+        if not isinstance(os_release, str):
+            return [host, transformed_obj]
+
+        os_details = self._match_regex_and_find_os_details(os_release)
+
         LOG.info(
             format_message(
                 self.prefix,
@@ -340,24 +338,11 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 % os_details,
                 account_number=self.account_number,
                 report_platform_id=self.report_platform_id))
-        return os_details
 
-    def _transform_os_release(self, host: dict):
-        """Transform 'system_profile.os_release' label."""
-        system_profile = host.get('system_profile', {})
-        os_release = system_profile.get('os_release')
-        if not isinstance(os_release, str):
-            return host
-
-        os_details = self._match_regex_and_find_os_details(os_release)
         if not os_details or not os_details['major']:
             del host['system_profile']['os_release']
-            LOG.info(format_message(
-                self.prefix, "Removed empty os_release fact for host with FQDN '%s'"
-                % (host.get('fqdn', '')),
-                account_number=self.account_number,
-                report_platform_id=self.report_platform_id))
-            return host
+            transformed_obj['removed'].append('empty os_release')
+            return [host, transformed_obj]
 
         host['system_profile']['os_release'] = os_details['version']
 
@@ -371,51 +356,44 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 'name': os_enum
             }
         else:
-            LOG.info(format_message(
-                self.prefix,
-                "Omitting operating system info for os release '%s'"
-                % (os_release),
-                account_number=self.account_number,
-                report_platform_id=self.report_platform_id))
+            transformed_obj['missing_data'].append(
+                "operating system info for os release '%s'" % os_release
+            )
 
         if os_release == os_details['version']:
-            return host
+            return [host, transformed_obj]
 
-        LOG.info(
-            format_message(
-                self.prefix,
-                "os_release transformed '%s' -> '%s'"
-                % (os_release, os_details['version']),
-                account_number=self.account_number,
-                report_platform_id=self.report_platform_id)
-        )
-        return host
+        transformed_obj['modified'].append(
+            "os_release from '%s' to '%s'" %
+            (os_release, os_details['version']))
 
-    def _transform_os_kernel_version(self, host: dict):
+        return [host, transformed_obj]
+
+    @staticmethod
+    def _transform_os_kernel_version(
+            host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
         """Transform 'system_profile.os_kernel_version' label."""
         system_profile = host.get('system_profile', {})
         os_kernel_version = system_profile.get('os_kernel_version')
 
         if not isinstance(os_kernel_version, str):
-            return host
+            return [host, transformed_obj]
 
         version_value = os_kernel_version.split('-')[0]
         host['system_profile']['os_kernel_version'] = version_value
-        LOG.info(
-            format_message(
-                self.prefix, "os_kernel_version transformed '%s' -> '%s' for host with FQDN '%s'"
-                % (os_kernel_version, version_value, host.get('fqdn', '')),
-                account_number=self.account_number,
-                report_platform_id=self.report_platform_id))
+        transformed_obj['modified'].append(
+            "os_kernel_version from '%s' to '%s'"
+            % (os_kernel_version, version_value))
 
-        return host
+        return [host, transformed_obj]
 
-    def _transform_network_interfaces(self, host: dict):
+    def _transform_network_interfaces(
+            self, host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
         """Transform 'system_profile.network_interfaces[]."""
         system_profile = host.get('system_profile', {})
         network_interfaces = system_profile.get('network_interfaces')
         if not network_interfaces:
-            return host
+            return [host, transformed_obj]
         filtered_nics = list(filter(lambda nic: nic.get('name'), network_interfaces))
         increment_counts = {
             'mtu': 0,
@@ -432,16 +410,10 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             field for field, count in increment_counts.items() if count > 0
         ]
         if len(modified_fields) > 0:
-            LOG.info(
-                format_message(
-                    self.prefix,
-                    "Transformed %s for host with FQDN '%s'"
-                    % (','.join(modified_fields), host.get('fqdn', '')),
-                    account_number=self.account_number,
-                    report_platform_id=self.report_platform_id))
+            transformed_obj['modified'].extend(modified_fields)
 
         host['system_profile']['network_interfaces'] = filtered_nics
-        return host
+        return [host, transformed_obj]
 
     @staticmethod
     def _transform_ipv6(nic: dict, increment_counts: dict):
@@ -468,39 +440,75 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         increment_counts['mtu'] += 1
         return increment_counts, nic
 
-    def _remove_installed_packages(self, host: dict):
-        """Delete list of installed_packages."""
+    @staticmethod
+    def _remove_installed_packages(
+            host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
+        """Delete installed_packages.
+
+        Kafka message exceeds the maximum request size.
+        """
         if 'installed_packages' in host['system_profile']:
             del host['system_profile']['installed_packages']
             host['tags'].append({
                 'namespace': 'report_slice_preprocessor',
                 'key': 'package_list_truncated',
                 'value': 'True'})
-        LOG.info(
-            format_message(
-                self.prefix,
-                'Removing installed_packages from the host with fqdn %s as size of \
-                Kafka message exceeds the maximum request size.' % host.get('fqdn', ''),
-                account_number=self.account_number,
-                report_platform_id=self.report_platform_id))
-        return host
+            transformed_obj['removed'].append('installed_packages')
 
-    def _transform_single_host(self, host: dict):
+        return [host, transformed_obj]
+
+    def _transform_single_host(self, request_id, host_id, host: dict):
         """Transform 'system_profile' fields."""
+        transformed_obj = copy.deepcopy(TRANSFORMED_DICT)
         if 'system_profile' in host:
-            host = self._transform_os_release(host)
-            host = self._transform_os_kernel_version(host)
-            host = self._transform_network_interfaces(host)
+            host, transformed_obj = self._transform_os_release(
+                host, transformed_obj)
+            host, transformed_obj = self._transform_os_kernel_version(
+                host, transformed_obj)
+            host, transformed_obj = self._transform_network_interfaces(
+                host, transformed_obj)
 
-        host = self._remove_empty_ip_addresses(host)
-        host = self._transform_mac_addresses(host)
-        host = self._remove_display_name(host)
-        host = self._remove_invalid_bios_uuid(host)
-        host = self._transform_tags(host)
+        host, transformed_obj = self._remove_empty_ip_addresses(
+            host, transformed_obj)
+        host, transformed_obj = self._transform_mac_addresses(
+            host, transformed_obj)
+        host, transformed_obj = self._remove_display_name(
+            host, transformed_obj)
+        host, transformed_obj = self._remove_invalid_bios_uuid(
+            host, transformed_obj)
+        host, transformed_obj = self._transform_tags(host, transformed_obj)
         host_request_size = bytes(json.dumps(host), 'utf-8')
         if len(host_request_size) >= KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE:
-            host = self._remove_installed_packages(host)
+            host, transformed_obj = self._remove_installed_packages(
+                host, transformed_obj)
+
+        self._print_transformed_info(request_id, host_id, transformed_obj)
         return host
+
+    def _print_transformed_info(self, request_id, host_id, transformed_obj):
+        """Print transformed logs."""
+        if transformed_obj is None:
+            return
+
+        log_sections = []
+        for key, value in transformed_obj.items():
+            if value:
+                log_sections.append('%s: %s' % (key, (',').join(value)))
+
+        if log_sections:
+            log_message = (
+                'Transformed details host with id %s (request_id: %s):\n'
+                % (host_id, request_id)
+            )
+            log_message += '\n'.join(log_sections)
+            LOG.info(
+                format_message(
+                    self.prefix,
+                    log_message,
+                    account_number=self.account_number,
+                    report_platform_id=self.report_platform_id
+                )
+            )
 
     # pylint:disable=too-many-locals
     # pylint: disable=too-many-statements
@@ -550,7 +558,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         try:  # pylint: disable=too-many-nested-blocks
             for host_id, host in hosts.items():
                 if HOSTS_TRANSFORMATION_ENABLED:
-                    host = self._transform_single_host(host)
+                    host = self._transform_single_host(
+                        report.request_id, host_id, host)
                     if cert_cn and ('system_profile' in host):
                         host['system_profile']['owner_id'] = cert_cn
                 system_unique_id = unique_id_base + host_id
