@@ -233,10 +233,10 @@
         },
         "s3transfer": {
             "hashes": [
-                "sha256:35627b86af8ff97e7ac27975fe0a98a312814b46c6333d8a6b889627bcd80994",
-                "sha256:efa5bd92a897b6a8d5c1383828dca3d52d0790e0756d49740563a3fb6ed03246"
+                "sha256:7a6f4c4d1fdb9a2b640244008e142cbc2cd3ae34b386584ef044dd0f27101971",
+                "sha256:95c58c194ce657a5f4fb0b9e60a84968c808888aed628cd98ab8771fe1db98ed"
             ],
-            "version": "==0.3.7"
+            "version": "==0.5.2"
         },
         "six": {
             "hashes": [
