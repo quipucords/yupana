@@ -7,7 +7,7 @@ verify_ssl = true
 asynctest = "==0.13.0"
 autopep8 = "==1.6.0"
 codecov = "==2.0.22"
-coverage = "==5.1"
+coverage = "==6.3.2"
 flake8 = "==4.0.1"
 pylint = "==2.5.3"
 pylint-django = "==2.0.15"
