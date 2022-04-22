@@ -345,9 +345,6 @@ class ReportProcessorTests(TransactionTestCase):
         self.report_record.report_platform_id = self.uuid
         self.report_record.upload_ack_status = report_processor.SUCCESS_CONFIRM_STATUS
         self.report_record.save()
-        self.processor.report_or_slice = self.report_record
-        # Note - hacky way to fix random test failure
-        await asyncio.sleep(0.01)
 
         def download_side_effect():
             """Transition the state to downloaded."""
@@ -357,11 +354,14 @@ class ReportProcessorTests(TransactionTestCase):
         with patch('processor.report_processor.'
                    'ReportProcessor.transition_to_downloaded',
                    side_effect=download_side_effect):
+            self.processor = report_processor.ReportProcessor()
+            self.processor.report_or_slice = self.report_record
             await self.processor.delegate_state()
             self.assertEqual(self.processor.report_platform_id,
                              self.report_record.report_platform_id)
-            # self.assertEqual(self.processor.report_or_slice.state, Report.DOWNLOADED)
-            self.assertEqual(self.processor.status, self.processor.report.upload_ack_status)
+            self.assertEqual(self.processor.report_or_slice.state, Report.DOWNLOADED)
+            self.assertEqual(self.processor.status,
+                             self.processor.report_or_slice.upload_ack_status)
 
         # test the async function call state
         self.report_record.state = Report.VALIDATED
