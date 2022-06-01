@@ -6,7 +6,7 @@ verify_ssl = true
 [dev-packages]
 asynctest = "==0.13.0"
 autopep8 = "==1.6.0"
-codecov = "==2.0.22"
+codecov = "==2.1.12"
 coverage = "==6.4"
 flake8 = "==4.0.1"
 pylint = "==2.5.3"
