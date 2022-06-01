@@ -24,4 +24,4 @@ six==1.16.0
 sqlparse==0.4.2
 urllib3==1.26.9; python_version != '3.4'
 watchtower==3.0.0
-whitenoise==5.0.1
+whitenoise==6.1.0
