@@ -22,6 +22,7 @@ class AbstractReport(models.Model):
     source = models.CharField(max_length=15, null=True)
     source_metadata = models.TextField(null=True)
     account = models.CharField(max_length=50, null=True)
+    org_id = models.CharField(max_length=50, null=True)
     request_id = models.CharField(max_length=50, null=True)
     upload_ack_status = models.CharField(max_length=10, null=True)
     upload_srv_kafka_msg = models.TextField(null=True)
@@ -76,6 +77,7 @@ class AbstractReport(models.Model):
             'source: {}, '\
             'source_metadata: {}, '\
             'account: {}, ' \
+            'org_id: {}, ' \
             'request_id: {}, '\
             'upload_ack_status: {}, ' \
             'upload_srv_kafka_msg: {}, ' \
@@ -93,6 +95,7 @@ class AbstractReport(models.Model):
                 self.source,
                 self.source_metadata,
                 self.account,
+                self.org_id,
                 self.request_id,
                 self.upload_ack_status,
                 self.upload_srv_kafka_msg,

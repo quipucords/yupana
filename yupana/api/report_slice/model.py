@@ -22,6 +22,7 @@ class AbstractReportSlice(models.Model):
     report_platform_id = models.UUIDField(null=True)
     report_slice_id = models.UUIDField(null=True)
     account = models.CharField(max_length=50, null=True)
+    org_id = models.CharField(max_length=50, null=True)
     report_json = models.TextField(null=True)
     git_commit = models.CharField(max_length=50, null=True)
     ready_to_archive = models.BooleanField(null=False, default=False)
@@ -77,6 +78,7 @@ class AbstractReportSlice(models.Model):
         return '{' + 'report_platform_id:{}, '\
             'report_slice_id: {}, '\
             'account: {}, ' \
+            'org_id: {}, ' \
             'report_json: {}, '\
             'git_commit: {}, '\
             'ready_to_archive: {}, '\
@@ -96,6 +98,7 @@ class AbstractReportSlice(models.Model):
                 self.report_platform_id,
                 self.report_slice_id,
                 self.account,
+                self.org_id,
                 self.report_json,
                 self.git_commit,
                 self.ready_to_archive,
