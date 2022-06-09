@@ -269,6 +269,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     self.prefix, object_found_message % (self.object_prefix.lower(),
                                                          self.report_or_slice.state),
                     account_number=self.account_number,
+                    org_id=self.org_id,
                     report_platform_id=self.report_or_slice.report_platform_id))
                 options = {'retry': RETRY.keep_same}
                 self.update_object_state(options=options)
@@ -282,6 +283,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                             self.prefix, object_found_message % (self.object_prefix.lower(),
                                                                  self.report_or_slice.state),
                             account_number=self.account_number,
+                            org_id=self.org_id,
                             report_platform_id=self.report_or_slice.report_platform_id))
                     self.transition_to_started()
             if not assigned:
@@ -421,7 +423,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 self.prefix,
                 'Could not update %s record due to the following error %s.' % (
                     self.object_prefix.lower(), str(error)),
-                account_number=self.account_number, report_platform_id=self.report_platform_id))
+                account_number=self.account_number, org_id=self.org_id,
+                report_platform_id=self.report_platform_id))
             print_error_loop_event()
 
     def move_candidates_to_failed(self):
@@ -444,7 +447,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 self.prefix,
                 'This %s has reached the retry limit of %s.'
                 % (self.object_prefix.lower(), str(RETRIES_ALLOWED)),
-                account_number=self.account_number, report_platform_id=self.report_platform_id))
+                account_number=self.account_number, org_id=self.org_id,
+                report_platform_id=self.report_platform_id))
             self.next_state = fail_state
             candidates = None
             failed = None
@@ -474,7 +478,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             LOG.error(format_message(
                 self.prefix,
                 log_message,
-                account_number=self.account_number, report_platform_id=self.report_platform_id))
+                account_number=self.account_number, org_id=self.org_id,
+                report_platform_id=self.report_platform_id))
 
             options = {'retry': RETRY.increment, 'retry_type': retry_type,
                        'candidate_hosts': candidate_hosts}
@@ -536,6 +541,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                                 completion_date_time)
         LOG.info(format_message('REPORT TIME STATS', report_time_facts,
                                 account_number=self.account_number,
+                                org_id=self.org_id,
                                 report_platform_id=self.report_platform_id))
 
     @DB_ERRORS.count_exceptions()  # noqa: C901 (too-complex)
@@ -563,6 +569,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             failed = False
             LOG.info(format_message(self.prefix, 'Archiving report.',
                                     account_number=self.account_number,
+                                    org_id=self.org_id,
                                     report_platform_id=self.report_platform_id))
             archived_rep_data = {
                 'account': report.account,
@@ -590,6 +597,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             archived_rep = rep_serializer.save()
             LOG.info(format_message(self.prefix, 'Report successfully archived.',
                                     account_number=self.account_number,
+                                    org_id=self.org_id,
                                     report_platform_id=self.report_platform_id))
 
             failed_states = [Report.FAILED_DOWNLOAD, Report.FAILED_VALIDATION,
@@ -637,6 +645,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     self.prefix,
                     'Archiving report slice %s.' % report_slice.report_slice_id,
                     account_number=self.account_number,
+                    org_id=self.org_id,
                     report_platform_id=self.report_platform_id))
             self.record_failed_state_metrics()
             # now delete the report object and it will delete all of the associated
@@ -648,6 +657,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             if all_report_slices:
                 LOG.info(format_message(self.prefix, 'Report slices successfully archived.',
                                         account_number=self.account_number,
+                                        org_id=self.org_id,
                                         report_platform_id=self.report_platform_id))
             self.log_time_stats(archived_rep)
             self.reset_variables()
@@ -657,6 +667,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                                     'Could not archive report because one or more associated slices'
                                     ' are still being processed.',
                                     account_number=self.account_number,
+                                    org_id=self.org_id,
                                     report_platform_id=self.report_platform_id))
             self.reset_variables()
 
@@ -696,6 +707,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             LOG.error(format_message(self.prefix,
                                      invalid_hosts_message,
                                      account_number=self.account_number,
+                                     org_id=self.org_id,
                                      report_platform_id=self.report_platform_id))
             raise QPCReportException()
         invalid_hosts_count = 0
@@ -711,6 +723,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             LOG.error(format_message(self.prefix,
                                      invalid_hosts_message,
                                      account_number=self.account_number,
+                                     org_id=self.org_id,
                                      report_platform_id=self.report_platform_id))
             raise QPCReportException()
         report_slice_id = self.report_json.get('report_slice_id')
@@ -723,12 +736,14 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             '%s/%s hosts are valid.' % (
                 total_valid, total_fingerprints),
             account_number=self.account_number,
+            org_id=self.org_id,
             report_platform_id=self.report_platform_id
         ))
         if not candidate_hosts:
             LOG.error(format_message(self.prefix,
                                      'report does not contain any valid hosts.',
                                      account_number=self.account_number,
+                                     org_id=self.org_id,
                                      report_platform_id=self.report_platform_id))
             raise QPCReportException()
         return candidate_hosts
@@ -779,6 +794,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     prefix,
                     invalid_hosts_message,
                     account_number=self.account_number,
+                    org_id=self.org_id,
                     report_platform_id=self.report_platform_id))
 
         return candidate_hosts, hosts_without_facts

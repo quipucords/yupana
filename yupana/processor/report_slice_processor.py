@@ -130,7 +130,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         LOG.info(format_message(
             self.prefix,
             'Uploading hosts to inventory. State is "%s".' % self.report_or_slice.state,
-            account_number=self.account_number, report_platform_id=self.report_platform_id))
+            account_number=self.account_number, org_id=self.org_id,
+            report_platform_id=self.report_platform_id))
         try:
             self.report_json = json.loads(self.report_or_slice.report_json)
             self.candidate_hosts = self._validate_report_details()
@@ -160,7 +161,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             self.prefix,
             'Uploading hosts to inventory. State is "%s".' %
             (self.report_or_slice.state),
-            account_number=self.account_number, report_platform_id=self.report_platform_id))
+            account_number=self.account_number, org_id=self.org_id,
+            report_platform_id=self.report_platform_id))
         request_id = None
         if self.report_or_slice.report:
             request_id = self.report_or_slice.report.request_id
@@ -174,6 +176,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                         'All hosts were successfully uploaded (request_id:%s).'
                         % request_id,
                         account_number=self.account_number,
+                        org_id=self.org_id,
                         report_platform_id=self.report_platform_id))
                 self.next_state = ReportSlice.HOSTS_UPLOADED
                 options = {'candidate_hosts': [], 'ready_to_archive': True}
@@ -186,6 +189,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                         'There are no valid hosts to upload (request_id:%s)'
                         % request_id,
                         account_number=self.account_number,
+                        org_id=self.org_id,
                         report_platform_id=self.report_platform_id))
                 self.next_state = ReportSlice.FAILED_VALIDATION
                 options = {'ready_to_archive': True}
@@ -194,6 +198,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         except Exception as error:  # pylint: disable=broad-except
             LOG.error(format_message(self.prefix, 'The following error occurred: %s.' % str(error),
                                      account_number=self.account_number,
+                                     org_id=self.org_id,
                                      report_platform_id=self.report_platform_id))
             self.determine_retry(ReportSlice.FAILED_HOSTS_UPLOAD, ReportSlice.VALIDATED,
                                  retry_type=ReportSlice.TIME)
@@ -338,6 +343,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                 "os version after parsing os_release: '%s'"
                 % os_details,
                 account_number=self.account_number,
+                org_id=self.org_id,
                 report_platform_id=self.report_platform_id))
 
         if not os_details or not os_details['major']:
@@ -507,6 +513,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                     self.prefix,
                     log_message,
                     account_number=self.account_number,
+                    org_id=self.org_id,
                     report_platform_id=self.report_platform_id
                 )
             )
@@ -581,6 +588,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                             self.prefix,
                             'Sending %s/%s hosts to the inventory service.' % (count, total_hosts),
                             account_number=self.account_number,
+                            org_id=self.org_id,
                             report_platform_id=self.report_platform_id))
                     try:
                         await asyncio.wait(send_futures, timeout=HOSTS_UPLOAD_TIMEOUT)

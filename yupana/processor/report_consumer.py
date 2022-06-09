@@ -82,6 +82,7 @@ class ReportConsumer():
         self.should_run = True
         self.prefix = 'REPORT CONSUMER'
         self.account_number = None
+        self.org_id = None
         self.upload_message = None
         self.consumer = AIOKafkaConsumer(
             QPC_TOPIC,
@@ -201,11 +202,13 @@ class ReportConsumer():
             self.account_number = json_message.get('account', rh_account)
             LOG.info(format_message(self.prefix,
                                     message,
-                                    account_number=self.account_number))
+                                    account_number=self.account_number,
+                                    org_id=self.org_id))
             LOG.debug(format_message(
                 self.prefix,
                 'Message: %s' % str(consumer_record),
-                account_number=self.account_number))
+                account_number=self.account_number,
+                org_id=self.org_id))
             return json_message
         except ValueError:
             raise QPCKafkaMsgException(format_message(
