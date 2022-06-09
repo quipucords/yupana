@@ -142,6 +142,7 @@ class ReportConsumer():
                     uploaded_report = {
                         'upload_srv_kafka_msg': json.dumps(self.upload_message),
                         'account': self.account_number,
+                        'org_id': self.upload_message.get('org_id'),
                         'request_id': request_id,
                         'state': Report.NEW,
                         'state_info': json.dumps([Report.NEW]),

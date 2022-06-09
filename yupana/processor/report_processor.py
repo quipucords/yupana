@@ -131,6 +131,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         """
         self.state = self.report_or_slice.state
         self.account_number = self.report_or_slice.account
+        self.org_id = self.report_or_slice.org_id
         self.upload_message = json.loads(self.report_or_slice.upload_srv_kafka_msg)
         if self.report_or_slice.report_platform_id:
             self.report_platform_id = self.report_or_slice.report_platform_id
@@ -281,6 +282,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         report_slice = {
             'state': ReportSlice.PENDING,
             'account': self.account_number,
+            'org_id': self.org_id,
             'state_info': json.dumps([ReportSlice.PENDING]),
             'last_update_time': datetime.now(pytz.utc),
             'retry_count': 0,

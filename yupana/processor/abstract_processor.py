@@ -114,6 +114,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         self.state = None
         self.next_state = None
         self.account_number = None
+        self.org_id = None
         self.upload_message = None
         self.report_platform_id = None
         self.report_slice_id = None
@@ -129,6 +130,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         self.report_or_slice = None
         self.state = None
         self.account_number = None
+        self.org_id = None
         self.upload_message = None
         self.report_platform_id = None
         self.report_slice_id = None
@@ -564,6 +566,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                                     report_platform_id=self.report_platform_id))
             archived_rep_data = {
                 'account': report.account,
+                'org_id': report.org_id,
                 'retry_count': report.retry_count,
                 'retry_type': report.retry_type,
                 'state': report.state,
@@ -600,6 +603,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             for report_slice in all_report_slices:
                 archived_slice_data = {
                     'account': report_slice.account,
+                    'org_id': report_slice.org_id,
                     'retry_count': report_slice.retry_count,
                     'retry_type': report_slice.retry_type,
                     'candidate_hosts': report_slice.candidate_hosts,
@@ -742,12 +746,14 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         for host in hosts:
             host_uuid = str(uuid.uuid4())
             host['account'] = self.account_number
+            host['org_id'] = self.org_id
             host_facts = host.get('facts', [])
             host_facts.append({'namespace': 'yupana',
                                'facts': {'yupana_host_id': host_uuid,
                                          'report_platform_id': str(self.report_platform_id),
                                          'report_slice_id': str(report_slice_id),
                                          'account': self.account_number,
+                                         'org_id': self.org_id,
                                          'source': self.report_or_slice.source}})
             host['stale_timestamp'] = self.get_stale_time()
             host['reporter'] = 'yupana'

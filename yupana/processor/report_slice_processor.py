@@ -112,6 +112,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         """
         self.state = self.report_or_slice.state
         self.account_number = self.report_or_slice.account
+        self.org_id = self.report_or_slice.org_id
         if self.report_or_slice.candidate_hosts:
             self.candidate_hosts = json.loads(self.report_or_slice.candidate_hosts)
         if self.report_or_slice.failed_hosts:
