@@ -825,6 +825,7 @@ class ReportProcessorTests(TransactionTestCase):
         # test all valid hosts
         self.processor.report_platform_id = self.uuid2
         self.processor.account_number = '12345'
+        self.processor.org_id = '12345'
         self.processor.report_or_slice = self.report_record
         hosts = [{'bios_uuid': 'value', 'name': 'value', 'facts': []},
                  {'insights_client_id': 'value', 'name': 'foo', 'facts': []},
@@ -856,6 +857,7 @@ class ReportProcessorTests(TransactionTestCase):
                                              'report_platform_id': str(self.uuid2),
                                              'report_slice_id': str(self.uuid),
                                              'account': '12345',
+                                             'org_id': '12345',
                                              'source': 'qpc'}}])
         for invalid_host in actual_invalid:
             for host_id, host in invalid_host.items():
@@ -868,6 +870,7 @@ class ReportProcessorTests(TransactionTestCase):
                                                  'report_platform_id': str(self.uuid2),
                                                  'report_slice_id': str(self.uuid),
                                                  'account': '12345',
+                                                 'org_id': '12345',
                                                  'source': 'qpc'}}])
 
         # test that invalid hosts are not removed

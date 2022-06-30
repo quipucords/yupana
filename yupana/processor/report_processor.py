@@ -131,6 +131,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         """
         self.state = self.report_or_slice.state
         self.account_number = self.report_or_slice.account
+        self.org_id = self.report_or_slice.org_id
         self.upload_message = json.loads(self.report_or_slice.upload_srv_kafka_msg)
         if self.report_or_slice.report_platform_id:
             self.report_platform_id = self.report_or_slice.report_platform_id
@@ -149,7 +150,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             self.prefix,
             'Attempting to download the report and extract the json. '
             'State is "%s".' % self.report_or_slice.state,
-            account_number=self.account_number))
+            account_number=self.account_number,
+            org_id=self.org_id))
         try:
             report_tar = self._download_report()
             options = self._extract_and_create_slices(report_tar)
@@ -161,7 +163,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             LOG.error(format_message(
                 self.prefix,
                 report_download_failed_msg % err,
-                account_number=self.account_number))
+                account_number=self.account_number,
+                org_id=self.org_id))
             self.next_state = Report.FAILED_DOWNLOAD
             options = {'ready_to_archive': True}
             self.update_object_state(options=options)
@@ -169,7 +172,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             LOG.error(format_message(
                 self.prefix,
                 report_download_failed_msg % err,
-                account_number=self.account_number))
+                account_number=self.account_number,
+                org_id=self.org_id))
             self.determine_retry(Report.FAILED_DOWNLOAD, Report.STARTED)
 
     @DB_ERRORS.count_exceptions()
@@ -179,7 +183,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         LOG.info(format_message(
             self.prefix,
             'Validating the report contents. State is "%s".' % self.report_or_slice.state,
-            account_number=self.account_number))
+            account_number=self.account_number,
+            org_id=self.org_id))
         # find all associated report slices
         report_slices = ReportSlice.objects.all().filter(report=self.report_or_slice)
         self.status = FAILURE_CONFIRM_STATUS
@@ -212,7 +217,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 format_message(
                     self.prefix,
                     'The uploaded report was invalid. Status set to "%s".' % self.status,
-                    account_number=self.account_number))
+                    account_number=self.account_number,
+                    org_id=self.org_id))
         self.next_state = Report.VALIDATED
         options = {'status': self.status}
         self.update_object_state(options=options)
@@ -224,7 +230,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             self.prefix,
             'Uploading validation status "%s". State is "%s".' %
             (self.status, self.state),
-            account_number=self.account_number, report_platform_id=self.report_platform_id))
+            account_number=self.account_number, org_id=self.org_id,
+            report_platform_id=self.report_platform_id))
         try:
             message_hash = self.upload_message['request_id']
             await self._send_confirmation(message_hash)
@@ -234,7 +241,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             LOG.info(format_message(
                 self.prefix,
                 'Status successfully uploaded.',
-                account_number=self.account_number, report_platform_id=self.report_platform_id))
+                account_number=self.account_number, org_id=self.org_id,
+                report_platform_id=self.report_platform_id))
             if self.status == FAILURE_CONFIRM_STATUS:
                 options = {'retry': RETRY.keep_same, 'ready_to_archive': True}
                 self.update_object_state(options=options)
@@ -243,6 +251,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             LOG.error(format_message(
                 self.prefix, 'The following error occurred: %s.' % str(error),
                 account_number=self.account_number,
+                org_id=self.org_id,
                 report_platform_id=self.report_platform_id))
             self.determine_retry(Report.FAILED_VALIDATION_REPORTING, Report.VALIDATED)
 
@@ -263,7 +272,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         LOG.info(
             format_message(
                 self.prefix, 'Creating report slice %s' % report_slice_id,
-                account_number=self.account_number, report_platform_id=self.report_platform_id))
+                account_number=self.account_number, org_id=self.org_id,
+                report_platform_id=self.report_platform_id))
 
         # first we should see if any slices exist with this slice id & report_platform_id
         # if they exist we will not create the slice
@@ -275,12 +285,14 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 self.prefix,
                 'a report slice with the report_platform_id %s and report_slice_id %s '
                 'already exists.' % (self.report_platform_id, report_slice_id),
-                account_number=self.account_number, report_platform_id=self.report_platform_id))
+                account_number=self.account_number, org_id=self.org_id,
+                report_platform_id=self.report_platform_id))
             return created
 
         report_slice = {
             'state': ReportSlice.PENDING,
             'account': self.account_number,
+            'org_id': self.org_id,
             'state_info': json.dumps([ReportSlice.PENDING]),
             'last_update_time': datetime.now(pytz.utc),
             'retry_count': 0,
@@ -303,6 +315,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     self.prefix,
                     'Successfully created report slice %s' % report_slice_id,
                     account_number=self.account_number,
+                    org_id=self.org_id,
                     report_platform_id=self.report_platform_id))
         return True
 
@@ -383,6 +396,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     self.prefix,
                     'Successfully updated report slice %s' % report_slice.report_slice_id,
                     account_number=self.account_number,
+                    org_id=self.org_id,
                     report_platform_id=self.report_platform_id))
         except Exception as error:  # pylint: disable=broad-except
             DB_ERRORS.inc()
@@ -390,7 +404,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             LOG.error(format_message(
                 self.prefix,
                 'Could not update report slice record due to the following error %s.' % str(error),
-                account_number=self.account_number, report_platform_id=self.report_platform_id))
+                account_number=self.account_number, org_id=self.org_id,
+                report_platform_id=self.report_platform_id))
             print_error_loop_event()
 
     def _download_report(self):
@@ -420,12 +435,14 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                                        download_response.status_code,
                                        report_url,
                                        self.upload_message),
-                                   account_number=self.account_number))
+                                   account_number=self.account_number,
+                                   org_id=self.org_id))
 
             LOG.info(format_message(
                 self.prefix,
                 'successfully downloaded TAR %s' % report_url,
-                account_number=self.account_number
+                account_number=self.account_number,
+                org_id=self.org_id
             ))
             return download_response.content
         except FailDownloadException as fail_err:
@@ -456,6 +473,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
         LOG.info(format_message(self.prefix,
                                 'Attempting to decode the file %s' % metadata.name,
                                 account_number=self.account_number,
+                                org_id=self.org_id,
                                 report_platform_id=self.report_platform_id))
         metadata_file = tar.extractfile(metadata)
         try:
@@ -467,12 +485,14 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             LOG.exception(
                 format_message(self.prefix, decode_error_message,
                                account_number=self.account_number,
+                               org_id=self.org_id,
                                report_platform_id=self.report_platform_id)
             )
             return {}
         LOG.info(format_message(self.prefix,
                                 'Successfully decoded the file %s' % metadata.name,
                                 account_number=self.account_number,
+                                org_id=self.org_id,
                                 report_platform_id=self.report_platform_id))
         metadata_json = json.loads(metadata_str)
         required_keys = ['report_id', 'host_inventory_api_version',
@@ -509,6 +529,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 self.prefix,
                 'The following source metadata was uploaded: %s' % source_metadata,
                 account_number=self.account_number,
+                org_id=self.org_id,
                 report_platform_id=self.report_platform_id
             ))
             options['source_metadata'] = source_metadata
@@ -546,6 +567,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 LOG.warning(
                     format_message(self.prefix, large_slice_message,
                                    account_number=self.account_number,
+                                   org_id=self.org_id,
                                    report_platform_id=self.report_platform_id))
 
         return valid_slice_ids, options
@@ -585,6 +607,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                                     self.prefix,
                                     'Attempting to decode the file %s' % file.name,
                                     account_number=self.account_number,
+                                    org_id=self.org_id,
                                     report_platform_id=self.report_platform_id))
                                 try:
                                     report_slice_string = report_slice.read().decode('utf-8')
@@ -595,6 +618,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                                     LOG.exception(
                                         format_message(self.prefix, decode_error_message,
                                                        account_number=self.account_number,
+                                                       org_id=self.org_id,
                                                        report_platform_id=self.report_platform_id)
                                     )
                                     continue
@@ -602,6 +626,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                                     self.prefix,
                                     'Successfully decoded the file %s' % file.name,
                                     account_number=self.account_number,
+                                    org_id=self.org_id,
                                     report_platform_id=self.report_platform_id))
                                 report_slice_json = json.loads(report_slice_string)
                                 report_slice_id = report_slice_json.get('report_slice_id', '')
@@ -626,6 +651,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                                     LOG.warning(
                                         format_message(self.prefix, mismatch_message,
                                                        account_number=self.account_number,
+                                                       org_id=self.org_id,
                                                        report_platform_id=self.report_platform_id))
                                     continue
                                 slice_options = {
@@ -650,6 +676,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                             self.prefix,
                             'successfully extracted & created report slices',
                             account_number=self.account_number,
+                            org_id=self.org_id,
                             report_platform_id=self.report_platform_id))
                     return options
 
@@ -717,6 +744,7 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     self.prefix,
                     'Send %s validation status to file upload on kafka' % self.status,
                     account_number=self.account_number,
+                    org_id=self.org_id,
                     report_platform_id=self.report_platform_id))
         except Exception as err:  # pylint: disable=broad-except
             KAFKA_ERRORS.inc()
@@ -739,7 +767,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                     self.prefix,
                     'a report with the report_platform_id %s already exists.' %
                     self.report_or_slice.report_platform_id,
-                    account_number=self.account_number, report_platform_id=self.report_platform_id))
+                    account_number=self.account_number, org_id=self.org_id,
+                    report_platform_id=self.report_platform_id))
                 self.archive_report_and_slices()
         except Report.DoesNotExist:
             pass

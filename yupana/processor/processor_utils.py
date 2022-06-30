@@ -42,7 +42,7 @@ def list_name_of_processors():
     return list(map(lambda i: i.processor_name, PROCESSOR_INSTANCES))
 
 
-def format_message(prefix, message, account_number=None,
+def format_message(prefix, message, account_number=None, org_id=None,
                    report_platform_id=None):
     """Format log messages in a consistent way.
 
@@ -52,13 +52,18 @@ def format_message(prefix, message, account_number=None,
     :param report_platform_id: (str) The qpc report id.
     :returns: (str) containing formatted message
     """
-    if not report_platform_id and not account_number:
+    if not report_platform_id and not account_number and not org_id:
         actual_message = 'Report %s - %s' % (prefix, message)
     elif account_number and not report_platform_id:
-        actual_message = 'Report(account=%s) %s - %s' % (account_number, prefix, message)
-    else:
-        actual_message = 'Report(account=%s, report_platform_id=%s) %s - %s' % (
+        actual_message = 'Report(account=%s, org_id=%s) %s - %s' % (
             account_number,
+            org_id,
+            prefix,
+            message)
+    else:
+        actual_message = 'Report(account=%s, org_id=%s, report_platform_id=%s) %s - %s' % (
+            account_number,
+            org_id,
             report_platform_id, prefix,
             message)
 
