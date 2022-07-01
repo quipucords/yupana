@@ -19,7 +19,7 @@ sphinx-rtd-theme = "==0.4.3"
 tox = "==3.14.6"
 
 [packages]
-Django = "==2.2.13"
+Django = "==4.0.5"
 aiokafka = "==0.7.2"
 app-common-python = "~=0.2.0"
 boto3 = "==1.24.21"
