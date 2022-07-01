@@ -8,7 +8,7 @@ chardet==5.0.0
 django-environ==0.9.0
 django-prometheus==2.2.0
 django==4.0.5
-djangorestframework==3.11.0
+djangorestframework==3.13.1
 docutils==0.15.2
 gunicorn==20.0.4
 idna==2.10
