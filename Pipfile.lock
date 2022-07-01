@@ -94,11 +94,10 @@
         },
         "django-prometheus": {
             "hashes": [
-                "sha256:4c30aa8eb944fcf3cf10e20dfabbbe11ad5a84fce62abb3658feffa4e2ac2b97",
-                "sha256:8f25e86a3c310f40cf32cfa1b56a2b6df9cb2521e4cb794844958697d98fb3d1"
+                "sha256:240378a1307c408bd5fc85614a3a57f1ce633d4a222c9e291e2bbf325173b801",
+                "sha256:e6616770d8820b8834762764bf1b76ec08e1b98e72a6f359d488a2e15fe3537c"
             ],
-            "index": "pypi",
-            "version": "==2.0.0"
+            "version": "==2.2.0"
         },
         "djangorestframework": {
             "hashes": [
