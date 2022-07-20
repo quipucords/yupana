@@ -26,7 +26,7 @@ import threading
 from uuid import UUID
 
 from aiokafka import AIOKafkaProducer
-from kafka.errors import KafkaConnectionError
+from kafka.errors import KafkaConnectionError, MessageSizeTooLargeError
 from processor.abstract_processor import (AbstractProcessor, FAILED_TO_VALIDATE)
 from processor.processor_utils import (PROCESSOR_INSTANCES,
                                        SLICE_PROCESSING_LOOP,
@@ -520,6 +520,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
     # pylint:disable=too-many-locals
     # pylint: disable=too-many-statements
+    # pylint: disable=too-many-branches
     @KAFKA_ERRORS.count_exceptions()  # noqa: C901 (too-complex)
     async def _upload_to_host_inventory_via_kafka(self, hosts):
         """
@@ -579,9 +580,13 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                                           'b64_identity': b64_identity}
                 }
                 msg = bytes(json.dumps(upload_msg), 'utf-8')
-                future = await self.producer.send(UPLOAD_TOPIC, msg)
-                send_futures.append(future)
-                associated_msg.append(upload_msg)
+                try:
+                    future = await self.producer.send(UPLOAD_TOPIC, msg)
+                    send_futures.append(future)
+                    associated_msg.append(upload_msg)
+                except MessageSizeTooLargeError as err:
+                    LOG.error('Unable to upload the host %s with org_id %s: %s',
+                              host.get('fqdn'), host.get('org_id'), err)
                 if count % HOSTS_UPLOAD_FUTURES_COUNT == 0 or count == total_hosts:
                     LOG.info(
                         format_message(
