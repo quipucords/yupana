@@ -264,7 +264,18 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
         """Remove 'ip_addresses' field."""
         ip_addresses = host.get('ip_addresses')
-        if ip_addresses is None or ip_addresses:
+        if (
+                ip_addresses is None or (
+                    ip_addresses and (
+                        len(ip_addresses) == len(set(ip_addresses))
+                    )
+                )
+        ):
+            return [host, transformed_obj]
+        if ip_addresses:
+            host['ip_addresses'] = list(set(ip_addresses))
+            transformed_obj['modified'].append(
+                'transformed ip_addresses to store unique values')
             return [host, transformed_obj]
 
         del host['ip_addresses']
