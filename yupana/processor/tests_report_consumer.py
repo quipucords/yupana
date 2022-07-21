@@ -127,12 +127,12 @@ class KafkaMsgHandlerTest(TestCase):
               f"{datetime.now().strftime('%Y%m%dT%H%M%SZ')}&X-Amz-Expires=86400"
         # test happy case
         with patch('processor.report_consumer.ReportConsumer.unpack_consumer_record',
-                   return_value={'account': '8910', 'request_id': '1234',
+                   return_value={'account': '8910', 'org_id': '12345', 'request_id': '1234',
                                  'url': url}):
             await self.report_consumer.save_message_and_ack(qpc_msg)
             report = Report.objects.get(account='8910')
             self.assertEqual(json.loads(report.upload_srv_kafka_msg),
-                             {'account': '8910', 'request_id': '1234',
+                             {'account': '8910', 'org_id': '12345', 'request_id': '1234',
                               'url': url})
             self.assertEqual(report.state, Report.NEW)
 
@@ -150,12 +150,12 @@ class KafkaMsgHandlerTest(TestCase):
 
         self.report_consumer.consumer.commit = CoroutineMock(side_effect=raise_error)
         with patch('processor.report_consumer.ReportConsumer.unpack_consumer_record',
-                   return_value={'rh_account': '1112', 'request_id': '1234',
+                   return_value={'rh_account': '1112', 'org_id': '1234', 'request_id': '1234',
                                  'url': url}):
             await self.report_consumer.save_message_and_ack(qpc_msg)
             report = Report.objects.get(account='1112')
             self.assertEqual(json.loads(report.upload_srv_kafka_msg),
-                             {'rh_account': '1112', 'request_id': '1234',
+                             {'rh_account': '1112', 'org_id': '1234', 'request_id': '1234',
                               'url': url})
             self.assertEqual(report.state, Report.NEW)
 

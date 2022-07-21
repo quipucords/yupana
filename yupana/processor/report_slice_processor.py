@@ -573,6 +573,8 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
                         host['system_profile']['owner_id'] = cert_cn
                 system_unique_id = unique_id_base + host_id
                 count += 1
+                if not host.get('org_id'):
+                    continue
                 upload_msg = {
                     'operation': 'add_host',
                     'data': host,

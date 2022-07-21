@@ -485,13 +485,13 @@ class ReportSliceProcessorTests(TestCase):
     async def async_test_upload_to_host_inventory_via_kafka_send_exception(self):
         """Test uploading to inventory via kafka."""
         self.processor.report_or_slice = self.report_slice
-        hosts = {str(self.uuid): {'bios_uuid': str(self.uuid), 'name': 'value'},
-                 str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo'},
-                 str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo'},
-                 str(self.uuid4): {'mac_addresses': 'value', 'name': 'foo'},
-                 str(self.uuid5): {'vm_uuid': 'value', 'name': 'foo'},
-                 str(self.uuid6): {'etc_machine_id': 'value'},
-                 str(self.uuid7): {'subscription_manager_id': 'value'}}
+        hosts = {str(self.uuid): {'bios_uuid': str(self.uuid), 'name': 'value', 'org_id': '123'},
+                 str(self.uuid2): {'insights_client_id': 'value', 'name': 'foo', 'org_id': '123'},
+                 str(self.uuid3): {'ip_addresses': 'value', 'name': 'foo', 'org_id': '123'},
+                 str(self.uuid4): {'mac_addresses': 'value', 'name': 'foo', 'org_id': '123'},
+                 str(self.uuid5): {'vm_uuid': 'value', 'name': 'foo', 'org_id': '123'},
+                 str(self.uuid6): {'etc_machine_id': 'value', 'org_id': '123'},
+                 str(self.uuid7): {'subscription_manager_id': 'value', 'org_id': '123'}}
         test_producer = AIOKafkaProducer(
             loop=report_slice_processor.SLICE_PROCESSING_LOOP,
             bootstrap_servers=report_slice_processor.INSIGHTS_KAFKA_ADDRESS
