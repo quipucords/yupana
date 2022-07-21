@@ -126,9 +126,10 @@ class ReportConsumer():
                 rh_account = self.upload_message.get('rh_account')
                 request_id = self.upload_message.get('request_id')
                 url = self.upload_message.get('url')
+                self.org_id = self.upload_message.get('org_id')
                 self.account_number = self.upload_message.get('account', rh_account)
-                if not self.account_number:
-                    missing_fields.append('account')
+                if not self.org_id:
+                    missing_fields.append('org_id')
                 if not request_id:
                     missing_fields.append('request_id')
                 if not url:
@@ -143,7 +144,7 @@ class ReportConsumer():
                     uploaded_report = {
                         'upload_srv_kafka_msg': json.dumps(self.upload_message),
                         'account': self.account_number,
-                        'org_id': self.upload_message.get('org_id'),
+                        'org_id': self.org_id,
                         'request_id': request_id,
                         'state': Report.NEW,
                         'state_info': json.dumps([Report.NEW]),
