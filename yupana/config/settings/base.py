@@ -35,6 +35,7 @@ import environ
 from boto3.session import Session
 from botocore.exceptions import ClientError
 from .env import ENVIRONMENT
+from aiokafka.helpers import create_ssl_context
 
 def get_logger(name):
     logging.basicConfig(
@@ -55,6 +56,22 @@ ENGINES = {
 ROOT_DIR = environ.Path(__file__) - 4
 APPS_DIR = ROOT_DIR.path('yupana')
 
+def kafka_ssl_config():
+    ssl_config = {}
+    if KAFKA_BROKER:
+        if KAFKA_BROKER.cacert:
+            ssl_config['ssl_context'] = create_ssl_context(
+                cafile=KAFKA_BROKER.cacert
+            )
+        if KAFKA_BROKER.sasl and KAFKA_BROKER.sasl.username:
+            ssl_config.update({
+                "security_protocol": KAFKA_BROKER.sasl.securityProtocol,
+                "sasl_mechanism": KAFKA_BROKER.sasl.saslMechanism,
+                "sasl_plain_username": KAFKA_BROKER.sasl.username,
+                "sasl_plain_password": KAFKA_BROKER.sasl.password,
+            })
+    return ssl_config
+
 if CLOWDER_ENABLED:
     LOG.info("Using Clowder Operator...")
     from app_common_python import LoadedConfig, KafkaTopics
@@ -68,6 +85,7 @@ if CLOWDER_ENABLED:
     DB_PASSWORD = LoadedConfig.database.password
     DB_HOST = LoadedConfig.database.hostname
     DB_PORT = LoadedConfig.database.port
+    KAFKA_BROKER = LoadedConfig.kafka.brokers[0]
     INSIGHTS_KAFKA_ADDRESS = LoadedConfig.kafka.brokers[0].hostname + ":" + str(LoadedConfig.kafka.brokers[0].port)
     QPC_TOPIC = KafkaTopics["platform.upload.qpc"].name
     UPLOAD_TOPIC = KafkaTopics["platform.inventory.host-ingress"].name
@@ -92,6 +110,7 @@ else:
     INSIGHTS_KAFKA_HOST = os.getenv('INSIGHTS_KAFKA_HOST', 'localhost')
     INSIGHTS_KAFKA_PORT = os.getenv('INSIGHTS_KAFKA_PORT', '29092')
     INSIGHTS_KAFKA_ADDRESS = f'{INSIGHTS_KAFKA_HOST}:{INSIGHTS_KAFKA_PORT}'
+    KAFKA_BROKER = None
     QPC_TOPIC = os.getenv('QPC_TOPIC', 'platform.upload.qpc')
     UPLOAD_TOPIC = os.getenv('UPLOAD_TOPIC', 'platform.inventory.host-ingress')
     VALIDATION_TOPIC = os.getenv('VALIDATION_TOPIC', 'platform.upload.validation')

@@ -45,7 +45,8 @@ from config.settings.base import (HOSTS_TRANSFORMATION_ENABLED,
                                   KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE,
                                   RETRIES_ALLOWED,
                                   RETRY_TIME,
-                                  UPLOAD_TOPIC)
+                                  UPLOAD_TOPIC,
+                                  kafka_ssl_config)
 
 LOG = logging.getLogger(__name__)
 
@@ -92,9 +93,15 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         state_metrics = {
             ReportSlice.FAILED_VALIDATION: FAILED_TO_VALIDATE
         }
+        kafka_ssl = kafka_ssl_config()
         self.producer = AIOKafkaProducer(
             loop=SLICE_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS,
-            max_request_size=KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE
+            max_request_size=KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE,
+            security_protocol=kafka_ssl.get('security_protocol', 'PLAINTEXT'),
+            ssl_context=kafka_ssl.get('ssl_context', None),
+            sasl_mechanism=kafka_ssl.get('sasl_mechanism', 'PLAIN'),
+            sasl_plain_username=kafka_ssl.get('sasl_plain_username', None),
+            sasl_plain_password=kafka_ssl.get('sasl_plain_password', None)
         )
         super().__init__(pre_delegate=self.pre_delegate,
                          state_functions=state_functions,

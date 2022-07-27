@@ -34,7 +34,7 @@ from prometheus_client import Counter
 
 from api.models import Report
 from api.serializers import ReportSerializer
-from config.settings.base import INSIGHTS_KAFKA_ADDRESS, QPC_TOPIC
+from config.settings.base import INSIGHTS_KAFKA_ADDRESS, QPC_TOPIC, kafka_ssl_config
 
 LOG = logging.getLogger(__name__)
 
@@ -84,10 +84,16 @@ class ReportConsumer():
         self.account_number = None
         self.org_id = None
         self.upload_message = None
+        kafka_ssl = kafka_ssl_config()
         self.consumer = AIOKafkaConsumer(
             QPC_TOPIC,
             loop=UPLOAD_REPORT_CONSUMER_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS,
-            group_id='qpc-group', enable_auto_commit=False
+            group_id='qpc-group', enable_auto_commit=False,
+            security_protocol=kafka_ssl.get('security_protocol', 'PLAINTEXT'),
+            ssl_context=kafka_ssl.get('ssl_context', None),
+            sasl_mechanism=kafka_ssl.get('sasl_mechanism', 'PLAIN'),
+            sasl_plain_username=kafka_ssl.get('sasl_plain_username', None),
+            sasl_plain_password=kafka_ssl.get('sasl_plain_password', None)
         )
 
     @KAFKA_ERRORS.count_exceptions()
