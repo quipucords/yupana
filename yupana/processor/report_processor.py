@@ -48,7 +48,8 @@ from config.settings.base import (INSIGHTS_KAFKA_ADDRESS,
                                   MAX_HOSTS_PER_REP,
                                   RETRIES_ALLOWED,
                                   RETRY_TIME,
-                                  VALIDATION_TOPIC)
+                                  VALIDATION_TOPIC,
+                                  kafka_ssl_config)
 
 LOG = logging.getLogger(__name__)
 SUCCESS_CONFIRM_STATUS = 'success'
@@ -112,8 +113,14 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             Report.FAILED_VALIDATION: FAILED_TO_VALIDATE
         }
         self.async_states = [Report.VALIDATED]
+        kafka_ssl = kafka_ssl_config()
         self.producer = AIOKafkaProducer(
-            loop=REPORT_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS
+            loop=REPORT_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS,
+            security_protocol=kafka_ssl.get('security_protocol', 'PLAINTEXT'),
+            ssl_context=kafka_ssl.get('ssl_context', None),
+            sasl_mechanism=kafka_ssl.get('sasl_mechanism', 'PLAIN'),
+            sasl_plain_username=kafka_ssl.get('sasl_plain_username', None),
+            sasl_plain_password=kafka_ssl.get('sasl_plain_password', None)
         )
         super().__init__(pre_delegate=self.pre_delegate,
                          state_functions=state_functions,
