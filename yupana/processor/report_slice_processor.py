@@ -267,11 +267,22 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         return [host, transformed_obj]
 
     @staticmethod
-    def _remove_empty_ip_addresses(
+    def _transform_ip_addresses(
             host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
-        """Remove 'ip_addresses' field."""
+        """Remove empty & make 'ip_addresses' unique."""
         ip_addresses = host.get('ip_addresses')
-        if ip_addresses is None or ip_addresses:
+        if (
+                ip_addresses is None or (
+                    ip_addresses and (
+                        len(ip_addresses) == len(set(ip_addresses))
+                    )
+                )
+        ):
+            return [host, transformed_obj]
+        if ip_addresses:
+            host['ip_addresses'] = list(set(ip_addresses))
+            transformed_obj['modified'].append(
+                'transformed ip_addresses to store unique values')
             return [host, transformed_obj]
 
         del host['ip_addresses']
@@ -482,7 +493,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
             host, transformed_obj = self._transform_network_interfaces(
                 host, transformed_obj)
 
-        host, transformed_obj = self._remove_empty_ip_addresses(
+        host, transformed_obj = self._transform_ip_addresses(
             host, transformed_obj)
         host, transformed_obj = self._transform_mac_addresses(
             host, transformed_obj)
