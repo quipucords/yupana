@@ -59,38 +59,38 @@ QUEUED_REPORTS = Gauge('queued_reports', 'Reports waiting to be processed')
 QUEUED_REPORT_SLICES = Gauge('queued_report_slices', 'Report Slices waiting to be processed')
 ARCHIVED_FAIL_REPORTS = Counter('archived_fail_reports',
                                 'Reports that have been archived as failures',
-                                ['account_number'])
+                                ['org_id'])
 ARCHIVED_SUCCESS_REPORTS = Counter('archived_success_reports',
                                    'Reports that have been archived as successes',
-                                   ['account_number'])
+                                   ['org_id'])
 ARCHIVED_FAIL_SLICES = Counter('archived_fail_slices',
                                'Slices that have been archived as failures',
-                               ['account_number'])
+                               ['org_id'])
 ARCHIVED_SUCCESS_SLICES = Counter('archived_success_slices',
                                   'Slices that have been archived as successes',
-                                  ['account_number'])
+                                  ['org_id'])
 FAILED_TO_DOWNLOAD = Counter('failed_download',
                              'Reports that failed to download',
-                             ['account_number'])
+                             ['org_id'])
 FAILED_TO_VALIDATE = Counter('failed_validation',
                              'Reports that could not be validated',
-                             ['account_number'])
+                             ['org_id'])
 INVALID_REPORTS = Counter('invalid_reports',
                           'Reports containing invalid syntax',
-                          ['account_number'])
+                          ['org_id'])
 TIME_RETRIES = Counter('time_retries',
                        'The total number of retries based on time for all reports',
-                       ['account_number'])
+                       ['org_id'])
 COMMIT_RETRIES = Counter('commit_retries',
                          'The total number of retries based on commit for all reports',
-                         ['account_number'])
+                         ['org_id'])
 REPORT_PROCESSING_LATENCY = Summary(
     'report_processing_latency',
     'The time in seconds that it takes to process a report'
 )
 VALIDATION_LATENCY = Summary('validation_latency', 'The time it takes to validate a report')
 INVALID_HOSTS = Gauge('invalid_hosts', 'The number of invalid hosts',
-                      ['account_number', 'source'])
+                      ['org_id', 'source'])
 
 
 # pylint: disable=broad-except, too-many-lines, too-many-public-methods
@@ -463,13 +463,13 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         else:
             self.next_state = current_state
             if retry_type == self.object_class.GIT_COMMIT:
-                COMMIT_RETRIES.labels(account_number=self.account_number).inc()
+                COMMIT_RETRIES.labels(org_id=self.org_id).inc()
                 log_message = \
                     'Saving the %s to retry when a new commit '\
                     'is pushed. Retries: %s' % (self.object_prefix.lower(),
                                                 str(self.report_or_slice.retry_count + 1))
             else:
-                TIME_RETRIES.labels(account_number=self.account_number).inc()
+                TIME_RETRIES.labels(org_id=self.org_id).inc()
                 log_message = \
                     'Saving the %s to retry at in %s minutes. '\
                     'Retries: %s' % (self.object_prefix.lower(),
@@ -490,7 +490,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         """Record the metrics based on the report or slice state."""
         if self.state in self.state_to_metric.keys():
             metric = self.state_to_metric.get(self.state)
-            metric.labels(account_number=self.account_number).inc()
+            metric.labels(org_id=self.org_id).inc()
 
     def log_time_stats(self, archived_rep):
         """Log the start/completion and processing times of the report."""
@@ -588,7 +588,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             if report.upload_ack_status:
                 if report.upload_ack_status == FAILURE_CONFIRM_STATUS:
                     failed = True
-                    INVALID_REPORTS.labels(account_number=self.account_number).inc()
+                    INVALID_REPORTS.labels(org_id=self.org_id).inc()
                 archived_rep_data['upload_ack_status'] = report.upload_ack_status
             if report.report_platform_id:
                 archived_rep_data['report_platform_id'] = report.report_platform_id
@@ -603,9 +603,9 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             failed_states = [Report.FAILED_DOWNLOAD, Report.FAILED_VALIDATION,
                              Report.FAILED_VALIDATION_REPORTING]
             if report.state in failed_states or failed:
-                ARCHIVED_FAIL_REPORTS.labels(account_number=self.account_number).inc()
+                ARCHIVED_FAIL_REPORTS.labels(org_id=self.org_id).inc()
             else:
-                ARCHIVED_SUCCESS_REPORTS.labels(account_number=self.account_number).inc()
+                ARCHIVED_SUCCESS_REPORTS.labels(org_id=self.org_id).inc()
 
             # loop through the associated reports & archive them
             for report_slice in all_report_slices:
@@ -638,9 +638,9 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 failed_states = [ReportSlice.FAILED_VALIDATION,
                                  ReportSlice.FAILED_HOSTS_UPLOAD]
                 if report_slice.state in failed_states:
-                    ARCHIVED_FAIL_SLICES.labels(account_number=self.account_number).inc()
+                    ARCHIVED_FAIL_SLICES.labels(org_id=self.org_id).inc()
                 else:
-                    ARCHIVED_SUCCESS_SLICES.labels(account_number=self.account_number).inc()
+                    ARCHIVED_SUCCESS_SLICES.labels(org_id=self.org_id).inc()
                 LOG.info(format_message(
                     self.prefix,
                     'Archiving report slice %s.' % report_slice.report_slice_id,
@@ -714,7 +714,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         for host in hosts:
             if not isinstance(host, dict):
                 invalid_hosts_count += 1
-        INVALID_HOSTS.labels(account_number=self.account_number,
+        INVALID_HOSTS.labels(org_id=self.org_id,
                              source=self.report_or_slice.source).set(invalid_hosts_count)
         if invalid_hosts_count > 0:
             hosts_count_message = \
@@ -760,14 +760,12 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
         hosts_without_facts = []
         for host in hosts:
             host_uuid = str(uuid.uuid4())
-            host['account'] = self.account_number
             host['org_id'] = self.org_id
             host_facts = host.get('facts', [])
             host_facts.append({'namespace': 'yupana',
                                'facts': {'yupana_host_id': host_uuid,
                                          'report_platform_id': str(self.report_platform_id),
                                          'report_slice_id': str(report_slice_id),
-                                         'account': self.account_number,
                                          'org_id': self.org_id,
                                          'source': self.report_or_slice.source}})
             host['stale_timestamp'] = self.get_stale_time()
@@ -780,7 +778,7 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     break
             if not found_facts:
                 INVALID_HOSTS.labels(
-                    account_number=self.account_number, source=self.report_or_slice.source).inc()
+                    org_id=self.org_id, source=self.report_or_slice.source).inc()
                 hosts_without_facts.append({host_uuid: host})
             candidate_hosts.append({host_uuid: host})
         if hosts_without_facts:

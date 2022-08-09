@@ -42,7 +42,7 @@ REPORT_PENDING_QUEUE = asyncio.Queue()
 
 MSG_UPLOADS = Counter('yupana_message_uploads',
                       'Number of messages uploaded to qpc topic',
-                      ['account_number'])
+                      ['org_id'])
 
 
 KAFKA_ERRORS = Counter('yupana_kafka_errors', 'Number of Kafka errors')
@@ -161,7 +161,7 @@ class ReportConsumer():
                     report_serializer = ReportSerializer(data=uploaded_report)
                     report_serializer.is_valid(raise_exception=True)
                     report_serializer.save()
-                    MSG_UPLOADS.labels(account_number=self.account_number).inc()
+                    MSG_UPLOADS.labels(org_id=self.org_id).inc()
                     LOG.info(format_message(
                         self.prefix,
                         'Upload service message saved with request_id: %s. Ready for processing.'
