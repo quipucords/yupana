@@ -59,13 +59,13 @@ RETRY_TIME = int(RETRY_TIME)
 MAX_HOSTS_PER_REP = int(MAX_HOSTS_PER_REP)
 HOSTS_PER_REPORT_SATELLITE = Gauge('hosts_per_sat_rep',
                                    'Hosts count in a satellite report',
-                                   ['account_number'])
+                                   ['org_id'])
 HOSTS_PER_REPORT_QPC = Gauge('hosts_per_qpc_rep',
                              'Hosts count in a QPC report',
-                             ['account_number'])
+                             ['org_id'])
 HOSTS_COUNTER = Counter('yupana_hosts_count',
                         'Total number of hosts uploaded',
-                        ['account_number', 'source'])
+                        ['org_id', 'source'])
 PROCESSOR_NAME = 'report_processor'
 
 
@@ -555,14 +555,14 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
                 invalid_slice_ids[report_slice_id] = num_hosts
         # record how many hosts there were for grafana charts
         HOSTS_COUNTER.labels(
-            account_number=self.account_number,
+            org_id=self.org_id,
             source=source).inc(total_hosts_in_report)
         if source.lower() == 'qpc':
             HOSTS_PER_REPORT_QPC.labels(
-                account_number=self.account_number).set(total_hosts_in_report)
+                org_id=self.org_id).set(total_hosts_in_report)
         elif source.lower() == 'satellite':
             HOSTS_PER_REPORT_SATELLITE.labels(
-                account_number=self.account_number).set(total_hosts_in_report)
+                org_id=self.org_id).set(total_hosts_in_report)
         # if any reports were over the max number of hosts, we need to log
         if invalid_slice_ids:
             for report_slice_id, num_hosts in invalid_slice_ids.items():

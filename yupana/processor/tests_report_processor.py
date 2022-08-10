@@ -656,7 +656,7 @@ class ReportProcessorTests(TransactionTestCase):
     # Tests for the functions that carry out the work ie (download/upload)
     def test_validate_report_success(self):
         """Test that a QPC report with the correct structure passes validation."""
-        self.processor.account_number = '123'
+        self.processor.org_id = '123'
         self.processor.report_or_slice = self.report_record
         self.processor.report_json = {
             'report_id': 1,
@@ -669,10 +669,10 @@ class ReportProcessorTests(TransactionTestCase):
         valid = self.processor._validate_report_details()
         for _, value in valid[0].items():
             self.assertIn('bios_uuid', value)
-            self.assertIn('account', value)
+            self.assertIn('org_id', value)
             self.assertIn('facts', value)
             self.assertEqual(value['bios_uuid'], 'value')
-            self.assertEqual(value['account'], '123')
+            self.assertEqual(value['org_id'], '123')
 
     def test_validate_report_missing_id(self):
         """Test that a QPC report with a missing id is fails validation."""
@@ -856,7 +856,6 @@ class ReportProcessorTests(TransactionTestCase):
                                    'facts': {'yupana_host_id': host_id,
                                              'report_platform_id': str(self.uuid2),
                                              'report_slice_id': str(self.uuid),
-                                             'account': '12345',
                                              'org_id': '12345',
                                              'source': 'qpc'}}])
         for invalid_host in actual_invalid:
@@ -869,7 +868,6 @@ class ReportProcessorTests(TransactionTestCase):
                                        'facts': {'yupana_host_id': host_id,
                                                  'report_platform_id': str(self.uuid2),
                                                  'report_slice_id': str(self.uuid),
-                                                 'account': '12345',
                                                  'org_id': '12345',
                                                  'source': 'qpc'}}])
 
@@ -1387,12 +1385,12 @@ class ReportProcessorTests(TransactionTestCase):
     def test_state_to_metric(self):
         """Test the state_to_metric function."""
         self.processor.state = Report.FAILED_DOWNLOAD
-        self.processor.account_number = '1234'
+        self.processor.org_id = '1234'
         failed_download_before = \
             REGISTRY.get_sample_value(
-                'failed_download_total', {'account_number': '1234'}) or 0
+                'failed_download_total', {'org_id': '1234'}) or 0
         self.processor.record_failed_state_metrics()
         failed_download_after = REGISTRY.get_sample_value(
-            'failed_download_total', {'account_number': '1234'})
+            'failed_download_total', {'org_id': '1234'})
         self.assertEqual(
             1, int(failed_download_after) - failed_download_before)
