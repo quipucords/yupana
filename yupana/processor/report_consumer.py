@@ -120,7 +120,7 @@ class ReportConsumer():
             consumer_record = await REPORT_PENDING_QUEUE.get()
             await self.save_message_and_ack(consumer_record)
 
-    async def save_message_and_ack(self, consumer_record):
+    async def save_message_and_ack(self, consumer_record):  # noqa: C901 (too-complex)
         """Save and ack the uploaded kafka message."""
         self.prefix = 'SAVING MESSAGE'
         if consumer_record.topic == QPC_TOPIC:
@@ -149,7 +149,6 @@ class ReportConsumer():
                 try:
                     uploaded_report = {
                         'upload_srv_kafka_msg': json.dumps(self.upload_message),
-                        'account': self.account_number,
                         'org_id': self.org_id,
                         'request_id': request_id,
                         'state': Report.NEW,
@@ -158,6 +157,8 @@ class ReportConsumer():
                         'arrival_time': datetime.now(pytz.utc),
                         'retry_count': 0
                     }
+                    if self.account_number:
+                        uploaded_report['account'] = self.account_number
                     report_serializer = ReportSerializer(data=uploaded_report)
                     report_serializer.is_valid(raise_exception=True)
                     report_serializer.save()
@@ -246,7 +247,11 @@ class ReportConsumer():
         try:
             # Consume messages
             async for msg in self.consumer:
-                await async_queue.put(msg)
+                service = dict(msg.headers or []).get('service')
+                if service:
+                    service = service.decode('utf-8')
+                    if service == 'qpc':
+                        await async_queue.put(msg)
         except Exception as err:  # pylint: disable=broad-except
             KAFKA_ERRORS.inc()
             LOG.error(format_message(

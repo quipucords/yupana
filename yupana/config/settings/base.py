@@ -87,7 +87,7 @@ if CLOWDER_ENABLED:
     DB_PORT = LoadedConfig.database.port
     KAFKA_BROKER = LoadedConfig.kafka.brokers[0]
     INSIGHTS_KAFKA_ADDRESS = LoadedConfig.kafka.brokers[0].hostname + ":" + str(LoadedConfig.kafka.brokers[0].port)
-    QPC_TOPIC = KafkaTopics["platform.upload.qpc"].name
+    QPC_TOPIC = KafkaTopics["platform.upload.announce"].name
     UPLOAD_TOPIC = KafkaTopics["platform.inventory.host-ingress"].name
     VALIDATION_TOPIC = KafkaTopics["platform.upload.validation"].name
 else:
@@ -111,7 +111,7 @@ else:
     INSIGHTS_KAFKA_PORT = os.getenv('INSIGHTS_KAFKA_PORT', '29092')
     INSIGHTS_KAFKA_ADDRESS = f'{INSIGHTS_KAFKA_HOST}:{INSIGHTS_KAFKA_PORT}'
     KAFKA_BROKER = None
-    QPC_TOPIC = os.getenv('QPC_TOPIC', 'platform.upload.qpc')
+    QPC_TOPIC = os.getenv('QPC_TOPIC', 'platform.upload.announce')
     UPLOAD_TOPIC = os.getenv('UPLOAD_TOPIC', 'platform.inventory.host-ingress')
     VALIDATION_TOPIC = os.getenv('VALIDATION_TOPIC', 'platform.upload.validation')
 
