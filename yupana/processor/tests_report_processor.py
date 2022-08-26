@@ -856,6 +856,7 @@ class ReportProcessorTests(TransactionTestCase):
                                    'facts': {'yupana_host_id': host_id,
                                              'report_platform_id': str(self.uuid2),
                                              'report_slice_id': str(self.uuid),
+                                             'account': '12345',
                                              'org_id': '12345',
                                              'source': 'qpc'}}])
         for invalid_host in actual_invalid:
@@ -868,6 +869,7 @@ class ReportProcessorTests(TransactionTestCase):
                                        'facts': {'yupana_host_id': host_id,
                                                  'report_platform_id': str(self.uuid2),
                                                  'report_slice_id': str(self.uuid),
+                                                 'account': '12345',
                                                  'org_id': '12345',
                                                  'source': 'qpc'}}])
 

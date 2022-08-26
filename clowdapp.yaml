@@ -56,7 +56,7 @@ objects:
       name: subscriptions
       version: 12
     kafkaTopics:
-      - topicName: platform.upload.qpc
+      - topicName: platform.upload.announce
         partitions: 1
       - topicName: platform.inventory.host-ingress
         partitions: 1

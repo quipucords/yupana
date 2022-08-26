@@ -298,7 +298,6 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
 
         report_slice = {
             'state': ReportSlice.PENDING,
-            'account': self.account_number,
             'org_id': self.org_id,
             'state_info': json.dumps([ReportSlice.PENDING]),
             'last_update_time': datetime.now(pytz.utc),
@@ -314,6 +313,8 @@ class ReportProcessor(AbstractProcessor):  # pylint: disable=too-many-instance-a
             'source_metadata': json.dumps(source_metadata),
             'creation_time': datetime.now(pytz.utc)
         }
+        if self.account_number:
+            report_slice['account'] = self.account_number
         slice_serializer = ReportSliceSerializer(data=report_slice)
         if slice_serializer.is_valid(raise_exception=True):
             slice_serializer.save()

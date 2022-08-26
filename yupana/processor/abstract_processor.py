@@ -572,7 +572,6 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                                     org_id=self.org_id,
                                     report_platform_id=self.report_platform_id))
             archived_rep_data = {
-                'account': report.account,
                 'org_id': report.org_id,
                 'retry_count': report.retry_count,
                 'retry_type': report.retry_type,
@@ -585,6 +584,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                 'processing_start_time': report.processing_start_time,
                 'processing_end_time': datetime.now(pytz.utc)
             }
+            if report.account:
+                archived_rep_data['account'] = report.account
             if report.upload_ack_status:
                 if report.upload_ack_status == FAILURE_CONFIRM_STATUS:
                     failed = True
@@ -610,7 +611,6 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             # loop through the associated reports & archive them
             for report_slice in all_report_slices:
                 archived_slice_data = {
-                    'account': report_slice.account,
                     'org_id': report_slice.org_id,
                     'retry_count': report_slice.retry_count,
                     'retry_type': report_slice.retry_type,
@@ -628,6 +628,8 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
                     'processing_start_time': report_slice.processing_start_time,
                     'processing_end_time': datetime.now(pytz.utc)
                 }
+                if report_slice.account:
+                    archived_slice_data['account'] = report_slice.account
                 if report_slice.report_platform_id:
                     archived_slice_data['report_platform_id'] = report_slice.report_platform_id
                 if report_slice.report_json:
@@ -762,12 +764,16 @@ class AbstractProcessor(ABC):  # pylint: disable=too-many-instance-attributes
             host_uuid = str(uuid.uuid4())
             host['org_id'] = self.org_id
             host_facts = host.get('facts', [])
-            host_facts.append({'namespace': 'yupana',
-                               'facts': {'yupana_host_id': host_uuid,
-                                         'report_platform_id': str(self.report_platform_id),
-                                         'report_slice_id': str(report_slice_id),
-                                         'org_id': self.org_id,
-                                         'source': self.report_or_slice.source}})
+            yupana_facts = {'namespace': 'yupana',
+                            'facts': {'yupana_host_id': host_uuid,
+                                      'report_platform_id': str(self.report_platform_id),
+                                      'report_slice_id': str(report_slice_id),
+                                      'org_id': self.org_id,
+                                      'source': self.report_or_slice.source}}
+            if self.account_number:
+                yupana_facts['facts']['account'] = self.account_number
+                host['account'] = self.account_number
+            host_facts.append(yupana_facts)
             host['stale_timestamp'] = self.get_stale_time()
             host['reporter'] = 'yupana'
             host['facts'] = host_facts
