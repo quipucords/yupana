@@ -63,6 +63,9 @@ def kafka_ssl_config():
             ssl_config['ssl_context'] = create_ssl_context(
                 cafile=KAFKA_BROKER.cacert
             )
+        else:
+            ssl_config['ssl_context'] = create_ssl_context()
+
         if KAFKA_BROKER.sasl and KAFKA_BROKER.sasl.username:
             ssl_config.update({
                 "security_protocol": KAFKA_BROKER.sasl.securityProtocol,
