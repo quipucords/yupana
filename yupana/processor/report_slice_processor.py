@@ -409,15 +409,13 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         """Remove mac_addresses for omitted nics."""
         mac_addresses = host.get('mac_addresses')
         len_of_mac_addrs_to_omit = len(mac_addresses_to_omit)
-        if mac_addresses is None or len_of_mac_addrs_to_omit == 0:
-            return [host, transformed_obj]
-        if mac_addresses:
-            host['mac_addresses'] = list(
-                set(mac_addresses) - set(mac_addresses_to_omit))
-            transformed_obj['removed'].append(
-                'omit mac_addresses for omitted nics')
+        if not mac_addresses or len_of_mac_addrs_to_omit == 0:
             return [host, transformed_obj]
 
+        host['mac_addresses'] = list(
+            set(mac_addresses) - set(mac_addresses_to_omit))
+        transformed_obj['removed'].append(
+            'omit mac_addresses for omitted nics')
         return [host, transformed_obj]
 
     def _transform_network_interfaces(
@@ -434,7 +432,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         for nic in network_interfaces:
             if nic.get('name'):
                 lowercase_name = nic['name'].lower()
-                if any(map(lowercase_name.__contains__,
+                if any(map(lowercase_name.startswith,
                            NETWORK_INTERFACES_TOKENS_TO_OMIT)):
                     mac_addresses_to_omit.append(nic.get('mac_address'))
                     continue

@@ -872,7 +872,7 @@ class ReportSliceProcessorTests(TestCase):
                     {'ipv4_addresses': ['192.168.10.10'], 'ipv6_addresses': [],
                      'mac_address': 'value', 'name': 'cali916c8937279'},
                     {'ipv4_addresses': ['192.168.10.11'], 'ipv6_addresses': [],
-                     'mac_address': 'test', 'name': 'test'},
+                     'mac_address': 'test', 'name': 'testcali'},
                 ]
             }}
 
@@ -886,7 +886,7 @@ class ReportSliceProcessorTests(TestCase):
                     'network_interfaces': [
                         {'ipv4_addresses': ['192.168.10.11'],
                          'ipv6_addresses': [],
-                         'mac_address': 'test', 'name': 'test'}]
+                         'mac_address': 'test', 'name': 'testcali'}]
                 }})
 
     def test_remove_empty_strings_in_ipv6_addresses(self):
