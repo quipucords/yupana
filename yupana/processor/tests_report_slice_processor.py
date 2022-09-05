@@ -860,6 +860,35 @@ class ReportSliceProcessorTests(TestCase):
                 }
             })
 
+    def test_omit_nic_with_cali_and_mac_address(self):
+        """Test to omit network_interface when name including 'cali'."""
+        # respective mac_address value from mac_addresses.
+        host = {
+            'mac_addresses': ['value', 'test'],
+            'system_profile': {
+                'network_interfaces': [
+                    {'ipv4_addresses': [], 'ipv6_addresses': [], 'name': ''},
+                    {'ipv4_addresses': [], 'ipv6_addresses': []},
+                    {'ipv4_addresses': ['192.168.10.10'], 'ipv6_addresses': [],
+                     'mac_address': 'value', 'name': 'cali916c8937279'},
+                    {'ipv4_addresses': ['192.168.10.11'], 'ipv6_addresses': [],
+                     'mac_address': 'test', 'name': 'testcali'},
+                ]
+            }}
+
+        host = self.processor._transform_single_host(
+            self.report_record.request_id, '123', host
+        )
+        self.assertEqual(
+            host, {
+                'mac_addresses': ['test'],
+                'system_profile': {
+                    'network_interfaces': [
+                        {'ipv4_addresses': ['192.168.10.11'],
+                         'ipv6_addresses': [],
+                         'mac_address': 'test', 'name': 'testcali'}]
+                }})
+
     def test_remove_empty_strings_in_ipv6_addresses(self):
         """Test to verify transformation for 'ipv6 addresses' in host."""
         ipv6_address = '2021:0db8:85a3:0000:0000:8a2e:0370:7335'

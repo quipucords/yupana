@@ -62,6 +62,7 @@ OS_RELEASE_PATTERN = re.compile(
 OS_VS_ENUM = {'Red Hat': 'RHEL', 'CentOS': 'CentOS'}
 PROCESSOR_NAME = 'report_slice_processor'
 TRANSFORMED_DICT = dict({'removed': [], 'modified': [], 'missing_data': []})
+NETWORK_INTERFACES_TOKENS_TO_OMIT = ['cali']
 
 
 class RetryUploadTimeException(Exception):
@@ -412,14 +413,43 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
 
         return [host, transformed_obj]
 
+    @staticmethod
+    def _remove_mac_addresses_for_omitted_nics(
+            host: dict, mac_addresses_to_omit: list,
+            transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
+        """Remove mac_addresses for omitted nics."""
+        mac_addresses = host.get('mac_addresses')
+        len_of_mac_addrs_to_omit = len(mac_addresses_to_omit)
+        if not mac_addresses or len_of_mac_addrs_to_omit == 0:
+            return [host, transformed_obj]
+
+        host['mac_addresses'] = list(
+            set(mac_addresses) - set(mac_addresses_to_omit))
+        transformed_obj['removed'].append(
+            'omit mac_addresses for omitted nics')
+        return [host, transformed_obj]
+
     def _transform_network_interfaces(
             self, host: dict, transformed_obj=copy.deepcopy(TRANSFORMED_DICT)):
         """Transform 'system_profile.network_interfaces[]."""
         system_profile = host.get('system_profile', {})
         network_interfaces = system_profile.get('network_interfaces')
+
         if not network_interfaces:
             return [host, transformed_obj]
-        filtered_nics = list(filter(lambda nic: nic.get('name'), network_interfaces))
+
+        mac_addresses_to_omit = []
+        filtered_nics = []
+        for nic in network_interfaces:
+            if nic.get('name'):
+                lowercase_name = nic['name'].lower()
+                if any(map(lowercase_name.startswith,
+                           NETWORK_INTERFACES_TOKENS_TO_OMIT)):
+                    mac_addresses_to_omit.append(nic.get('mac_address'))
+                    continue
+                filtered_nics.append(nic)
+        host, transformed_obj = self._remove_mac_addresses_for_omitted_nics(
+            host, mac_addresses_to_omit, transformed_obj)
         increment_counts = {
             'mtu': 0,
             'ipv6_addresses': 0
