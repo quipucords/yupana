@@ -60,8 +60,10 @@ def kafka_ssl_config():
     ssl_config = {}
     if KAFKA_BROKER:
         if KAFKA_BROKER.cacert:
+            with open('/tmp/cacert', 'w') as f:
+                f.write(KAFKA_BROKER.cacert)
             ssl_config['ssl_context'] = create_ssl_context(
-                cafile=KAFKA_BROKER.cacert
+                cafile="/tmp/cacert"
             )
         else:
             ssl_config['ssl_context'] = create_ssl_context()
