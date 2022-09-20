@@ -98,11 +98,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         self.producer = AIOKafkaProducer(
             loop=SLICE_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS,
             max_request_size=KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE,
-            security_protocol=self.kafka_ssl.get('security_protocol', 'PLAINTEXT'),
-            ssl_context=self.kafka_ssl.get('ssl_context', None),
-            sasl_mechanism=self.kafka_ssl.get('sasl_mechanism', 'PLAIN'),
-            sasl_plain_username=self.kafka_ssl.get('sasl_plain_username', None),
-            sasl_plain_password=self.kafka_ssl.get('sasl_plain_password', None)
+            **self.kafka_ssl
         )
         super().__init__(pre_delegate=self.pre_delegate,
                          state_functions=state_functions,
@@ -581,11 +577,7 @@ class ReportSliceProcessor(AbstractProcessor):  # pylint: disable=too-many-insta
         self.producer = AIOKafkaProducer(
             loop=SLICE_PROCESSING_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS,
             max_request_size=KAFKA_PRODUCER_OVERRIDE_MAX_REQUEST_SIZE,
-            security_protocol=self.kafka_ssl.get('security_protocol', 'PLAINTEXT'),
-            ssl_context=self.kafka_ssl.get('ssl_context', None),
-            sasl_mechanism=self.kafka_ssl.get('sasl_mechanism', 'PLAIN'),
-            sasl_plain_username=self.kafka_ssl.get('sasl_plain_username', None),
-            sasl_plain_password=self.kafka_ssl.get('sasl_plain_password', None)
+            **self.kafka_ssl
         )
         try:
             await self.producer.start()

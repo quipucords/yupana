@@ -70,10 +70,10 @@ def kafka_ssl_config():
 
         if KAFKA_BROKER.sasl and KAFKA_BROKER.sasl.username:
             ssl_config.update({
-                "security_protocol": KAFKA_BROKER.sasl.securityProtocol,
-                "sasl_mechanism": KAFKA_BROKER.sasl.saslMechanism,
-                "sasl_plain_username": KAFKA_BROKER.sasl.username,
-                "sasl_plain_password": KAFKA_BROKER.sasl.password,
+                "security_protocol": getattr(KAFKA_BROKER.sasl, 'securityProtocol', 'PLAINTEXT'),
+                "sasl_mechanism": getattr(KAFKA_BROKER.sasl, 'saslMechanism', 'PLAIN'),
+                "sasl_plain_username": getattr(KAFKA_BROKER.sasl, 'username', None),
+                "sasl_plain_password": getattr(KAFKA_BROKER.sasl, 'password', None),
             })
     return ssl_config
 
