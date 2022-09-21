@@ -89,11 +89,7 @@ class ReportConsumer():
             QPC_TOPIC,
             loop=UPLOAD_REPORT_CONSUMER_LOOP, bootstrap_servers=INSIGHTS_KAFKA_ADDRESS,
             group_id='qpc-group', enable_auto_commit=False,
-            security_protocol=kafka_ssl.get('security_protocol', 'PLAINTEXT'),
-            ssl_context=kafka_ssl.get('ssl_context', None),
-            sasl_mechanism=kafka_ssl.get('sasl_mechanism', 'PLAIN'),
-            sasl_plain_username=kafka_ssl.get('sasl_plain_username', None),
-            sasl_plain_password=kafka_ssl.get('sasl_plain_password', None)
+            **kafka_ssl
         )
 
     @KAFKA_ERRORS.count_exceptions()

@@ -60,18 +60,20 @@ def kafka_ssl_config():
     ssl_config = {}
     if KAFKA_BROKER:
         if KAFKA_BROKER.cacert:
+            with open('/tmp/cacert', 'w') as f:
+                f.write(KAFKA_BROKER.cacert)
             ssl_config['ssl_context'] = create_ssl_context(
-                cafile=KAFKA_BROKER.cacert
+                cafile="/tmp/cacert"
             )
         else:
             ssl_config['ssl_context'] = create_ssl_context()
 
         if KAFKA_BROKER.sasl and KAFKA_BROKER.sasl.username:
             ssl_config.update({
-                "security_protocol": KAFKA_BROKER.sasl.securityProtocol,
-                "sasl_mechanism": KAFKA_BROKER.sasl.saslMechanism,
-                "sasl_plain_username": KAFKA_BROKER.sasl.username,
-                "sasl_plain_password": KAFKA_BROKER.sasl.password,
+                "security_protocol": getattr(KAFKA_BROKER.sasl, 'securityProtocol', 'PLAINTEXT'),
+                "sasl_mechanism": getattr(KAFKA_BROKER.sasl, 'saslMechanism', 'PLAIN'),
+                "sasl_plain_username": getattr(KAFKA_BROKER.sasl, 'username', None),
+                "sasl_plain_password": getattr(KAFKA_BROKER.sasl, 'password', None),
             })
     return ssl_config
 
