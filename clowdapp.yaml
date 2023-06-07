@@ -62,7 +62,68 @@ objects:
         partitions: 1
       - topicName: platform.upload.validation
         partitions: 1
-
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: subscriptions-db-cleaner-config
+  data:
+    clean.sh: |
+      cat /subscriptions-db-cleaner/clean.sql | psql > /dev/null
+    clean.sql: |
+      DELETE FROM api_reportslicearchive;
+      DELETE FROM api_reportarchive;
+      DELETE FROM api_reportslice;
+      DELETE FROM api_report;
+- apiVersion: batch/v1
+  kind: CronJob
+  metadata:
+    name: subscriptions-db-cleaner-cronjob
+  spec:
+    schedule: ${DB_CLEANER_SCHEDULE}
+    suspend: ${{DISABLE_DB_CLEANER}}
+    concurrencyPolicy: Forbid
+    jobTemplate:
+      spec:
+        template:
+          spec:
+            restartPolicy: Never
+            volumes:
+            - name: subscriptions-db-cleaner-volume
+              configMap:
+                name: subscriptions-db-cleaner-config
+            containers:
+            - name: subscriptions-db-cleaner
+              image: quay.io/cloudservices/postgresql-rds:12-1
+              restartPolicy: Never
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 100Mi
+                limits:
+                  cpu: 200m
+                  memory: 200Mi
+              volumeMounts:
+              - name: subscriptions-db-cleaner-volume
+                mountPath: /subscriptions-db-cleaner
+              command: ['sh', '/subscriptions-db-cleaner/clean.sh']
+              env:
+              - name: PGHOST
+                valueFrom:
+                  secretKeyRef:
+                    name: subscriptions
+                    key: ${DB_SECRET_HOSTNAME_KEY}
+              - name: PGDATABASE
+                value: ${DB_NAME}
+              - name: PGUSER
+                valueFrom:
+                  secretKeyRef:
+                    name: subscriptions
+                    key: ${DB_SECRET_USERNAME_KEY}
+              - name: PGPASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: subscriptions
+                    key: ${DB_SECRET_PASSWORD_KEY}
 parameters:
 - description : ClowdEnvironment name
   name: ENV_NAME
@@ -77,6 +138,24 @@ parameters:
 - description: Image tag
   name: IMAGE_TAG
   required: true
+- name: DB_CLEANER_SCHEDULE
+  description: Execution time specified in cron format
+  value: "*/10 * * * *"
+- name: DB_NAME
+  description: Database name used by the notifications-db-cleaner CronJob
+  value: notifications_backend
+- name: DB_SECRET_HOSTNAME_KEY
+  description: Key of the hostname field in the notifications-backend-db secret
+  value: db.host
+- name: DB_SECRET_PASSWORD_KEY
+  description: Key of the password field in the notifications-backend-db secret
+  value: db.password
+- name: DB_SECRET_USERNAME_KEY
+  description: Key of the username field in the notifications-backend-db secret
+  value: db.user
+- name: DISABLE_DB_CLEANER
+  description: Should the DB cleaner CronJob be disabled?
+  value: "false"
 - description: Initial cpu request.
   displayName: CPU Request
   name: CPU_REQUEST
