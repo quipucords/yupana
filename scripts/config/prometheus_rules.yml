@@ -1,0 +1,10 @@
+groups:
+  - name: alerting_rules
+    rules:
+      - alert: YupanaProcessorDead
+        expr: rate(yupana_processor_dead_total[5m]) > 0
+        labels:
+          severity: major
+        annotations:
+          summary: "Yupana processor dead"
+          description: "Yupana processor dead."

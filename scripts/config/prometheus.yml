@@ -20,4 +20,7 @@ scrape_configs:
       # for docker versions under 18.03 onwards you can use host.docker.internal
       # to point at your localhost from the container
       # for version 17.06 - 18.03 we use docker.for.mac.localhost
-      - targets: ['docker.for.mac.localhost:8001'] # Uses /metrics by default
+      - targets: ['docker.for.mac.localhost:8001','172.17.0.1:8001'] # Uses /metrics by default
+
+rule_files:
+  - "prometheus_rules.yml"

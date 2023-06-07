@@ -33,4 +33,5 @@ services:
           - '9090:9090'
       volumes:
           - './scripts/config/prometheus.yml:/etc/prometheus/prometheus.yml'
+          - './scripts/config/prometheus_rules.yml:/etc/prometheus/prometheus_rules.yml'
       image: prom/prometheus
